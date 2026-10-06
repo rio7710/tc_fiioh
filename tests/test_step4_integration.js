@@ -263,10 +263,13 @@ assert.equal(payload.video_pan_x, 0.6, 'video_pan_x should convert back to 0..1 
 assert.equal(payload.scene_dissolve_seconds, 1.0, 'scene_dissolve_seconds preserved');
 assert.deepEqual(payload.platforms, ['youtube', 'threads'], 'platforms list should match configured effective settings');
 
-// Verify getSceneCropPositions deep copy export
+// Verify setSceneCropPositions & getSceneCropPositions deep copy export
 assert.equal(typeof Step04VideoEditor.getSceneCropPositions, 'function', 'getSceneCropPositions must be exported');
+assert.equal(typeof Step04VideoEditor.setSceneCropPositions, 'function', 'setSceneCropPositions must be exported');
+Step04VideoEditor.setSceneCropPositions({ sc1: { '9x16': 65 } });
 const cropPositions = Step04VideoEditor.getSceneCropPositions();
 assert.equal(typeof cropPositions, 'object', 'getSceneCropPositions should return an object');
+assert.deepEqual(cropPositions.sc1, { '9x16': 65 }, 'setSceneCropPositions should populate crop positions');
 
-console.log('✓ Phase 3 settings configuration, unit conversion, and payload wrapping tests passed');
+console.log('✓ Phase 3 & 4 settings configuration, unit conversion, and payload wrapping tests passed');
 console.log('✓ Strict lifecycle, pre-partial safety, and post-partial init tests passed');

@@ -168,6 +168,12 @@
     }
   }
 
+  function setSceneCropPositions(positions) {
+    if (positions && typeof positions === 'object') {
+      sceneCropPositions = JSON.parse(JSON.stringify(positions));
+    }
+  }
+
   function getSceneCropPositions() {
     return JSON.parse(JSON.stringify(sceneCropPositions || {}));
   }
@@ -776,6 +782,7 @@
     getSceneDissolveSeconds: () => sceneDissolveSeconds,
     getEffectiveSettingsPayload: getEffectiveSettingsPayload,
     getSceneCropPositions: getSceneCropPositions,
+    setSceneCropPositions: setSceneCropPositions,
     initStep4UI: initStep4UI,
     isInitialized: () => isStep4Initialized,
     applyTimeline: applyTimeline,
