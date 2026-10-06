@@ -29,6 +29,7 @@
   let configuredSettings = null;
   let configuredCatalog = null;
   let sceneDissolveSeconds = 0.5;
+  let currentVolume = 0.5;
 
   function fmt(seconds) {
     return MobileSync ? MobileSync.formatTime(seconds) : '00:00';
@@ -92,6 +93,36 @@
     }
     if (settings && typeof settings === 'object') {
       configuredSettings = settings;
+      if (settings.type !== undefined) currentType = settings.type;
+      if (settings.music !== undefined) selectedMusic = settings.music;
+      if (settings.preview_platform !== undefined || settings.previewPlatform !== undefined) {
+        currentPreviewPlatform = settings.preview_platform || settings.previewPlatform;
+      }
+      if (Array.isArray(settings.platforms)) {
+        selectedPlatforms.clear();
+        settings.platforms.forEach(p => selectedPlatforms.add(p));
+      }
+      const rawVolume = settings.volume;
+      if (rawVolume !== undefined) {
+        currentVolume = Number.isFinite(Number(rawVolume)) ? Math.max(0, Math.min(1, Number(rawVolume))) : 0.5;
+      }
+      const rawPan = settings.video_pan_x !== undefined ? settings.video_pan_x : settings.videoPanX;
+      if (Number.isFinite(Number(rawPan))) {
+        const numPan = Number(rawPan);
+        const panPercent = numPan <= 1.0 ? numPan * 100 : numPan;
+        videoPanX = RatioProfiles ? RatioProfiles.clampVideoPan(panPercent) : Math.max(0, Math.min(100, panPercent));
+      }
+      const rawDissolve = settings.scene_dissolve_seconds !== undefined ? settings.scene_dissolve_seconds : settings.sceneDissolveSeconds;
+      if (Number.isFinite(Number(rawDissolve))) {
+        sceneDissolveSeconds = Math.max(0, Math.min(3, Number(rawDissolve)));
+      }
+      const rawCaptionSize = settings.caption_size !== undefined ? settings.caption_size : settings.captionSize;
+      if (Number.isFinite(Number(rawCaptionSize))) {
+        captionSizeLevel = Math.max(-5, Math.min(5, Number(rawCaptionSize)));
+      }
+      if (settings.narration !== undefined) {
+        narrationEnabled = Boolean(settings.narration);
+      }
       restoreEditorSettings(settings);
     }
     return { settings: configuredSettings, catalog: configuredCatalog };
@@ -99,11 +130,11 @@
 
   function getEffectiveSettingsPayload() {
     const musicVolume = typeof document !== 'undefined' ? document.querySelector('#musicVolume') : null;
-    const volumeNum = musicVolume ? Number(musicVolume.value) : 0.5;
+    const vol = musicVolume ? Number(musicVolume.value) : currentVolume;
     return {
       type: currentType,
       music: selectedMusic,
-      volume: Number.isFinite(volumeNum) ? Math.max(0, Math.min(1, volumeNum)) : 0.5,
+      volume: Number.isFinite(vol) ? Math.max(0, Math.min(1, vol)) : 0.5,
       narration: narrationEnabled,
       preview_platform: currentPreviewPlatform,
       platforms: Array.from(selectedPlatforms),
@@ -222,8 +253,10 @@
 
     const musicVolume = hasDoc ? document.querySelector('#musicVolume') : null;
     const rawVolume = source.volume;
-    const volumeNum = Number.isFinite(Number(rawVolume)) ? Math.max(0, Math.min(1, Number(rawVolume))) : 0.5;
-    if (musicVolume) musicVolume.value = String(volumeNum);
+    if (rawVolume !== undefined) {
+      currentVolume = Number.isFinite(Number(rawVolume)) ? Math.max(0, Math.min(1, Number(rawVolume))) : 0.5;
+    }
+    if (musicVolume) musicVolume.value = String(currentVolume);
 
     const rawPan = source.video_pan_x !== undefined ? source.video_pan_x : source.videoPanX;
     let panPercent = 50;
@@ -707,6 +740,7 @@
     const musicVolume = document.querySelector('#musicVolume');
     if (musicVolume) {
       musicVolume.addEventListener('input', () => {
+        currentVolume = Number(musicVolume.value);
         saveEditorSettings();
         persistRenderSettings();
       });
