@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://thinkcast.example/schemas/unified-content-production.schema.json",
+  "title": "ThinkCast unified content production document",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "document_id", "project", "concept_variants", "selected_variant_id", "production", "provenance"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "document_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]+$"},
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "brand", "purpose", "audience", "selected_keywords", "aspect_ratio", "resolution"],
+      "properties": {
+        "title": {"type": "string", "minLength": 1},
+        "brand": {"type": "string", "const": "생각담 | ThinkCast"},
+        "purpose": {"type": "string", "minLength": 1},
+        "audience": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "selected_keywords": {
+          "description": "STEP 02에서 사용자가 선택한 1~5개의 주제 키워드. 이후 컨셉, 메시지, 장면과 내레이션 생성의 필수 입력이다.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "aspect_ratio": {"enum": ["16:9", "9:16", "4:5"]},
+        "resolution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": {"type": "integer", "minimum": 1},
+            "height": {"type": "integer", "minimum": 1}
+          }
+        }
+      }
+    },
+    "concept_variants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "theme", "lead", "story_method", "visual_tone", "core_message", "keywords", "source"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^concept-[0-9]{2}$"},
+          "title": {"type": "string", "minLength": 1},
+          "theme": {"type": "string", "minLength": 1},
+          "lead": {"type": "string", "minLength": 1},
+          "story_method": {"type": "string", "minLength": 1},
+          "visual_tone": {"type": "string", "minLength": 1},
+          "core_message": {"type": "string", "minLength": 1},
+          "keywords": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+          "source": {"enum": ["provided", "ai_inferred"]}
+        }
+      }
+    },
+    "selected_variant_id": {"type": ["string", "null"], "pattern": "^concept-[0-9]{2}$"},
+    "production": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/production"}
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_files", "ai_additions_marked", "notes"],
+      "properties": {
+        "source_files": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "ai_additions_marked": {"type": "boolean", "const": true},
+        "notes": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  },
+  "$defs": {
+    "sourcedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "source"],
+      "properties": {
+        "text": {"type": "string"},
+        "source": {"enum": ["provided", "ai_inferred"]}
+      }
+    },
+    "production": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference_assets", "continuity", "global_prompts", "timing_policy", "timeline", "narration_cues", "postproduction", "output"],
+      "properties": {
+        "reference_assets": {
+          "type": "array",
+          "description": "사용자가 제공한 인물·장소·스타일 기준 이미지. 생성 프롬프트는 ID로 이를 참조한다.",
+          "items": {"$ref": "#/$defs/referenceAsset"}
+        },
+        "continuity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["characters", "locations", "props"],
+          "properties": {
+            "characters": {"type": "array", "items": {"$ref": "#/$defs/sourcedText"}},
+            "locations": {"type": "array", "items": {"$ref": "#/$defs/sourcedText"}},
+            "props": {"type": "array", "items": {"$ref": "#/$defs/sourcedText"}}
+          }
+        },
+        "global_prompts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["style", "negative"],
+          "properties": {"style": {"$ref": "#/$defs/sourcedText"}, "negative": {"$ref": "#/$defs/sourcedText"}}
+        },
+        "timing_policy": {"$ref": "#/$defs/timingPolicy"},
+        "timeline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["duration_source", "scenes"],
+          "properties": {
+            "duration_source": {"const": "timeline.scenes[-1].end"},
+            "scenes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/scene"}}
+          }
+        },
+        "narration_cues": {
+          "type": "array",
+          "minItems": 1,
+          "description": "하나의 내레이션이 한 개 이상의 연속 장면을 덮을 수 있는 프로젝트 시간축 큐",
+          "items": {"$ref": "#/$defs/narrationCue"}
+        },
+        "postproduction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["captions", "voice", "bgm", "transitions"],
+          "properties": {
+            "captions": {"$ref": "#/$defs/sourcedText"},
+            "voice": {"$ref": "#/$defs/sourcedText"},
+            "bgm": {"$ref": "#/$defs/sourcedText"},
+            "transitions": {"$ref": "#/$defs/sourcedText"}
+          }
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["video_codec", "audio_codec", "pixel_format", "faststart"],
+          "properties": {
+            "video_codec": {"const": "h264"},
+            "audio_codec": {"const": "aac"},
+            "pixel_format": {"const": "yuv420p"},
+            "faststart": {"const": true}
+          }
+        }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "start", "end", "media_type", "source_media", "reference_ids", "characters", "narration_cue_ids", "sequence", "image_prompt", "camera", "lighting", "motion_prompt", "transition"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^scene-[0-9]{2,}$"},
+        "title": {"type": "string", "minLength": 1},
+        "start": {"type": "number", "minimum": 0},
+        "end": {"type": "number", "exclusiveMinimum": 0},
+        "media_type": {"enum": ["image", "video"]},
+        "source_media": {"type": ["string", "null"]},
+        "reference_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^ref-[a-z0-9_-]+$"}},
+        "characters": {"type": "array", "items": {"type": "string"}},
+        "narration_cue_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^narration-[0-9]{2,}$"}},
+        "sequence": {"$ref": "#/$defs/sequenceContinuity"},
+        "narration": {"$ref": "#/$defs/sourcedText"},
+        "caption": {
+          "description": "현재 운영 단계에서는 같은 장면 narration.text와 완전히 동일해야 하는 화면 자막",
+          "$ref": "#/$defs/sourcedText"
+        },
+        "image_prompt": {"$ref": "#/$defs/sourcedText"},
+        "camera": {"$ref": "#/$defs/sourcedText"},
+        "lighting": {"$ref": "#/$defs/sourcedText"},
+        "motion_prompt": {"$ref": "#/$defs/sourcedText"},
+        "transition": {"$ref": "#/$defs/sourcedText"}
+      }
+    },
+    "narrationCue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "start", "end", "scene_ids", "narration", "caption", "timing_source", "estimated_duration_seconds", "measured_duration_seconds", "audio_uri"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^narration-[0-9]{2,}$"},
+        "start": {"type": "number", "minimum": 0},
+        "end": {"type": "number", "exclusiveMinimum": 0},
+        "scene_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^scene-[0-9]{2,}$"}},
+        "narration": {"$ref": "#/$defs/sourcedText"},
+        "caption": {"$ref": "#/$defs/sourcedText"}
+        ,"timing_source": {"enum": ["estimated_speech_rate", "tts_measured_duration"]}
+        ,"estimated_duration_seconds": {"type": "number", "exclusiveMinimum": 0}
+        ,"measured_duration_seconds": {"type": ["number", "null"], "exclusiveMinimum": 0}
+        ,"audio_uri": {"type": ["string", "null"]}
+      }
+    },
+    "timingPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["planning_source", "final_source", "estimated_characters_per_second", "reconciliation"],
+      "properties": {
+        "planning_source": {"const": "estimated_speech_rate"},
+        "final_source": {"const": "tts_measured_duration"},
+        "estimated_characters_per_second": {"type": "number", "minimum": 3, "maximum": 8},
+        "reconciliation": {"const": "retime_timeline_narration_captions_transitions_and_export"}
+      }
+    },
+    "sequenceContinuity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["continuity_from", "entry_action", "exit_action", "camera_motion", "camera_bridge", "continuity_anchor", "character_blocking", "camera_axis_transition"],
+      "properties": {
+        "continuity_from": {"type": ["string", "null"]},
+        "entry_action": {"type": "string", "minLength": 1},
+        "exit_action": {"type": "string", "minLength": 1},
+        "camera_motion": {"enum": ["fixed", "zoom_in", "zoom_out", "dolly_in", "dolly_out", "pan", "tilt", "tracking", "match_cut", "cutaway"]},
+        "camera_bridge": {"type": "string", "minLength": 1},
+        "continuity_anchor": {"type": "string", "minLength": 1},
+        "character_blocking": {"type": "string", "minLength": 1},
+        "camera_axis_transition": {"enum": ["establish", "same_side", "motivated_cross"]}
+      }
+    },
+    "referenceAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "uri", "status", "usage"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^ref-[a-z0-9_-]+$"},
+        "kind": {"enum": ["character", "location", "style"]},
+        "uri": {"type": ["string", "null"]},
+        "status": {"enum": ["pending", "ready"]},
+        "usage": {"type": "string", "minLength": 1}
+        ,"character_id": {"type": "string", "pattern": "^character-[a-z0-9_-]+$"}
+        ,"display_name": {"type": "string", "minLength": 1}
+        ,"identity_group": {"type": "string", "minLength": 1}
+        ,"appearance_lock": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

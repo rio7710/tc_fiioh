@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: greenhill-content-demo
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: P1_NO_BROWSER
+        value: "1"
+      - key: RENDER_PRESET
+        value: ultrafast
+      - key: FFMPEG_THREADS
+        value: "1"

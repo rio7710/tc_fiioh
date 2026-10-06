@@ -1,0 +1,20 @@
+FROM python:3.13-slim
+
+RUN groupadd -g 10001 appuser \
+    && useradd -u 10001 -g appuser -m -s /bin/bash appuser \
+    && mkdir -p /data /app \
+    && chown -R appuser:appuser /data /app
+
+WORKDIR /app
+
+COPY --chown=appuser:appuser 01_app /app/01_app
+COPY --chown=appuser:appuser contracts /app/contracts
+COPY --chown=appuser:appuser tools/validate_json_schema.py /app/tools/validate_json_schema.py
+
+ENV DATA_DIR=/data
+ENV SQLITE_PATH=/data/tc.sqlite
+ENV WORKER_HEALTH_PATH=/data/worker_health.json
+
+USER appuser
+
+CMD ["python", "01_app/worker.py"]

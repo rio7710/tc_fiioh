@@ -1,0 +1,13 @@
+**/__pycache__
+**/*.pyc
+.git
+.gitignore
+.openai
+.imports
+02_media/video/source_clips
+02_media/video/P1_merged_titles.mp4
+03_docs
+04_exports
+05_archive
+P1_미리보기_및_변환_실행.bat
+README_폴더안내.md

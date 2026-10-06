@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kling API 실험실 · 생각담</title>
+  <style>
+    :root{--green:#174f48;--deep:#0b302c;--paper:#f3efe7;--card:#fffaf0;--line:#cfc4b2;--gold:#dbc49b;--ink:#252722;--danger:#93472f}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif}button,input,select,textarea{font:inherit}
+    header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px max(20px,calc((100% - 1180px)/2));background:var(--deep)}header img{width:min(265px,48vw)}header a{color:var(--gold);font-size:12px;font-weight:800;text-decoration:none}
+    main{width:min(1180px,calc(100% - 28px));margin:24px auto 50px}.intro{margin-bottom:16px;padding:20px 22px;border-radius:8px;background:var(--green);color:white}.intro small{color:var(--gold);font-weight:900;letter-spacing:.14em}.intro h1{margin:7px 0 5px;font-size:28px}.intro p{margin:0;color:#d7e3df;font-size:12px;line-height:1.6}
+    .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,.8fr);gap:16px}.grid[hidden]{display:none}.panel{padding:19px;border:1px solid var(--line);border-radius:7px;background:var(--card);box-shadow:4px 5px 0 #ded5c6}.panel h2{margin:0 0 15px;color:var(--deep);font-size:17px}.field{display:grid;gap:6px;margin-bottom:12px;color:#5c5549;font-size:11px;font-weight:850}.field input,.field select,.field textarea{width:100%;padding:10px;border:1px solid #bcae98;border-radius:4px;background:#fff;color:var(--ink)}.field textarea{min-height:120px;resize:vertical;line-height:1.55}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .warning{margin:0 0 16px;padding:14px 16px;border:2px solid #b44f32;border-radius:6px;background:#fff0e7;color:#7e2f1f;font-size:13px;font-weight:900;line-height:1.6}.warning strong{display:block;font-size:16px}.connection{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:16px}.connection .field{margin:0}.usage-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:16px}.usage-card{padding:12px;border:1px solid #9db7ae;border-radius:5px;background:#edf5f1;color:#315f52}.usage-card small{display:block;font-size:9px;font-weight:900}.usage-card strong{display:block;margin-top:4px;font-size:20px}.usage-card button{margin-top:5px;border:0;background:none;color:var(--green);font-size:10px;font-weight:900;cursor:pointer}.scene-preview,.generated-preview{display:block;width:100%;aspect-ratio:16/9;margin-bottom:13px;border:1px solid var(--line);border-radius:5px;background:#ded8ce;object-fit:cover}.generated-preview[hidden]{display:none}.artifact-link{display:block;margin:10px 0;padding:10px;border:1px solid #71998d;border-radius:4px;background:#edf5f1;color:var(--green);font-size:11px;font-weight:900;text-align:center}.artifact-link[hidden]{display:none}.use-generated{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:10px;border:1px solid #9db7ae;border-radius:4px;background:#edf5f1;color:var(--green);font-size:11px;font-weight:900}.use-generated input{width:17px;height:17px}.actions{display:flex;flex-wrap:wrap;gap:8px}.actions button{min-height:40px;padding:9px 14px;border:1px solid var(--green);border-radius:4px;background:white;color:var(--green);font-weight:900;cursor:pointer}.actions .primary{background:var(--green);color:white}.actions button:disabled{opacity:.5;cursor:wait}.status{min-height:43px;margin:14px 0 0;padding:10px;border:1px dashed #ae9b7e;background:#eee4d2;color:#61584b;font-size:11px;line-height:1.55}.status.error{color:var(--danger)}pre{min-height:240px;max-height:440px;overflow:auto;margin:0;padding:13px;border:1px solid var(--line);border-radius:4px;background:#172522;color:#dce8e3;font:11px/1.6 Consolas,monospace;white-space:pre-wrap;word-break:break-all}video{display:block;width:100%;margin-top:12px;border-radius:5px;background:#111}.note{margin:14px 0 0;color:#71685b;font-size:10px;line-height:1.6}
+    @media(max-width:780px){.grid{grid-template-columns:1fr}.two{grid-template-columns:1fr}.usage-bar{grid-template-columns:1fr 1fr}.intro h1{font-size:23px}.panel{padding:15px}}
+  </style>
+</head>
+<body>
+  <header><img src="/01_app/assets/brand/thinkcast-user-logo-inverse.png" alt="생각담 ThinkCast"><a href="/01_app/P1_title_design_preview.html">메인 데모로 돌아가기 →</a></header>
+  <main>
+    <section class="intro"><small>ISOLATED KLING PIPELINE HARNESS · LOCAL ONLY</small><h1>Kling API 파이프라인 실험실</h1><p>자연어 이미지 생성부터 이미지→영상 변환까지 실제 작업 흐름과 원문 상태를 확인합니다. 결과는 프로젝트에 자동 반영하지 않습니다.</p></section>
+    <aside class="warning" role="alert"><strong>주의 · 실제 토큰이 사용되는 페이지입니다.</strong>이미지 또는 영상 생성 버튼을 누르면 Kling 토큰이나 크레딧이 실제로 차감됩니다. 단순 호기심이나 불필요한 반복 테스트는 자제해 주세요.</aside>
+    <section class="panel connection"><label class="field">Kling 임시 API 키 · 환경변수 설정 시 생략 가능<input id="apiKey" type="password" autocomplete="off" placeholder="KLING_API_KEY"></label><div class="actions"><button id="connect" type="button">키 연결 확인 · 무료</button></div></section>
+    <section class="usage-bar" aria-label="Kling 실제 사용량">
+      <div class="usage-card"><small>이미지 잔여 Units</small><strong id="imageRemaining">—</strong></div>
+      <div class="usage-card"><small>영상 잔여 Units</small><strong id="videoRemaining">—</strong></div>
+      <div class="usage-card"><small>이번 이미지 차감</small><strong id="imageDeduction">0</strong></div>
+      <div class="usage-card"><small>이번 영상 차감</small><strong id="videoDeduction">0</strong><button id="usageRefresh" type="button">실제 잔량 새로고침</button></div>
+    </section>
+    <div class="grid" style="margin-bottom:16px">
+      <form class="panel" id="imageForm">
+        <h2>1단계 · 자연어 → 이미지</h2>
+        <div class="two">
+          <label class="field">이미지 모델<select id="imageModel"><option value="kling-v1">Kling Image v1 · 최저가 기본</option><option value="kling-v1-5">Kling Image 1.5</option><option value="kling-image-o1">Kling Image O1</option><option value="kling-image-3.0">Kling Image 3.0</option></select></label>
+          <label class="field">화면 비율<select id="imageRatio"><option value="16:9">16:9 · 영상용</option><option value="9:16">9:16 · 쇼츠</option><option value="1:1">1:1 · 정사각형</option></select></label>
+        </div>
+        <div class="two">
+          <label class="field">현재 씬 이미지 참고<select id="referenceMode"><option value="none">사용 안 함</option><option value="background">실사진 배경 고정 + 인물만 추가</option><option value="subject">캐릭터·의상 유지</option><option value="face">한 명의 얼굴 유지</option></select></label>
+          <label class="field">참조 강도<select id="referenceStrength" disabled><option value="0.35">약하게 · 35%</option><option value="0.55" selected>보통 · 55%</option><option value="0.75">강하게 · 75%</option></select></label>
+        </div>
+        <label class="field">자연어 이미지 프롬프트<textarea id="imagePrompt" maxlength="2500" placeholder="생성할 장면을 자연어로 입력하세요."></textarea></label>
+        <label class="field">네거티브 프롬프트<textarea id="imageNegative" maxlength="2500"></textarea></label>
+        <p class="warning"><strong>이미지 생성 전 확인</strong>실제 유료 요청입니다. 최저가 모델을 기본으로 선택했지만 계정 요금표를 확인해 주세요.</p>
+        <div class="actions"><button class="primary" id="imageGenerate" type="submit">실제 토큰 사용 · 이미지 생성</button><button id="imageRefresh" type="button" disabled>이미지 상태 조회</button></div>
+        <p class="status" id="imageStatus" role="status" aria-live="polite">프롬프트를 입력한 뒤 이미지 작업을 제출하세요.</p>
+      </form>
+      <section class="panel"><h2>1단계 결과</h2><pre id="imageOutput">아직 요청하지 않았습니다.</pre><a class="artifact-link" id="imageArtifact" href="#" download hidden>로컬 저장 이미지 열기·다운로드</a><img class="generated-preview" id="generatedPreview" alt="Kling 생성 이미지" hidden><div class="actions"><button class="primary" id="approveImage" type="button" disabled>이미지 확인 · 2단계로 이동</button></div></section>
+    </div>
+    <div class="grid" id="videoStage" hidden>
+      <form class="panel" id="labForm">
+        <h2>2단계 · 이미지 → 영상</h2>
+        <label class="use-generated"><input id="useGenerated" type="checkbox" disabled> 1단계 산출물 자동 연결 · 생성 이미지를 영상 입력으로 사용</label>
+        <label class="field">기준 씬<select id="scene"></select></label>
+        <img class="scene-preview" id="preview" alt="선택한 씬 미리보기">
+        <div class="two">
+          <label class="field">모델<select id="model"><option value="kling-v1-6">kling-v1-6</option><option value="kling-v2-master">kling-v2-master</option></select></label>
+          <label class="field">길이<select id="duration"><option value="5">5초 · 최소 테스트</option><option value="10">10초</option></select></label>
+        </div>
+        <label class="field">자연어 모션 프롬프트<textarea id="prompt" maxlength="2500"></textarea></label>
+        <label class="field">네거티브 프롬프트<textarea id="negative" maxlength="2500"></textarea></label>
+        <p class="warning"><strong>생성 전 확인</strong>아래 ‘영상 생성’ 버튼은 실제 유료 요청입니다. 필요한 씬과 프롬프트를 확인한 뒤 한 번만 실행해 주세요.</p>
+        <div class="actions"><button class="primary" id="generate" type="submit">실제 토큰 사용 · 영상 생성</button></div>
+        <p class="status" id="status" role="status" aria-live="polite">연결 확인은 크레딧을 사용하지 않습니다. 영상 생성 버튼은 Kling 크레딧을 사용할 수 있습니다.</p>
+        <p class="note">키는 브라우저 저장소에 저장하지 않으며 요청 직후 입력창에서 삭제합니다. 생성 작업은 비동기이므로 완료까지 시간이 걸릴 수 있습니다.</p>
+      </form>
+      <section class="panel">
+        <h2>작업 상태 및 원문 결과</h2>
+        <div class="actions" style="margin-bottom:10px"><button id="refresh" type="button" disabled>현재 상태 조회</button></div>
+        <pre id="output">아직 요청하지 않았습니다.</pre>
+        <a class="artifact-link" id="videoArtifact" href="#" download hidden>로컬 저장 영상 열기·다운로드</a>
+        <video id="resultVideo" controls hidden></video>
+      </section>
+    </div>
+  </main>
+  <script>
+    const form=document.querySelector('#labForm'),imageForm=document.querySelector('#imageForm'),keyInput=document.querySelector('#apiKey'),sceneSelect=document.querySelector('#scene'),preview=document.querySelector('#preview'),promptInput=document.querySelector('#prompt'),negativeInput=document.querySelector('#negative'),statusEl=document.querySelector('#status'),output=document.querySelector('#output'),refresh=document.querySelector('#refresh'),resultVideo=document.querySelector('#resultVideo'),imageStatus=document.querySelector('#imageStatus'),imageOutput=document.querySelector('#imageOutput'),imageRefresh=document.querySelector('#imageRefresh'),generatedPreview=document.querySelector('#generatedPreview'),useGenerated=document.querySelector('#useGenerated'),imageRemaining=document.querySelector('#imageRemaining'),videoRemaining=document.querySelector('#videoRemaining'),imageDeduction=document.querySelector('#imageDeduction'),videoDeduction=document.querySelector('#videoDeduction'),usageRefresh=document.querySelector('#usageRefresh'),imageArtifact=document.querySelector('#imageArtifact'),videoArtifact=document.querySelector('#videoArtifact'),referenceMode=document.querySelector('#referenceMode'),referenceStrength=document.querySelector('#referenceStrength'),imageModel=document.querySelector('#imageModel'),approveImage=document.querySelector('#approveImage'),videoStage=document.querySelector('#videoStage');
+    let demoData=null,taskId='',imageTaskId='',generatedImageUrl='',pollTimer=null,imagePollTimer=null;
+    async function request(url,options={}){const response=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.error||`요청 실패 (HTTP ${response.status})`);return body}
+    function setStatus(message,error=false){statusEl.textContent=message;statusEl.classList.toggle('error',error)}
+    function setImageStatus(message,error=false){imageStatus.textContent=message;imageStatus.classList.toggle('error',error)}
+    function units(value){return Number.isFinite(Number(value))?Number(value).toLocaleString('ko-KR',{maximumFractionDigits:4}):'—'}
+    function renderUsage(usage,kind=''){const account=usage?.account||usage||{},summary=account.summary||{};imageRemaining.textContent=units(summary.image?.remaining);videoRemaining.textContent=units(summary.video?.remaining);const deduction=usage?.task_deduction;if(deduction&&(!kind||kind==='image'))imageDeduction.textContent=units(deduction.image);if(deduction&&(!kind||kind==='video'))videoDeduction.textContent=units(deduction.video)}
+    function renderArtifact(link,artifact){if(!artifact?.uri)return;link.href=artifact.uri;link.hidden=false}
+    async function refreshUsage(){usageRefresh.disabled=true;try{const result=await request('/api/kling-lab/usage');renderUsage(result.usage)}catch(error){setImageStatus(`사용량 조회 실패 · ${error.message}`,true)}finally{usageRefresh.disabled=false}}
+    function selectedStoryboard(){return demoData?.storyboard?.scenes?.find(item=>item.scene_id===sceneSelect.value)}
+    function scenePreviewUrl(){return demoData.timeline.scenes.find(item=>item.id===sceneSelect.value)?.preview_uri||''}
+    function syncVideoInputPreview(){preview.src=useGenerated.checked&&generatedPreview.src?generatedPreview.src:scenePreviewUrl()}
+    function syncScene(){const story=selectedStoryboard();syncVideoInputPreview();promptInput.value=story?.motion_prompt||'';negativeInput.value=demoData.storyboard?.global_negative_prompt||'';if(!document.querySelector('#imagePrompt').value)document.querySelector('#imagePrompt').value=story?.scene_prompt||''}
+    async function load(){demoData=await request('/api/demo');sceneSelect.innerHTML=demoData.timeline.scenes.map((item,index)=>`<option value="${item.id}">${String(index+1).padStart(2,'0')} · ${item.name} · ${item.end-item.start}초</option>`).join('');document.querySelector('#imageNegative').value=demoData.storyboard?.global_negative_prompt||'';syncScene();await refreshUsage()}
+    sceneSelect.addEventListener('change',syncScene);
+    useGenerated.addEventListener('change',()=>{syncVideoInputPreview();setStatus(useGenerated.checked?'1단계 생성 이미지가 2단계 영상 입력으로 연결되었습니다.':'기존 씬 이미지가 2단계 영상 입력으로 선택되었습니다.')});
+    approveImage.addEventListener('click',()=>{useGenerated.disabled=false;useGenerated.checked=true;syncVideoInputPreview();videoStage.hidden=false;setImageStatus('이미지를 승인했습니다 · 2단계 영상 입력으로 전달했습니다.');setStatus('승인 이미지 연결 완료 · 모션 프롬프트를 확인한 뒤 영상 생성을 실행하세요.');videoStage.scrollIntoView({behavior:'smooth',block:'start'})});
+    referenceMode.addEventListener('change',()=>{const enabled=referenceMode.value!=='none';referenceStrength.disabled=!enabled;if(enabled){imageModel.value='kling-v1-5';setImageStatus('참조 이미지는 Kling Image 1.5로 생성됩니다. 얼굴 참고는 한 명의 얼굴만 있는 이미지에 사용하세요.')}});
+    imageModel.addEventListener('change',()=>{if(imageModel.value!=='kling-v1-5'&&referenceMode.value!=='none'){referenceMode.value='none';referenceStrength.disabled=true;setImageStatus('선택한 모델은 이 실험실의 참조 이미지 모드를 지원하지 않아 참고 옵션을 해제했습니다.')}});
+    document.querySelector('#connect').addEventListener('click',async()=>{const button=document.querySelector('#connect');button.disabled=true;setImageStatus('Kling API 인증을 확인하고 있습니다.');try{const result=await request('/api/kling-lab/connect',{method:'POST',body:JSON.stringify({api_key:keyInput.value.trim()})});setImageStatus(result.message);setStatus(result.message);await refreshUsage()}catch(error){setImageStatus(error.message,true);setStatus(error.message,true)}finally{keyInput.value='';button.disabled=false}});
+    imageForm.addEventListener('submit',async event=>{event.preventDefault();const button=document.querySelector('#imageGenerate');button.disabled=true;generatedPreview.hidden=true;imageArtifact.hidden=true;approveImage.disabled=true;videoStage.hidden=true;useGenerated.checked=false;useGenerated.disabled=true;syncVideoInputPreview();setImageStatus('Kling에 이미지 생성 작업을 제출하고 있습니다.');try{const result=await request('/api/kling-lab/image-generate',{method:'POST',body:JSON.stringify({api_key:keyInput.value.trim(),model_name:imageModel.value,aspect_ratio:document.querySelector('#imageRatio').value,scene_id:sceneSelect.value,reference_mode:referenceMode.value,reference_strength:Number(referenceStrength.value),prompt:document.querySelector('#imagePrompt').value.trim(),negative_prompt:document.querySelector('#imageNegative').value.trim()})});imageTaskId=result.trace.provider_task_id;imageOutput.textContent=JSON.stringify(result,null,2);renderUsage(result.usage,'image');imageRefresh.disabled=false;setImageStatus(`이미지 작업 접수 완료 · ${imageTaskId}`);scheduleImagePoll()}catch(error){setImageStatus(error.message,true);imageOutput.textContent='이미지 작업을 제출하지 못했습니다.'}finally{keyInput.value='';button.disabled=false}});
+    form.addEventListener('submit',async event=>{event.preventDefault();const button=document.querySelector('#generate');button.disabled=true;setStatus('Kling에 영상 생성 작업을 제출하고 있습니다.');resultVideo.hidden=true;videoArtifact.hidden=true;try{const result=await request('/api/kling-lab/generate',{method:'POST',body:JSON.stringify({api_key:keyInput.value.trim(),scene_id:sceneSelect.value,image_url:useGenerated.checked?generatedImageUrl:'',model_name:document.querySelector('#model').value,duration:document.querySelector('#duration').value,prompt:promptInput.value.trim(),negative_prompt:negativeInput.value.trim()})});taskId=result.trace.provider_task_id;output.textContent=JSON.stringify(result,null,2);renderUsage(result.usage,'video');refresh.disabled=false;setStatus(`영상 작업 접수 완료 · ${taskId}`);schedulePoll()}catch(error){setStatus(error.message,true);output.textContent='영상 작업을 제출하지 못했습니다.'}finally{keyInput.value='';button.disabled=false}});
+    function imageUrl(task){const images=task?.task_result?.images||task?.result?.images||task?.images||[];return images[0]?.url||images[0]?.image_url||task?.image_url||''}
+    function videoUrl(task){const videos=task?.task_result?.videos||task?.result?.videos||task?.videos||[];return videos[0]?.url||videos[0]?.video_url||task?.video_url||''}
+    async function checkImage(){if(!imageTaskId)return;imageRefresh.disabled=true;try{const result=await request(`/api/kling-lab/image-status?task_id=${encodeURIComponent(imageTaskId)}`);imageOutput.textContent=JSON.stringify(result.task,null,2);renderUsage(result.usage,'image');renderArtifact(imageArtifact,result.local_artifact);const state=result.task.task_status||result.task.status||'unknown';setImageStatus(`Kling 이미지 작업 상태 · ${state}`);const remoteUrl=imageUrl(result.task),previewUrl=result.local_artifact?.uri||remoteUrl;if(previewUrl){generatedImageUrl=remoteUrl;generatedPreview.src=previewUrl;generatedPreview.hidden=false;approveImage.disabled=false;setImageStatus('이미지 생성·로컬 저장 완료 · 결과를 확인하고 승인해 주세요.')}if(['succeed','succeeded','failed'].includes(state)){clearTimeout(imagePollTimer);imagePollTimer=null}else scheduleImagePoll()}catch(error){setImageStatus(error.message,true)}finally{imageRefresh.disabled=false}}
+    async function check(){if(!taskId)return;refresh.disabled=true;try{const result=await request(`/api/kling-lab/status?task_id=${encodeURIComponent(taskId)}`);output.textContent=JSON.stringify(result.task,null,2);renderUsage(result.usage,'video');renderArtifact(videoArtifact,result.local_artifact);const state=result.task.task_status||result.task.status||'unknown';setStatus(`Kling 작업 상태 · ${state}`);const url=result.local_artifact?.uri||videoUrl(result.task);if(url){resultVideo.src=url;resultVideo.hidden=false;setStatus('영상 생성·로컬 저장 완료')}if(['succeed','succeeded','failed'].includes(state)){clearTimeout(pollTimer);pollTimer=null}else schedulePoll()}catch(error){setStatus(error.message,true)}finally{refresh.disabled=false}}
+    function schedulePoll(){clearTimeout(pollTimer);pollTimer=setTimeout(check,5000)}
+    function scheduleImagePoll(){clearTimeout(imagePollTimer);imagePollTimer=setTimeout(checkImage,5000)}
+    imageRefresh.addEventListener('click',checkImage);
+    refresh.addEventListener('click',check);
+    usageRefresh.addEventListener('click',refreshUsage);
+    load().catch(error=>setStatus(error.message,true));
+  </script>
+</body>
+</html>

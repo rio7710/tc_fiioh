@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "summary": {"type": "string"},
+    "risk_level": {"enum": ["low", "medium", "high"]},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "severity": {"enum": ["info", "warning", "error"]},
+          "file": {"type": "string"},
+          "message": {"type": "string"}
+        },
+        "required": ["severity", "file", "message"]
+      }
+    },
+    "recommended_checks": {"type": "array", "items": {"type": "string"}}
+  },
+  "required": ["summary", "risk_level", "findings", "recommended_checks"]
+}

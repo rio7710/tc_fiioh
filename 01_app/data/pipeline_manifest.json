@@ -1,0 +1,162 @@
+{
+  "schema_version": "1.0.0",
+  "pipeline_id": "greenhill-content-production",
+  "project_clock": {
+    "unit": "seconds",
+    "duration_source": "timeline.scenes[-1].end",
+    "frame_rate": 24
+  },
+  "job_states": ["queued", "running", "succeeded", "failed", "cancelled"],
+  "phases": [
+    {
+      "id": "planning",
+      "label": "스토리보드 제작 회의",
+      "workers": ["content_pd", "story_writer", "visual_director", "storyboard_editor"]
+    },
+    {
+      "id": "production",
+      "label": "이미지 제작 구성",
+      "workers": ["character_resolver", "scene_image", "scene_image_regeneration", "bridge_image", "voice_generation", "bridge_review", "scene_image_approval"]
+    },
+    {
+      "id": "export",
+      "label": "선택 버전 배포 준비",
+      "workers": ["image_to_video", "production_qa", "settings_lock", "final_composite", "artifact_register"]
+    },
+    {
+      "id": "distribution",
+      "label": "배포 캘린더",
+      "workers": ["schedule_content", "publish_content"]
+    }
+  ],
+  "workers": [
+    {
+      "id": "content_pd",
+      "depends_on": [],
+      "input": ["keywords", "audience", "brand_rules"],
+      "output": ["creative_brief"],
+      "adapters": ["openai_text", "claude_text"]
+    },
+    {
+      "id": "story_writer",
+      "depends_on": ["content_pd"],
+      "input": ["creative_brief"],
+      "output": ["script_draft"],
+      "adapters": ["openai_text", "claude_text"]
+    },
+    {
+      "id": "visual_director",
+      "depends_on": ["story_writer"],
+      "input": ["creative_brief", "script_draft"],
+      "output": ["shot_plan"],
+      "adapters": ["openai_text", "claude_text"]
+    },
+    {
+      "id": "storyboard_editor",
+      "depends_on": ["visual_director"],
+      "input": ["script_draft", "shot_plan"],
+      "output": ["storyboard", "timeline"],
+      "adapters": ["openai_text", "claude_text"]
+    },
+    {
+      "id": "character_resolver",
+      "depends_on": ["storyboard_editor"],
+      "input": ["storyboard", "character_library"],
+      "output": ["character_refs"],
+      "adapters": ["internal_character_library"]
+    },
+    {
+      "id": "scene_image",
+      "depends_on": ["character_resolver"],
+      "input": ["storyboard", "character_refs"],
+      "output": ["scene_images"],
+      "adapters": ["openai_image", "nano_banana", "diffusers"]
+    },
+    {
+      "id": "bridge_image",
+      "depends_on": ["scene_image"],
+      "input": ["scene_images", "shot_plan"],
+      "output": ["bridge_images"],
+      "adapters": ["openai_image", "nano_banana", "diffusers"]
+    },
+    {
+      "id": "scene_image_regeneration",
+      "trigger": "manual",
+      "depends_on": ["scene_image"],
+      "input": ["scene_id", "base_prompt_ref", "additional_prompt", "preserve_existing"],
+      "output": ["image_candidate"],
+      "adapters": ["openai_image", "nano_banana", "diffusers"]
+    },
+    {
+      "id": "voice_generation",
+      "depends_on": ["storyboard_editor"],
+      "input": ["script_draft", "timeline", "voice_profile"],
+      "output": ["voice_clips", "voice_timing"],
+      "adapters": ["openai_voice", "external_tts"]
+    },
+    {
+      "id": "bridge_review",
+      "depends_on": ["bridge_image"],
+      "input": ["scene_images", "bridge_images", "shot_plan"],
+      "output": ["reviewed_visual_sequence"],
+      "adapters": ["openai_vision", "claude_vision"]
+    },
+    {
+      "id": "scene_image_approval",
+      "trigger": "manual",
+      "depends_on": ["bridge_review"],
+      "input": ["reviewed_visual_sequence", "image_candidates", "candidate_selections"],
+      "output": ["approved_visual_sequence"],
+      "adapters": ["internal_orchestrator"]
+    },
+    {
+      "id": "image_to_video",
+      "depends_on": ["scene_image_approval"],
+      "input": ["approved_visual_sequence", "timeline", "motion_prompts"],
+      "output": ["scene_videos"],
+      "adapters": ["seedance", "kling"]
+    },
+    {
+      "id": "production_qa",
+      "depends_on": ["image_to_video", "voice_generation"],
+      "input": ["scene_videos", "voice_clips", "timeline"],
+      "output": ["qa_report", "approved_timeline"],
+      "adapters": ["openai_vision", "claude_vision"]
+    },
+    {
+      "id": "settings_lock",
+      "depends_on": ["production_qa"],
+      "input": ["approved_timeline", "editor_settings"],
+      "output": ["export_spec"],
+      "adapters": ["internal_orchestrator"]
+    },
+    {
+      "id": "final_composite",
+      "depends_on": ["settings_lock"],
+      "input": ["export_spec", "scene_videos", "voice_clips", "music", "caption_pngs", "platform_presets"],
+      "output": ["platform_videos"],
+      "adapters": ["ffmpeg"]
+    },
+    {
+      "id": "artifact_register",
+      "depends_on": ["final_composite"],
+      "input": ["platform_videos", "project_metadata"],
+      "output": ["registered_artifacts", "calendar_draft"],
+      "adapters": ["object_storage", "metadata_store"]
+    },
+    {
+      "id": "schedule_content",
+      "depends_on": ["artifact_register"],
+      "input": ["registered_artifacts", "schedule", "platforms"],
+      "output": ["scheduled_publications"],
+      "adapters": ["platform_publishers"]
+    },
+    {
+      "id": "publish_content",
+      "depends_on": ["schedule_content"],
+      "input": ["scheduled_publications"],
+      "output": ["publication_receipts"],
+      "adapters": ["platform_publishers"]
+    }
+  ]
+}

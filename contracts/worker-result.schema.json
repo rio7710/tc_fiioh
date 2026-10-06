@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://greenhill.example/schemas/worker-result.schema.json",
+  "title": "Greenhill worker result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "job_id", "stage", "status", "artifacts", "metrics", "error"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "job_id": {"type": "string", "minLength": 8},
+    "stage": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "status": {"enum": ["succeeded", "failed", "cancelled"]},
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "uri", "media_type", "checksum", "metadata"],
+        "properties": {
+          "name": {"type": "string"},
+          "uri": {"type": "string"},
+          "media_type": {"type": "string"},
+          "checksum": {"type": "string"},
+          "metadata": {"type": "object"}
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "provider": {"type": ["string", "null"]},
+        "latency_ms": {"type": ["integer", "null"], "minimum": 0},
+        "cost_usd": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "error": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message", "retryable"],
+          "properties": {
+            "code": {"type": "string"},
+            "message": {"type": "string"},
+            "retryable": {"type": "boolean"}
+          }
+        }
+      ]
+    }
+  }
+}

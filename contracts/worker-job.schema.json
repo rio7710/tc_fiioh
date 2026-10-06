@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://greenhill.example/schemas/worker-job.schema.json",
+  "title": "Greenhill worker job",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "job_id", "project_id", "stage", "status", "attempt", "idempotency_key", "input", "trace"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "job_id": {"type": "string", "minLength": 8},
+    "project_id": {"type": "string", "minLength": 1},
+    "stage": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "status": {"enum": ["queued", "running", "succeeded", "failed", "cancelled"]},
+    "attempt": {"type": "integer", "minimum": 1},
+    "idempotency_key": {"type": "string", "minLength": 8},
+    "input": {"type": "object"},
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trace_id", "created_at"],
+      "properties": {
+        "trace_id": {"type": "string", "minLength": 8},
+        "parent_job_id": {"type": ["string", "null"]},
+        "created_at": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

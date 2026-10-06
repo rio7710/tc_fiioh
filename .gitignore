@@ -1,0 +1,48 @@
+# ==========================================
+# Environment & Secrets
+# ==========================================
+.env
+.env.*
+.env.save
+.env.backup-*
+!.env.example
+
+# ==========================================
+# Databases & Local Runtime Storage
+# ==========================================
+*.sqlite
+*.sqlite3
+*.db
+01_app/data/*.sqlite
+01_app/data/tc.sqlite
+
+# ==========================================
+# Python & Test Caches
+# ==========================================
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ==========================================
+# Media, Uploads, Exports & Backups
+# ==========================================
+02_media/video/source_clips/
+02_media/generated/kling/
+02_media/video/P1_merged_titles.mp4
+02_media/video/P1_merged.mp4
+03_docs/
+04_exports/
+05_archive/
+deployment/backups/
+resource_upload/
+
+# ==========================================
+# OS & Editor Metadata
+# ==========================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

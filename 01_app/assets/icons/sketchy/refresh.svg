@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" data-icon="refresh" style="color:var(--sk-ink,#1E1E28)">
+  <g class="fills" stroke="none">
+
+  </g>
+  <g class="ink" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M76 34 A32 32 0 1 0 80 54" stroke-width="5"/>
+    <path d="M78 16 L78 36 L58 36"/>
+  </g>
+</svg>

@@ -1,0 +1,200 @@
+"""Existing HTTP APIs are the production adapters; this module owns sequencing only."""
+import json
+import os
+import random
+import threading
+import time
+from contextlib import closing
+from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+from urllib.parse import quote
+
+from automation_store import STAGES
+
+
+class AdapterFailure(RuntimeError):
+    pass
+
+
+class InternalAPI:
+    def __init__(self, auth, user_id):
+        self.auth = auth
+        self.user_id = user_id
+        self.token = auth.create_session(user_id, days=1/8)
+        self.base = os.environ.get('AUTOMATION_API_URL', 'http://api:10000').rstrip('/')
+
+    def close(self):
+        self.auth.delete_session(self.token)
+
+    def call(self, path, payload):
+        self.auth.delete_session(self.token)
+        self.token = self.auth.create_session(self.user_id, days=1/8)
+        body = json.dumps(payload, ensure_ascii=False).encode() if payload is not None else None
+        # 409 means the local API did not start this request. Other errors may have
+        # incurred provider cost; never automatically replay an ambiguous request.
+        for attempt in range(3):
+            req = Request(self.base + path, body, headers={'Content-Type':'application/json', 'Cookie':'thinkcast_session='+self.token}, method='POST' if body is not None else 'GET')
+            try:
+                with urlopen(req, timeout=7200) as response:
+                    result = json.load(response)
+                if result.get('ok') is not True:
+                    raise AdapterFailure('기존 제작 API가 작업을 완료하지 못했습니다.')
+                return result
+            except HTTPError as exc:
+                if exc.code == 409 and attempt < 2:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise AdapterFailure(f'제작 API 요청이 실패했습니다 (HTTP {exc.code}). 결과 확인 후 다시 시도해 주세요.') from None
+            except (URLError, TimeoutError, ConnectionError, json.JSONDecodeError):
+                raise AdapterFailure('제작 API 응답을 확인하지 못했습니다. 중복 과금을 피하기 위해 실행을 멈췄습니다.') from None
+
+
+class AutomationRunner:
+    def __init__(self, store, api_factory=InternalAPI, base_keywords=None):
+        self.store, self.auth, self.api_factory = store, store.auth, api_factory
+        self.base_keywords = base_keywords
+
+    def execute(self, run):
+        stop = threading.Event()
+        def keep_alive():
+            while not stop.wait(15):
+                try:
+                    if not self.store.heartbeat(run['run_id'],run['lease_owner']):
+                        return
+                except Exception:
+                    return
+        thread = threading.Thread(target=keep_alive, daemon=True)
+        thread.start()
+        api = None
+        try:
+            api = self.api_factory(self.auth,run['user_id'])
+            self.pipeline(run,api)
+            self.store.finish(run,'succeeded')
+        except InterruptedError:
+            self.store.finish(run,'cancelled')
+        except AdapterFailure as exc:
+            self.store.finish(run,'failed','adapter_failed',str(exc))
+        except Exception:
+            self.store.finish(run,'failed','production_failed','제작 단계에서 오류가 발생했습니다. 콘텐츠 결과를 확인한 뒤 다시 시도해 주세요.')
+        finally:
+            stop.set()
+            thread.join(timeout=2)
+            if api:
+                api.close()
+
+    def pipeline(self,run,api):
+        config, project, user = run['config'],run['project_id'],run['user_id']
+        level = STAGES.index(config['endpoint'])
+        source_revision = None
+        def step(key,operation,stage=None):
+            return self.store.step(run,key,stage or key,operation)
+        def call(path,extra=None):
+            if not self.store.check_active(run):
+                raise InterruptedError('자동화가 중지되었습니다.')
+            if source_revision:
+                current=self.auth.latest_stage_data(user,project,3)
+                if not current or current['revision_id']!=source_revision:
+                    raise AdapterFailure('자동화 중 대본이 변경되어 실행을 멈췄습니다.')
+            return api.call(path,{'project_id':project,**(extra or {})})
+        def choose_keywords():
+            # A committed revision is authoritative if a previous response was lost.
+            existing=self.auth.latest_stage_data(user,project,2)
+            if existing:
+                return {'keywords':existing['data'].get('seasonal_keywords',[]),'revision_id':existing['revision_id'],'already_applied':True}
+            spec=config['keywords']
+            if spec['ai']:
+                data=api.call('/api/season-keywords/preview',{'count':spec['count'],'month':spec['month'],'refresh':True})
+                items=data['keywords']
+            else:
+                source=self.base_keywords
+                if source is None:
+                    source=json.loads((Path(__file__).parent/'data'/'demo_data.json').read_text(encoding='utf-8'))['keywords']
+                unique={item['label']:item for item in source if not item.get('seasonal')}
+                items=random.SystemRandom().sample(list(unique.values()),spec['count'])
+            if len(items)!=spec['count'] or len({item['label'] for item in items})!=len(items):
+                raise AdapterFailure('추천 키워드 개수 또는 중복 검증에 실패했습니다.')
+            return {'keywords':items}
+        chosen=step('keywords_select',choose_keywords)
+        keyword_revision=step('keywords_confirm',lambda:self.auth.apply_keyword_recommendation(user,project,chosen['keywords']) if not chosen.get('already_applied') else {'revision_id':chosen['revision_id']})
+        if self.auth.latest_stage_data(user,project,2)['revision_id']!=keyword_revision['revision_id']:
+            raise AdapterFailure('자동화 중 키워드가 변경되어 실행을 멈췄습니다.')
+        if level==1:
+            return
+        step('script_plan',lambda:call('/api/script/plan'))
+        step('script_generate',lambda:call('/api/script/generate'))
+        if config.get('voice'):
+            step('voice_select',lambda:call('/api/voice/select',{'profile_id':config['voice']['profile_id']}))
+        def confirm_script():
+            latest=self.auth.latest_stage_data(user,project,3)
+            if not latest or not latest['data'].get('document'):
+                raise AdapterFailure('생성된 대본을 찾을 수 없습니다.')
+            if latest['status']!='confirmed':
+                self.auth.confirm_stage_revision(user,project,latest['revision_id'])
+            return {'revision_id':latest['revision_id']}
+        confirmed=step('script_confirm',confirm_script)
+        source_revision=confirmed['revision_id']
+        if level==2:
+            return
+        step('voice_prepare',lambda:call('/api/production/prepare'))
+        latest=self.auth.latest_stage_data(user,project,3)
+        if latest['revision_id']!=confirmed['revision_id']:
+            raise AdapterFailure('자동화 중 대본이 변경되어 실행을 멈췄습니다.')
+        scenes=latest['data']['document']['production']['timeline']['scenes']
+        for scene in scenes:
+            step('image_'+scene['id'],lambda s=scene:call('/api/storyboard/image-generate',{
+                'scene_id':s['id'],'provider':'openai','model':os.environ.get('AUTOMATION_IMAGE_MODEL','gpt-image-2.5-sunburst'),'force':False}),stage='scene_image')
+        if config['video']['scene_count']:
+            decision=step('video_scene_selection',lambda:call('/api/storyboard/auto-select',{'count':config['video']['scene_count']}))
+            current_images={item['scene_id']:item['artifact_id'] for item in self.auth.list_scene_images(user,project,source_revision)}
+            if decision.get('revision_id')!=source_revision or any(current_images.get(item['scene_id'])!=item['artifact_id'] for item in decision['source_signature']):
+                raise AdapterFailure('선택 이후 이미지가 변경되었습니다. 장면 선택을 다시 확인해 주세요.')
+            for selected in decision['selected']:
+                sid=selected['scene_id']
+                def convert(scene_id=sid):
+                    submitted=step('video_submit_'+scene_id+'_'+str(run['attempt']),lambda:call('/api/storyboard/video-generate',{'scene_id':scene_id,'force':False}),stage='image_to_video')
+                    job=submitted.get('video_job') or submitted.get('scene_video_job')
+                    if not isinstance(job,dict):raise AdapterFailure('Kling 작업 정보를 확인하지 못했습니다.')
+                    if job['status']=='succeeded':return job
+                    deadline=time.monotonic()+3600
+                    while time.monotonic()<deadline:
+                        if not self.store.check_active(run):raise InterruptedError('자동화가 중지되었습니다.')
+                        result=api.call('/api/storyboard/video-status?task_id='+quote(job['task_id'],safe=''),None)
+                        if result['status']=='succeeded':return result
+                        if result['status'] in ('failed','cancelled'):raise AdapterFailure('Kling 장면 생성이 실패했습니다. 같은 장면으로 다시 시도할 수 있습니다.')
+                        time.sleep(5)
+                    raise AdapterFailure('Kling 완료 대기 시간이 초과되었습니다. 저장된 작업 ID로 다시 확인해 주세요.')
+                step('video_complete_'+sid,convert,stage='image_to_video')
+        if level==3:
+            return
+        if config['video']['crop']=='ai':
+            for scene in scenes:
+                def align(sid=scene['id']):
+                    result=call('/api/project/auto-crop',{'scene_id':sid,'apply':True})
+                    if result.get('needs_review'):raise AdapterFailure('사람 위치를 자동으로 맞추기 어려운 장면이 있습니다. 영상 디자인에서 크롭을 확인해 주세요.')
+                    return result
+                step('crop_'+scene['id'],align,stage='person_crop')
+        def design():
+            selections=[{'role':role,'enabled':enabled,'version_id':config['brand_versions'].get(role,''),'settings':{}}
+                        for role,enabled in config['brand'].items()]
+            brands=self.auth.save_content_brand_selections(user,project,selections)
+            source=self.auth.latest_stage_data(user,project,4)
+            data={**(source['data'] if source else {}),'automation_editor':{'channels':config['channels'],'crop':config['video']['crop'],'brand':brands,'run_id':run['run_id']}}
+            result=self.auth.save_stage_draft(user,project,4,data)
+            return {'revision_id':result['revision_id']}
+        step('video_design',design)
+        if level==4:
+            return
+        def export():
+            job_id='automation-'+run['run_id']
+            with closing(self.auth._connect()) as db:
+                rows=db.execute("SELECT uri,metadata_json FROM artifacts WHERE project_id=? AND artifact_type='final_video' AND status='active' AND json_extract(metadata_json,'$.job_id')=?",(project,job_id)).fetchall()
+            covered={p for row in rows for p in json.loads(row['metadata_json']).get('platforms',[])}
+            if set(config['channels']).issubset(covered):
+                return {'reused':True,'exports':[{'url':row['uri']} for row in rows]}
+            if rows:
+                raise AdapterFailure('일부 출력이 이미 저장되어 있습니다. 중복 출력을 피하기 위해 콘텐츠에서 나머지를 확인해 주세요.')
+            return call('/render',{'job_id':job_id,'platforms':config['channels'],'preview_platform':config['channels'][0],
+                                   'type':'editorial','music':'satie','volume':0.5,'narration':True,'video_pan_x':0.5,
+                                   'scene_crop_positions':self.auth.scene_crop_positions(user,project)})
+        step('final_export_calendar',export,stage='final_composite')

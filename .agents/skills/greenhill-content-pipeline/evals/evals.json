@@ -1,0 +1,23 @@
+{
+  "skill_name": "greenhill-content-pipeline",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "STEP 03 대본을 수정하면 TTS 생성 워커부터 다시 실행하고 이전 이미지 생성 결과는 재사용하게 해줘.",
+      "expected_output": "Uses the worker manifest, preserves upstream artifacts, and defines an idempotent partial rerun from voice generation onward.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "장면 6을 이미지로 바꾸되 2.5초 길이와 기존 STT/BGM 싱크를 유지하고 갤럭시 호환 MP4로 변환해줘.",
+      "expected_output": "Treats image duration independently, preserves the project clock, and validates H.264/AAC mobile output.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Kling 실패 시 Seedance로 재시도하고 진행 모달이 실제 워커 상태를 보여주도록 API 계약을 만들어줘.",
+      "expected_output": "Keeps provider fallback inside the I2V worker and exposes durable queued/running/succeeded/failed events.",
+      "files": []
+    }
+  ]
+}

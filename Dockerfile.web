@@ -1,0 +1,23 @@
+FROM python:3.13-slim
+
+RUN groupadd -g 10001 appuser \
+    && useradd -u 10001 -g appuser -m -s /bin/bash appuser \
+    && mkdir -p /data /app \
+    && chown -R appuser:appuser /data /app
+
+WORKDIR /app
+
+COPY --chown=appuser:appuser 01_app /app/01_app
+COPY --chown=appuser:appuser 02_media/video/P1_merged.mp4 /app/02_media/video/P1_merged.mp4
+COPY --chown=appuser:appuser 02_media/images/scenes/scene_*.webp /app/02_media/images/scenes/
+COPY --chown=appuser:appuser 02_media/music /app/02_media/music
+COPY --chown=appuser:appuser 02_media/narration /app/02_media/narration
+
+ENV PORT=3000
+ENV API_URL=http://tc_temp_api:10000
+
+USER appuser
+
+EXPOSE 3000
+
+CMD ["python", "01_app/web_gateway.py"]

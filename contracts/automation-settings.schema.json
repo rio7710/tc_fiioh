@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "User recurring production settings",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "endpoint", "repeat", "keywords", "video", "brand", "channels"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "endpoint": {"enum": ["manual", "2", "3", "3-1", "4", "5"]},
+    "repeat": {
+      "type": "object", "additionalProperties": false, "required": ["unit", "interval"],
+      "properties": {"unit": {"enum": ["day", "week", "month", "count"]}, "interval": {"type": "integer", "minimum": 1, "maximum": 100}}
+    },
+    "keywords": {
+      "type": "object", "additionalProperties": false, "required": ["count", "ai", "month"],
+      "properties": {"count": {"type": "integer", "minimum": 1, "maximum": 5}, "ai": {"type": "boolean"}, "month": {"type": "string", "pattern": "^$|^[0-9]{4}-(0[1-9]|1[0-2])$"}}
+    },
+    "video": {
+      "type": "object", "additionalProperties": false, "required": ["scene_count", "crop"],
+      "properties": {"scene_count": {"type": "integer", "minimum": 0, "maximum": 200}, "crop": {"enum": ["default", "manual", "ai"]}}
+    },
+    "voice": {
+      "type": "object", "additionalProperties": false, "required": ["profile_id"],
+      "properties": {"profile_id": {"enum": ["warm_female", "bright_female", "steady_male", "qwen_narrator", "qwen_etp"]}}
+    },
+    "brand": {
+      "type": "object", "additionalProperties": false, "required": ["intro", "outro", "watermark"],
+      "properties": {"intro": {"type": "boolean"}, "outro": {"type": "boolean"}, "watermark": {"type": "boolean"}}
+    },
+    "channels": {"type": "array", "uniqueItems": true, "items": {"enum": ["youtube", "instagram", "facebook", "tiktok", "naver", "kakaotalk", "threads", "x", "linkedin"]}}
+  }
+}

@@ -1,0 +1,437 @@
+{
+  "keywords": [
+    {
+      "id": "reassurance",
+      "label": "안심",
+      "description": "부드럽고 안정적인 신뢰"
+    },
+    {
+      "id": "expertise",
+      "label": "전문 돌봄",
+      "description": "전문 인력과 체계"
+    },
+    {
+      "id": "dignity",
+      "label": "존중",
+      "description": "개인의 선택과 존엄"
+    },
+    {
+      "id": "recovery",
+      "label": "일상 회복",
+      "description": "익숙한 하루와 자립"
+    },
+    {
+      "id": "family",
+      "label": "가족 소통",
+      "description": "가족까지 이어지는 안심"
+    },
+    {
+      "id": "warmth",
+      "label": "따뜻한 관계",
+      "description": "함께하는 정서적 교감"
+    },
+    {
+      "id": "rehabilitation",
+      "label": "재활",
+      "description": "움직임과 회복"
+    },
+    {
+      "id": "community",
+      "label": "함께하는 즐거움",
+      "description": "프로그램과 교류"
+    },
+    {
+      "id": "personalized",
+      "label": "맞춤 돌봄",
+      "description": "개인별 생활 패턴과 필요",
+      "image": "dignity"
+    },
+    {
+      "id": "health",
+      "label": "건강 관리",
+      "description": "매일 세심하게 살피는 건강",
+      "image": "expertise"
+    },
+    {
+      "id": "safety",
+      "label": "안전한 환경",
+      "description": "편안하게 머무는 생활 공간",
+      "image": "reassurance"
+    },
+    {
+      "id": "nutrition",
+      "label": "식사와 영양",
+      "description": "건강을 생각한 즐거운 식사",
+      "image": "family"
+    },
+    {
+      "id": "cognitive",
+      "label": "인지 활동",
+      "description": "생각과 기억을 깨우는 프로그램",
+      "image": "community"
+    },
+    {
+      "id": "comfort",
+      "label": "편안한 공간",
+      "description": "집처럼 익숙하고 포근한 환경",
+      "image": "reassurance"
+    },
+    {
+      "id": "vitality",
+      "label": "활기찬 하루",
+      "description": "움직임이 있는 건강한 일상",
+      "image": "rehabilitation"
+    },
+    {
+      "id": "emotional",
+      "label": "정서 안정",
+      "description": "마음을 살피는 따뜻한 교감",
+      "image": "warmth"
+    },
+    {
+      "id": "independence",
+      "label": "자립 지원",
+      "description": "스스로 선택하고 이어가는 생활",
+      "image": "recovery"
+    },
+    {
+      "id": "medical",
+      "label": "의료 연계",
+      "description": "필요할 때 이어지는 전문 지원",
+      "image": "expertise"
+    },
+    {
+      "id": "transparent",
+      "label": "투명한 소통",
+      "description": "돌봄 과정을 공유하는 신뢰",
+      "image": "family"
+    },
+    {
+      "id": "local",
+      "label": "지역사회 연결",
+      "description": "세상과 계속 이어지는 생활",
+      "image": "community"
+    }
+  ],
+  "timeline": {
+    "unit": "seconds",
+    "scenes": [
+      {
+        "id": "scene-01",
+        "name": "생활실 도입",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_01.webp",
+        "start": 0.0,
+        "end": 2.5,
+        "cue_start": 0.5,
+        "cue_end": 2.05,
+        "script_line_index": 0
+      },
+      {
+        "id": "scene-02",
+        "name": "커튼을 여는 손",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_02.webp",
+        "start": 2.5,
+        "end": 6.0,
+        "cue_start": 2.7,
+        "cue_end": 6.02,
+        "script_line_index": 1
+      },
+      {
+        "id": "scene-03",
+        "name": "햇살과 미소",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_03.webp",
+        "start": 6.0,
+        "end": 8.0,
+        "script_line_index": null
+      },
+      {
+        "id": "scene-04",
+        "name": "보호사 입장 브릿지",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_04.webp",
+        "start": 8.0,
+        "end": 11.0,
+        "cue_start": 8.3,
+        "cue_end": 10.75,
+        "script_line_index": 2
+      },
+      {
+        "id": "scene-05",
+        "name": "눈높이 상담",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_05.webp",
+        "start": 11.0,
+        "end": 13.5,
+        "cue_start": 11.3,
+        "cue_end": 13.05,
+        "script_line_index": 3
+      },
+      {
+        "id": "scene-06",
+        "name": "자리에서 일어남",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_06.webp",
+        "start": 13.5,
+        "end": 17.5,
+        "cue_start": 13.8,
+        "cue_end": 16.8,
+        "script_line_index": 4
+      },
+      {
+        "id": "scene-07",
+        "name": "세 사람의 만남",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_07.webp",
+        "start": 17.5,
+        "end": 20.0,
+        "cue_start": 18.2,
+        "cue_end": 19.75,
+        "script_line_index": 5
+      },
+      {
+        "id": "scene-08",
+        "name": "간호사 인계",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_08.webp",
+        "start": 20.0,
+        "end": 23.5,
+        "cue_start": 20.2,
+        "cue_end": 23.5,
+        "script_line_index": 6
+      },
+      {
+        "id": "scene-09",
+        "name": "복도 이동",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_09.webp",
+        "start": 23.5,
+        "end": 26.5,
+        "cue_start": 23.7,
+        "cue_end": 26.49,
+        "script_line_index": 7
+      },
+      {
+        "id": "scene-10",
+        "name": "프로그램실 도착",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_10.webp",
+        "start": 26.5,
+        "end": 30.0,
+        "cue_start": 26.7,
+        "cue_end": 29.99,
+        "script_line_index": 8
+      },
+      {
+        "id": "scene-11",
+        "name": "활동 선택",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_11.webp",
+        "start": 30.0,
+        "end": 33.5,
+        "cue_start": 30.4,
+        "cue_end": 32.9,
+        "script_line_index": 9
+      },
+      {
+        "id": "scene-12",
+        "name": "꽃꽂이 합류",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_12.webp",
+        "start": 33.5,
+        "end": 37.0,
+        "cue_start": 33.7,
+        "cue_end": 36.3,
+        "script_line_index": 10
+      },
+      {
+        "id": "scene-13",
+        "name": "꽃 한 송이의 교감",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_13.webp",
+        "start": 37.0,
+        "end": 41.0,
+        "cue_start": 37.3,
+        "cue_end": 40.89,
+        "script_line_index": 11
+      },
+      {
+        "id": "scene-14",
+        "name": "함께 만드는 하루",
+        "media_type": "image",
+        "preview_uri": "/02_media/images/scenes/scene_14.webp",
+        "start": 41.0,
+        "end": 46.0,
+        "cue_start": 41.1,
+        "cue_end": 45.97,
+        "script_line_index": 12
+      }
+    ]
+  },
+  "storyboard": {
+    "schema_version": "1.0.0",
+    "source": "reverse_engineered_from_approved_scene_images",
+    "aspect_ratio": "16:9",
+    "global_style": "사실적인 한국 요양원 브랜드 필름, 따뜻하고 품위 있는 관찰 다큐멘터리 톤, 자연스러운 피부와 표정, 아이보리·우드·딥그린 색조, 부드러운 주간광과 실내 간접조명, 과장되지 않은 돌봄의 순간, 화면 안 글자와 로고 없음",
+    "global_negative_prompt": "왜곡된 손과 손가락, 중복 인물, 인물 외형과 의상 변화, 부자연스러운 미소, 과도한 피부 보정, 차갑고 병원 같은 분위기, 의료 위기 상황, 카메라 응시, 자막, 글자, 로고, 워터마크, 깜빡임, 프레임 왜곡",
+    "scenes": [
+      {
+        "scene_id": "scene-01",
+        "approved_image_uri": "/02_media/images/scenes/scene_01.webp",
+        "scene_prompt": "아침의 고급스럽고 편안한 한국 요양원 생활실 전경. 라벤더색 카디건과 회색 옷을 입고 은빛 머리를 단정히 묶은 한국인 여성 어르신이 큰 창가에 서서 초록 산을 바라본다. 오른쪽에는 정돈된 침대, 왼쪽에는 안락의자와 흰 꽃이 놓인 작은 원형 탁자. 따뜻한 아이보리 벽과 우드 헤드보드, 부드러운 자연광. 넓은 공간과 인물의 고요한 일상을 함께 보여주는 사실적인 시네마틱 와이드숏.",
+        "camera": "눈높이 24mm 와이드숏, 고정에 가까운 매우 느린 전진",
+        "lighting": "창문에서 들어오는 부드러운 아침 자연광과 따뜻한 간접조명",
+        "motion_prompt": "어르신이 편안히 호흡하며 창밖을 바라보고 얇은 커튼과 옷자락이 아주 미세하게 움직인다. 카메라는 천천히 앞으로 이동한다. 인물과 실내 구조를 그대로 유지한다."
+      },
+      {
+        "scene_id": "scene-02",
+        "approved_image_uri": "/02_media/images/scenes/scene_02.webp",
+        "scene_prompt": "라벤더색 카디건을 입은 동일한 한국인 여성 어르신이 창가의 흰 속커튼을 손끝으로 살며시 만지는 순간. 오른쪽 얼굴 옆선과 주름진 손의 섬세한 질감, 창밖의 푸른 산이 부드럽게 흐려진 배경. 돌봄 시설의 조용한 아침을 담은 사실적인 감성 클로즈업.",
+        "camera": "눈높이 50mm 클로즈업, 손에서 얼굴로 아주 느린 초점 이동",
+        "lighting": "커튼을 투과한 확산 자연광",
+        "motion_prompt": "어르신의 손가락이 얇은 커튼을 부드럽게 당기고 커튼이 살짝 흔들린다. 얼굴은 창밖을 향한 채 평온한 표정을 유지한다. 손가락 형태와 얼굴 정체성을 보존한다."
+      },
+      {
+        "scene_id": "scene-03",
+        "approved_image_uri": "/02_media/images/scenes/scene_03.webp",
+        "scene_prompt": "동일한 한국인 여성 어르신의 창가 측면 인물사진. 은빛 머리를 낮게 묶고 라벤더색 카디건을 입은 채 초록 산을 바라보며 아주 잔잔하게 미소 짓는다. 뒤편의 따뜻한 벽등과 흰 꽃, 밝은 창이 어우러지는 고요하고 희망적인 분위기. 사실적인 시네마틱 미디엄 클로즈업.",
+        "camera": "눈높이 50mm 미디엄 클로즈업, 미세한 푸시인",
+        "lighting": "얼굴을 부드럽게 감싸는 창가 자연광과 따뜻한 벽등",
+        "motion_prompt": "어르신이 천천히 한 번 눈을 깜빡이고 입가에 자연스러운 미소가 번진다. 창밖 나뭇잎과 커튼만 미세하게 움직인다. 무성 내레이션 여백 장면으로 차분하게 유지한다."
+      },
+      {
+        "scene_id": "scene-04",
+        "approved_image_uri": "/02_media/images/scenes/scene_04.webp",
+        "scene_prompt": "따뜻한 요양원 생활실 문이 열리고 베이지색 돌봄복을 입은 중년 한국인 여성 요양보호사가 부드럽게 미소 지으며 들어온다. 전경에는 라벤더색 카디건을 입은 어르신의 뒷모습, 오른쪽에는 정돈된 침대. 서로를 발견하는 반가운 순간을 담은 오버숄더 와이드숏.",
+        "camera": "어르신 뒤쪽 눈높이 35mm 오버숄더숏, 문 쪽으로 완만한 시선 유도",
+        "lighting": "생활실의 따뜻한 조명과 문밖의 밝은 복도광",
+        "motion_prompt": "요양보호사가 문을 조금 더 열고 한 걸음 천천히 들어오며 어르신에게 따뜻하게 고개 인사한다. 어르신은 보호사 쪽으로 고개를 돌린다. 문과 손의 접촉을 자연스럽게 유지한다."
+      },
+      {
+        "scene_id": "scene-05",
+        "approved_image_uri": "/02_media/images/scenes/scene_05.webp",
+        "scene_prompt": "창가 생활실의 안락의자에 마주 앉은 동일한 어르신과 베이지색 돌봄복의 요양보호사. 가운데 작은 원형 탁자와 흰 꽃, 뒤편의 정돈된 침대. 보호사가 열린 손짓으로 다정하게 말을 건네고 어르신이 편안하게 경청한다. 눈높이를 맞춘 존중과 신뢰를 표현하는 사실적인 투숏.",
+        "camera": "눈높이 40mm 균형 잡힌 미디엄 투숏, 고정",
+        "lighting": "창가의 부드러운 주간광과 따뜻한 실내 보조광",
+        "motion_prompt": "보호사가 작은 손짓으로 차분히 이야기하고 어르신이 미소로 반응하며 가볍게 고개를 끄덕인다. 두 사람의 시선은 서로에게 고정되고 꽃과 가구는 움직이지 않는다."
+      },
+      {
+        "scene_id": "scene-06",
+        "approved_image_uri": "/02_media/images/scenes/scene_06.webp",
+        "scene_prompt": "동일한 생활실에서 라벤더색 카디건의 어르신이 의자에서 편안하게 일어나 서 있고, 베이지색 돌봄복의 요양보호사가 열린 손으로 출입문 방향을 안내한다. 넓고 안전한 동선과 정돈된 침대, 창밖의 초록 풍경. 자립을 존중하며 다음 일상으로 이동하는 사실적인 와이드숏.",
+        "camera": "눈높이 28mm 와이드숏, 인물 사이 공간을 살린 정적 구도",
+        "lighting": "밝은 자연광과 따뜻한 천장 간접조명",
+        "motion_prompt": "어르신이 천천히 자세를 바로 세우고 보호사는 문 쪽을 부드럽게 안내한다. 어르신이 시선을 안내 방향으로 옮긴다. 과도한 부축 없이 안정적인 움직임만 표현한다."
+      },
+      {
+        "scene_id": "scene-07",
+        "approved_image_uri": "/02_media/images/scenes/scene_07.webp",
+        "scene_prompt": "딥그린 문틀의 요양원 생활실 입구에서 세 명의 한국인 여성이 만나는 장면. 중앙의 라벤더색 카디건 어르신, 왼쪽의 베이지색 요양보호사, 오른쪽의 짙은 청록색 유니폼 간호사. 간호사가 열린 손으로 인사하고 모두 자연스럽게 미소 짓는다. 따뜻한 복도와 안전 손잡이가 보이는 사실적인 미디엄 그룹숏.",
+        "camera": "눈높이 35mm 미디엄 와이드 그룹숏, 정면 고정",
+        "lighting": "생활실과 복도의 균일하고 따뜻한 실내광",
+        "motion_prompt": "간호사가 손을 내밀어 반갑게 인사하고 어르신과 보호사가 시선을 옮겨 미소로 답한다. 세 사람의 위치와 얼굴, 의상 색상을 일관되게 유지한다."
+      },
+      {
+        "scene_id": "scene-08",
+        "approved_image_uri": "/02_media/images/scenes/scene_08.webp",
+        "scene_prompt": "생활실 문 앞에서 베이지색 요양보호사가 짙은 청록색 유니폼의 간호사에게 어르신의 일상을 자연스럽게 인계하는 순간. 라벤더색 카디건의 어르신은 두 사람 사이에서 안심한 미소를 보인다. 간호사는 이동 방향을 열린 손으로 안내한다. 따뜻한 돌봄의 연속성을 보여주는 사실적인 그룹숏.",
+        "camera": "눈높이 35mm 미디엄 그룹숏, 세 사람의 표정을 모두 담는 안정적 구도",
+        "lighting": "따뜻하고 부드러운 복도 조명",
+        "motion_prompt": "보호사가 작은 손짓으로 설명하고 간호사가 고개를 끄덕인 뒤 복도 방향을 안내한다. 어르신은 두 사람을 번갈아 바라보며 미소 짓는다."
+      },
+      {
+        "scene_id": "scene-09",
+        "approved_image_uri": "/02_media/images/scenes/scene_09.webp",
+        "scene_prompt": "밝고 넓은 한국 요양원 복도에서 짙은 청록색 유니폼의 간호사와 라벤더색 카디건의 어르신이 나란히 천천히 걸어간다. 열린 딥그린 문가에는 베이지색 요양보호사가 손을 들어 따뜻하게 배웅한다. 벽면 안전 손잡이와 긴 원근감이 편안한 이동을 강조하는 후면 와이드숏.",
+        "camera": "뒤쪽 눈높이 28mm 트래킹 와이드숏, 복도 중앙 소실점",
+        "lighting": "복도 천장과 벽등의 따뜻하고 균일한 조명",
+        "motion_prompt": "간호사와 어르신이 보폭을 맞춰 천천히 앞으로 걷고 잠시 서로를 보며 미소 짓는다. 문가의 보호사는 작게 손을 흔든다. 카메라는 뒤에서 부드럽게 따라간다."
+      },
+      {
+        "scene_id": "scene-10",
+        "approved_image_uri": "/02_media/images/scenes/scene_10.webp",
+        "scene_prompt": "딥그린 문이 열린 밝은 요양원 프로그램실 입구. 전경 왼쪽에는 라벤더색 카디건의 어르신 뒷모습, 오른쪽에는 짙은 청록색 유니폼 간호사가 환한 미소와 열린 손으로 활동 공간을 소개한다. 안쪽에는 여러 어르신이 꽃꽂이와 색종이 활동을 하는 따뜻하고 활기찬 공간. 사실적인 오버숄더 와이드숏.",
+        "camera": "어르신 뒤쪽 28mm 오버숄더 와이드숏, 실내로 느린 전진",
+        "lighting": "큰 창의 밝은 주간광과 따뜻한 샹들리에 조명",
+        "motion_prompt": "간호사가 프로그램실 안쪽을 부드럽게 안내하고 어르신이 안을 둘러본다. 배경 인물들은 꽃과 종이를 천천히 다루며 자연스럽게 활동한다. 카메라는 문을 지나 아주 조금 전진한다."
+      },
+      {
+        "scene_id": "scene-11",
+        "approved_image_uri": "/02_media/images/scenes/scene_11.webp",
+        "scene_prompt": "따뜻한 프로그램실의 큰 테이블 앞에서 라벤더색 카디건의 어르신이 흰 꽃과 색종이 활동 중 원하는 것을 살펴본다. 짙은 청록색 유니폼 간호사가 꽃꽂이 자리를 열린 손으로 안내하고, 배경의 다른 어르신들은 각자 활동한다. 선택과 자립을 존중하는 사실적인 미디엄 와이드숏.",
+        "camera": "눈높이 32mm 미디엄 와이드숏, 꽃 테이블에서 두 인물로 시선 연결",
+        "lighting": "부드러운 창빛과 따뜻한 천장 조명",
+        "motion_prompt": "간호사가 꽃을 향해 손을 내밀고 어르신이 테이블을 살핀 뒤 작은 미소와 함께 꽃 한 송이에 손을 뻗는다. 배경 활동은 느리고 자연스럽게 유지한다."
+      },
+      {
+        "scene_id": "scene-12",
+        "approved_image_uri": "/02_media/images/scenes/scene_12.webp",
+        "scene_prompt": "프로그램실 꽃꽂이 테이블에 앉은 두 한국인 여성 어르신. 라벤더색 카디건의 주인공이 흰 꽃 한 송이를 들고 베이지색 상의를 입은 또래 어르신과 따뜻하게 웃는다. 짙은 청록색 유니폼 간호사가 곁에서 편안히 지켜본다. 흰 꽃과 초록 줄기가 놓인 풍성한 테이블, 함께하는 즐거움을 담은 사실적인 그룹숏.",
+        "camera": "눈높이 35mm 미디엄 그룹숏, 테이블 높이에서 완만한 푸시인",
+        "lighting": "따뜻한 실내광과 오른쪽 창의 부드러운 자연광",
+        "motion_prompt": "주인공 어르신이 꽃을 천천히 들어 친구에게 보여주고 두 사람이 눈을 맞추며 웃는다. 간호사는 곁에서 잔잔히 미소 짓는다. 꽃줄기와 손가락을 자연스럽게 보존한다."
+      },
+      {
+        "scene_id": "scene-13",
+        "approved_image_uri": "/02_media/images/scenes/scene_13.webp",
+        "scene_prompt": "흰 꽃이 놓인 테이블에서 두 한국인 여성 어르신이 꽃 한 송이를 함께 바라보며 환하게 교감하는 순간. 오른쪽은 라벤더색 카디건의 주인공, 왼쪽은 베이지색 상의의 친구. 서로의 손과 꽃, 자연스러운 주름과 따뜻한 미소가 선명한 사실적인 감성 클로즈업.",
+        "camera": "눈높이 55mm 미디엄 클로즈업, 두 얼굴과 꽃에 얕은 심도",
+        "lighting": "얼굴을 따뜻하게 감싸는 확산 주간광",
+        "motion_prompt": "친구가 꽃줄기를 살짝 다듬어 건네고 주인공이 조심스럽게 받아 들며 함께 웃는다. 시선은 서로와 꽃 사이에서 자연스럽게 이동한다. 손과 꽃 형태를 정확히 유지한다."
+      },
+      {
+        "scene_id": "scene-14",
+        "approved_image_uri": "/02_media/images/scenes/scene_14.webp",
+        "scene_prompt": "따뜻한 요양원 프로그램실에서 꽃꽂이를 하는 두 어르신 주변으로 베이지색 요양보호사, 짙은 재킷의 관리자, 청록색 유니폼 간호사가 함께 모여 자연스럽게 웃는다. 배경에서도 다른 어르신들이 활동을 이어간다. 흰 꽃, 딥그린 가구, 큰 창과 샹들리에가 조화를 이루며 함께 만드는 행복한 하루를 보여주는 사실적인 브랜드 필름 엔딩 와이드숏.",
+        "camera": "눈높이 28mm 와이드 앙상블숏, 매우 느린 후진 또는 고정",
+        "lighting": "따뜻한 황금빛 실내광과 밝은 창가 자연광의 균형",
+        "motion_prompt": "주인공이 꽃을 들어 주변 사람들에게 보여주고 모두가 자연스럽게 미소로 반응한다. 작은 고개 끄덕임과 편안한 호흡만 표현하며 마지막에는 안정된 그룹 구도로 멈춘다. 엔딩 타이틀을 얹을 수 있도록 화면 가장자리 여백을 유지한다."
+      }
+    ]
+  },
+  "state": {
+    "user": {
+      "name": "greenhill"
+    },
+    "selected_keywords": [
+      "reassurance",
+      "warmth",
+      "health",
+      "nutrition"
+    ],
+    "script": {
+      "headline": "하루를 보면 마음이 보입니다",
+      "concept": "안심, 따뜻한 관계, 건강 관리, 식사와 영양을 중심으로 한 그린힐의 하루 이야기",
+      "lines": [
+        "좋은 돌봄은,",
+        "한 사람의 하루를 바라보는 일에서 시작합니다.",
+        "햇살을 맞는 작은 순간부터,",
+        "반가운 인사를 건네고,",
+        "눈높이를 맞춰 마음의 이야기를 듣습니다.",
+        "그리고 함께,",
+        "오늘의 몸과 마음을 세심히 살핍니다.",
+        "돌봄의 마음은 자연스럽게 이어지고,",
+        "편안한 발걸음은 새로운 하루로 향합니다.",
+        "익숙한 미소가 기다리는 곳에서,",
+        "오늘 하고 싶은 일을 스스로 고르고,",
+        "함께하는 즐거움 속으로 천천히 들어갑니다.",
+        "행복한 하루를 함께 만드는 곳, 그린힐 재활실버케어 요양원입니다."
+      ]
+    },
+    "image_regeneration_requests": [
+      {
+        "job_id": "scene-image-6-1788172096146329100",
+        "scene_index": 5,
+        "request_number": 1,
+        "base_prompt_ref": "storyboard.scenes[5].image_prompt",
+        "additional_prompt": "표정을 더 밝게",
+        "preserve_existing": true,
+        "status": "queued",
+        "adapter": "image_provider_planned",
+        "created_at": "2026-08-31T19:28:16+09:00"
+      }
+    ]
+  }
+}

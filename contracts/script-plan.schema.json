@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ThinkCast phase-one script plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "title", "synopsis", "narration_beats", "cast_choices", "location_choices"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "title": {"type": "string", "minLength": 1},
+    "synopsis": {"type": "string", "minLength": 1},
+    "narration_beats": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"type": "string", "minLength": 1, "maxLength": 70}},
+    "cast_choices": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "location_choices": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  }
+}

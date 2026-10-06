@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>요금 안내 · 생각담 | ThinkCast</title>
+<link rel="icon" type="image/png" href="/01_app/assets/brand/thinkcast-user-symbol-inverse.png?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Song+Myung&display=swap" rel="stylesheet">
+<script src="/01_app/assets/components/thinkcast-top-nav.js?v=3"></script>
+<style>
+:root{--green:#174f48;--deep:#0b302c;--paper:#f4efe4;--card:#fbf8f0;--ink:#292c28;--muted:#747269;--gold:#d8b66a;--line:#d8d0c1}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink)}
+body{font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;word-break:keep-all}
+.shell{width:min(1480px,calc(100% - 40px));margin:0 auto;padding:34px 0 48px}
+thinkcast-top-nav{display:block}
+.app-top{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:28px}
+.brand-logo{display:block;width:min(285px,34vw);height:auto}
+.step-nav{display:flex;align-items:end;gap:5px}
+.steps{display:flex;align-items:end;gap:5px;list-style:none;margin:0;padding:0}
+.step-item{display:flex;min-width:112px;height:42px;padding:0 14px;align-items:center;gap:9px;border:1px solid #d5cfc3;border-bottom-color:#bbb3a5;border-radius:9px 9px 2px 2px;background:#e8e2d7;color:#88877f;font-size:10px;font-weight:850;letter-spacing:.05em;box-shadow:0 3px 8px rgba(34,38,34,.05);text-decoration:none;transition:.2s}
+.step-item:hover{border-color:#b99b6a;background:#f2eadb;color:var(--deep)}
+.step-item.active{height:48px;border-color:var(--green);background:var(--green);color:#fff;box-shadow:0 7px 16px rgba(23,79,72,.18)}
+.step-dot{display:grid;place-items:center;width:24px;height:24px;border-right:1px solid rgba(112,104,89,.25);color:#9b7b55;font-family:Georgia,serif;font-size:11px}
+.step-item.active .step-dot{border-color:rgba(255,255,255,.25);color:var(--gold)}
+.pricing-page{position:relative;width:min(1320px,100%);min-height:680px;margin:0 auto;padding:48px 52px;border:1px solid var(--line);border-radius:8px 22px 22px 8px;background-color:var(--card);background-image:linear-gradient(rgba(92,75,52,.025) 1px,transparent 1px);background-size:100% 32px;box-shadow:0 22px 60px rgba(33,39,33,.1)}
+.pricing-page::after{content:"";position:absolute;top:24px;bottom:24px;left:17px;width:26px;background:radial-gradient(circle at 50% 12px,#f3efe7 0 5px,#aaa394 5.5px 7px,transparent 7.5px) center top/26px 44px repeat-y;pointer-events:none}
+.temporary{display:inline-flex;margin:0 0 14px;padding:6px 10px;border:1px dashed #a88c5e;background:#f4e7c8;color:#7d5b2d;font-size:10px;font-weight:900;letter-spacing:.12em}
+.kicker{margin:0 0 8px;color:var(--green);font-size:12px;font-weight:850;letter-spacing:.12em}
+h1{margin:0;color:var(--deep);font-family:"Noto Serif KR","Batang",serif;font-size:clamp(28px,4vw,42px);letter-spacing:-.05em}
+.intro{max-width:900px;margin:12px 0 0;color:var(--muted);font-size:13px;line-height:1.7}
+.plans{display:grid;max-width:780px;grid-template-columns:minmax(0,1fr);gap:14px}
+.plan{display:grid;min-height:300px;padding:28px 30px;grid-template-columns:minmax(0,1.2fr) minmax(240px,.8fr);column-gap:34px;align-content:start;border:2px solid var(--green);border-radius:7px;background:#f2f6ef;box-shadow:4px 5px 0 #d3ddcf}
+.plan-label{margin:0;color:#8a6b42;font-size:10px;font-weight:900;letter-spacing:.14em}
+.plan h2{margin:8px 0 5px;color:var(--deep);font-family:"Noto Serif KR","Batang",serif;font-size:25px}
+.price{margin:12px 0 18px;color:var(--deep);font-family:Georgia,"Noto Serif KR",serif;font-size:30px;font-weight:700}
+.price small{color:var(--muted);font-family:inherit;font-size:11px;font-weight:500}
+.plan ul{display:grid;grid-row:1/5;grid-column:2;gap:10px;margin:0;padding:7px 0 0;align-content:start;list-style:none;color:#55584f;font-size:14px;line-height:1.55}
+.plan li::before{content:"✓";margin-right:7px;color:var(--green);font-weight:900}
+.notice{margin:26px 0 0;padding:14px 16px;border:1px dashed #b9a98e;background:#f0e7d5;color:#695638;font-size:12px;line-height:1.65}
+.matrix-section{margin-top:28px;padding-top:24px;border-top:1px dashed #a99b84}
+.matrix-section.first{display:flex;margin-top:24px;padding-top:0;border-top:0;flex-direction:column}.matrix-section.first>h2{order:-2}.matrix-section.first>.pricing-rationale,.matrix-section.first>.profit-overview{order:-1}
+.matrix-section h2{margin:0;color:var(--deep);font-family:"Noto Serif KR","Batang",serif;font-size:28px}
+.matrix-intro{max-width:880px;margin:10px 0 20px;color:var(--muted);font-size:12px;line-height:1.7}
+.matrix-group{margin-top:22px}
+.matrix-group h3{margin:0 0 9px;color:var(--green);font-size:15px}
+.matrix-scroll{overflow-x:auto;border:1px solid var(--line);background:#fffdf7}
+.cost-matrix{width:100%;min-width:820px;border-collapse:collapse;font-size:11px;line-height:1.45}
+.cost-matrix th,.cost-matrix td{padding:9px 10px;border-right:1px solid #e1dacd;border-bottom:1px solid #e1dacd;text-align:left;vertical-align:top}
+.cost-matrix th{background:#eee4d2;color:#615744;font-size:10px;letter-spacing:.03em;white-space:nowrap}
+.cost-matrix tr:last-child td{border-bottom:0}.cost-matrix th:last-child,.cost-matrix td:last-child{border-right:0}
+.cost-matrix .money{font-family:Georgia,"Noto Sans KR",sans-serif;font-weight:700;white-space:nowrap}
+.cost-matrix .current{background:#eef4ef}.cost-matrix .legacy{color:#8a8173;background:#f3f0e9}
+.quality-chip{display:inline-block;padding:2px 6px;border-radius:999px;background:#e4ede6;color:var(--green);font-size:9px;font-weight:900;white-space:nowrap}
+.matrix-foot{margin:9px 0 0;color:#81796d;font-size:10px;line-height:1.6}
+.assumption-matrix{min-width:680px}.profit-matrix{min-width:1080px}
+.profit-positive{color:#176846;font-weight:900}.profit-positive::before{content:"+"}.profit-negative{color:#a33d32;font-weight:900}.profit-caution{color:#9a5a2f;font-weight:900}
+.profit-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.profit-card{display:flex;min-width:0;flex-direction:column;padding:18px;border:1px solid #cfc4b3;border-top:4px solid var(--green);border-radius:7px;background:#fffdf7;box-shadow:0 5px 14px rgba(45,49,42,.06)}
+.profit-card h4{margin:0;color:var(--deep);font-size:17px}.profit-card .format{margin:5px 0 13px;color:#8a6b42;font-size:10px;font-weight:900;letter-spacing:.04em}
+.cadence{display:inline-flex;margin:0 0 10px;padding:5px 8px;align-self:flex-start;border-radius:4px;background:var(--green);color:#fff;font-size:10px;font-weight:900;letter-spacing:.03em}
+.profit-card .supply{margin:0 0 13px;color:var(--deep);font-family:Georgia,"Noto Sans KR",sans-serif;font-size:25px;font-weight:800}.profit-card .supply small{color:var(--muted);font-family:inherit;font-size:9px;font-weight:600}
+.regular-price{color:#8c887f;font-family:"Noto Sans KR",sans-serif;font-size:10px;font-weight:650;text-decoration:line-through}.promo-label{display:inline-flex;margin-left:4px;padding:2px 5px;border-radius:999px;background:#efe0bc;color:#76531f;font-size:8px;font-weight:900;vertical-align:middle}
+.revenue-scale{display:grid;grid-template-columns:auto 1fr;gap:0;margin:0 0 13px;padding:8px 10px;background:#eaf1eb;font-size:9px}.revenue-scale span,.revenue-scale strong{padding:4px 0;border-bottom:1px solid #d5e0d6}.revenue-scale span{color:#5f6e63}.revenue-scale strong{text-align:right;white-space:nowrap}.revenue-scale span:nth-last-child(-n+2),.revenue-scale strong:nth-last-child(-n+2){border-bottom:0}
+.profit-model{display:grid;min-height:86px;gap:6px;margin:0 0 14px;padding:9px 10px;background:#f3eee2;color:#5d5a52;font-size:9px;line-height:1.4}.api-line{display:flex;flex-wrap:wrap;gap:4px;align-items:center}.api-provider{color:var(--deep);font-weight:900}.api-badge{display:inline-flex;padding:2px 5px;border:1px solid #cfbea2;border-radius:999px;background:#fffaf0;color:#765b35;font-family:Georgia,"Noto Sans KR",sans-serif;font-size:8px;font-weight:800;white-space:nowrap}
+.profit-card dl{display:grid;grid-template-columns:1fr auto;gap:0;margin:0;font-size:10px}.profit-card dt,.profit-card dd{margin:0;padding:7px 0;border-bottom:1px solid #e8e1d5}.profit-card dd{text-align:right;font-family:Georgia,"Noto Sans KR",sans-serif;font-weight:750;white-space:nowrap}
+.profit-result{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:auto;padding-top:14px;align-items:end}.profit-result span{color:var(--muted);font-size:10px;font-weight:800}.profit-result strong{color:#176846;font-family:Georgia,"Noto Sans KR",sans-serif;font-size:20px;text-align:right}.profit-result em{grid-column:1/-1;color:var(--green);font-size:11px;font-style:normal;font-weight:900;text-align:right}
+.source-ref{color:#426b61;font-family:Georgia,serif;font-size:9px;font-weight:800;text-decoration:none;white-space:nowrap}.source-ref:hover{text-decoration:underline}
+.source-link{color:var(--green);font-weight:750;word-break:break-all}
+@media(max-width:980px){.app-top{align-items:flex-start;flex-direction:column}}
+@media(max-width:1100px){.profit-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.shell{width:100%;padding:0 12px 28px}.app-top{position:sticky;top:0;z-index:20;gap:10px;margin:0 -12px 16px;padding:10px 12px 9px;background:rgba(20,12,9,.92)}.brand-logo{width:210px}.step-nav{display:grid;width:100%;grid-template-columns:repeat(6,1fr);gap:4px}.steps{display:contents}.step-item{min-width:0;height:37px;padding:0 5px;justify-content:center;gap:3px;font-size:8px;letter-spacing:0}.step-item.active{height:41px}.step-dot{width:auto;height:auto;padding-right:4px;font-size:8px}.step-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pricing-page{min-height:calc(100dvh - 82px);padding:30px 18px 28px 39px;border-radius:7px 16px 16px 7px}.pricing-page::after{top:15px;bottom:15px;left:7px;width:22px;background-size:22px 38px}.plans{gap:11px}.plan{min-height:0;padding:24px 20px;grid-template-columns:1fr}.plan ul{grid-row:auto;grid-column:auto;padding-top:8px}.intro{font-size:14px}.profit-cards{grid-template-columns:1fr}}
+</style>
+<link rel="stylesheet" href="/01_app/assets/components/thinkcast-top-nav.css?v=1">
+</head>
+<body>
+<main class="shell">
+  <thinkcast-top-nav current="0"></thinkcast-top-nav>
+  <section class="pricing-page">
+    <span class="temporary">INTERNAL WORKSHEET · 임시 페이지</span>
+    <p class="kicker">00 · COST &amp; PRICING MATRIX</p>
+    <h1>월 정기 상품 원가·손익 매트릭스</h1>
+    <p class="intro">모든 금액은 내부 검토용 추정치입니다. API 모델 조합과 고객 수를 정한 뒤 공급가를 확정하며, 회계·세무상 확정 손익 자료로 사용하지 않습니다.</p>
+
+    <section class="matrix-section first" aria-labelledby="businessMatrixTitle">
+      <h2 id="businessMatrixTitle">사업성 요약</h2>
+      <div class="matrix-group pricing-rationale">
+        <h3>가격 결정 이유 · 투자자 요약</h3>
+        <div class="matrix-scroll"><table class="cost-matrix assumption-matrix">
+          <thead><tr><th>결정 항목</th><th>적용 기준</th><th>가격에 반영한 이유</th></tr></thead>
+          <tbody>
+            <tr><td>제공량</td><td class="money">주 1회 · 월 4회 제작·배포</td><td>일회성 제작이 아니라 매주 기획·대본·이미지·영상·음성·자막·배포까지 반복하는 월 정기 운영 상품</td></tr>
+            <tr><td>사람 외주 대체가치</td><td class="money">편당 50만–80만원<br>월 200만–320만원</td><td>20컷·60–100초 제작량을 국내 프리랜서 공개가에 대입한 비교값. 프로모션가 27.9만–74.9만원은 사람 외주 환산보다 약 63–91% 낮아 가격 경쟁력 확보 <a class="source-ref" href="#source-m-01">[M-01~04]</a></td></tr>
+            <tr><td>목표 수익성</td><td class="money">10곳 기준 40–45%</td><td>프로모션 중에도 API 재시도·수정·환불 위험을 감당하도록 네 상품 이익률을 42.4–44.8%로 설정</td></tr>
+            <tr><td>가격 계산 기준</td><td class="money">API + 운영비 7만원<br>+ 인프라 배부 4만원 + PG 3.3%</td><td>10곳 운영 시 고객당 실질 원가를 먼저 계산하고 목표 이익률을 역산한 뒤 상업 가격으로 반올림 <a class="source-ref" href="#source-i-01">[I-01]</a></td></tr>
+            <tr><td>공통 품질 하한</td><td>전 상품 고품질 문서 작성·상위 모델 의미 검수·로컬 린트·승인 게이트</td><td>저가 상품도 잘못된 대본이 이미지·영상 비용으로 번지지 않게 차단하며, 상품별 차이를 문서 신뢰도가 아니라 미디어 모델과 포맷에 둠</td></tr>
+            <tr><td>상품별 가격 차이</td><td>720p/1080p · 단일/멀티 포맷 · 1K/2K/4K 원본 · Kling/Veo 영상 모델</td><td>영상 API가 전체 원가 차이를 가장 크게 만들기 때문에 해상도·생성 모델·멀티 포맷 범위를 단계별로 차등 적용</td></tr>
+            <tr><td>규모 효과</td><td class="money">10곳 인프라 40만원<br>50곳 이상 고객당 배부 감소</td><td>기준 가격은 초기 10곳에서 수익성을 확보하고, 고객 증가 시 인프라 고정비 분산으로 재투자 여력과 장애 대응 여유를 확보</td></tr>
+          </tbody>
+        </table></div>
+        <p class="matrix-foot">프로모션가: 쇼츠 라이트 279,000원 · 멀티 스탠다드 319,000원 · 멀티 프로 399,000원 · 멀티 프리미엄 749,000원. 모두 VAT 별도이며 손익은 10곳 운영 기준입니다.</p>
+      </div>
+      <div class="matrix-group">
+        <h3>공통 산정 가정</h3>
+        <div class="matrix-scroll"><table class="cost-matrix assumption-matrix">
+          <thead><tr><th>구분</th><th>적용값</th><th>산정 메모</th></tr></thead>
+          <tbody>
+            <tr><td>제작·배포 주기</td><td class="money">주 1회 · 월 4회</td><td>월 정기 상품 공통 제공 기준. 콘텐츠 제작 후 선택 플랫폼 배포 일정 등록</td></tr>
+            <tr><td>기획·대본 품질</td><td class="money">전 상품 고품질</td><td>기획안·대본·스크립트·촬영 대본은 등급과 무관하게 상위급 LLM으로 작성·검수</td></tr>
+            <tr><td>상위 모델 의미 검수</td><td class="money">전 상품 공통 포함</td><td>브랜드 적합성·사실관계·서사·장면 연결·촬영 가능성을 상위 모델이 검수하고, 통과 전에는 이미지 이후 작업을 생성하지 않음</td></tr>
+            <tr><td>LLM 토큰 운영 목표</td><td class="money">월 입력 12만 · 출력 4만</td><td>고정 템플릿·프롬프트 캐시·JSON 스키마·로컬 린트·오류 필드 부분 수정 하네스 적용을 전제로 한 목표치</td></tr>
+            <tr><td>이미지 품질</td><td class="money">라이트 1K · 멀티 2K · 프리미엄 4K</td><td>720p 단일 포맷 쇼츠 라이트는 1K, 스탠다드·프로는 2K, 프리미엄만 최상급 4K 원본 이미지 적용</td></tr>
+            <tr><td>이미지 생성</td><td class="money">편당 20장 · 월 80장</td><td>이미지 생성 로스 포함 호출량</td></tr>
+            <tr><td>이미지→영상</td><td class="money">편당 60–100초</td><td>20장 × 장당 3–5초</td></tr>
+            <tr><td>영상 재시도</td><td class="money">20%</td><td>실패·품질 미달 재생성 예비율</td></tr>
+            <tr><td>월 음성 길이</td><td class="money">약 4–6.7분</td><td>완성 영상 240–400초 기준. Typecast 구독 선택 시 최소 월비용은 공통 고정비에 별도 추가</td></tr>
+            <tr><td>환율</td><td class="money">1 USD = 1,374.55원</td><td>2026-08-28 기준 <a class="source-ref" href="#source-fx-01">[FX-01]</a>, 외화 결제 여유 5%는 API 예산에 포함</td></tr>
+            <tr><td>운영 변동비</td><td class="money">고객당 월 70,000원</td><td>사람 검수 50,000원 + 수정·응대 예비 20,000원 내부 가정 <a class="source-ref" href="#source-i-01">[I-01]</a></td></tr>
+            <tr><td>공통 인프라 고정비</td><td class="money">10곳 기준 월 400,000원</td><td>M4 mini 3년 상각 + 코로케이션·회선 + 클라우드 DB·저장소·백업·모니터링 내부 가정 <a class="source-ref" href="#source-i-01">[I-01]</a></td></tr>
+            <tr><td>기준 고객 수</td><td class="money">10곳</td><td>고객당 인프라 고정비 배부 40,000원. 고객 증가 시 워커·회선·저장소를 계단식 증설</td></tr>
+            <tr><td>결제비</td><td class="money">공급가액의 3.3%</td><td>PG 미선정 상태의 내부 가정 <a class="source-ref" href="#source-i-01">[I-01]</a>, 계좌이체 시 달라짐</td></tr>
+          </tbody>
+        </table></div>
+        <h3 style="margin-top:16px">전 상품 공통 검증 게이트</h3>
+        <div class="matrix-scroll"><table class="cost-matrix assumption-matrix">
+          <thead><tr><th>게이트</th><th>자동 검증</th><th>상위 모델 검수</th><th>실패 시 처리</th></tr></thead>
+          <tbody>
+            <tr><td>기획·대본·촬영 대본</td><td>필수 필드·길이·JSON 스키마·금칙어·타임라인 참조 린트</td><td>브랜드·사실성·논리·서사·장면 연결·촬영 가능성</td><td><strong>이미지 생성 차단</strong> · 오류 필드만 부분 수정</td></tr>
+            <tr><td>스토리보드·장면 이미지</td><td>장면 ID·URI·해상도·화면비·메타데이터·누락 검사</td><td>인물·제품·배경 일관성 및 대본 의미 일치</td><td><strong>I2V 생성 차단</strong> · 사용자 승인 이미지 외 변환 금지</td></tr>
+            <tr><td>I2V·음성·자막</td><td>길이·해상도·타임코드·나레이션·자막 동기화 검사</td><td>시각 품질·움직임 오류·발음·문맥 최종 QA</td><td>해당 장면만 재생성 · 이후 합성 결과는 <code>stale</code> 처리</td></tr>
+            <tr><td>최종 렌더·배포</td><td>H.264/AAC·FPS·최종 길이·플랫폼 규격·중복 일정 검사</td><td>최종 콘텐츠·브랜드·배포 문안 승인 검수</td><td><strong>배포 차단</strong> · 승인된 이전 산출물과 비용 기록 보존</td></tr>
+          </tbody>
+        </table></div>
+        <p class="matrix-foot">비싼 뒤 단계를 만든 뒤 삭제하는 방식이 아니라, 앞 단계가 통과하기 전에는 다음 작업을 큐에 넣지 않습니다. 앞 단계 수정 시 영향받은 장면 이후 산출물만 무효화하고 정상 산출물은 재사용합니다.</p>
+      </div>
+
+      <div class="matrix-group">
+        <h3>월 정기 상품 4단계 · 포맷 지원 범위</h3>
+        <div class="matrix-scroll"><table class="cost-matrix profit-matrix">
+          <thead><tr><th>상품 단계</th><th>정상가 / 프로모션가<br>VAT 별도</th><th>지원 포맷·납품 해상도</th><th>제작 품질 정책</th><th>월 기본 제공량</th><th>운영 기준</th></tr></thead>
+          <tbody>
+            <tr><td>쇼츠 라이트</td><td class="money"><span class="regular-price">299,000원</span><br>279,000원 <span class="promo-label">PROMO</span></td><td><strong>9:16 숏폼 전용</strong><br>720×1280 · 720p</td><td>고품질 기획·대본<br>1K 이미지<br><strong>라이트급 I2V</strong></td><td><strong>주 1회 · 월 4회 제작·배포</strong><br>회당 이미지 20장<br>장당 영상 3–5초</td><td>1:1·16:9 미지원·확대 크롭 장면만 2K 예외 적용</td></tr>
+            <tr><td>멀티 스탠다드</td><td class="money"><span class="regular-price">349,000원</span><br>319,000원 <span class="promo-label">PROMO</span></td><td><strong>9:16 · 1:1 · 16:9</strong><br>1080×1920 · 1080×1080 · 1920×1080 · FHD</td><td>고품질 기획·대본<br>2K 이미지<br><strong>스탠다드급 1080p I2V</strong></td><td><strong>주 1회 · 월 4회 제작·배포</strong><br>회당 이미지 20장<br>장당 영상 3–5초</td><td>동일 마스터 타임라인에서 포맷별 크롭·안전영역·인코딩 최적화</td></tr>
+            <tr><td>멀티 프로</td><td class="money"><span class="regular-price">449,000원</span><br>399,000원 <span class="promo-label">PROMO</span></td><td><strong>9:16 · 1:1 · 16:9</strong><br>1080×1920 · 1080×1080 · 1920×1080 · FHD</td><td>고품질 기획·대본<br><strong>최상급 2K 이미지</strong><br>Veo Fast 1080p I2V</td><td><strong>주 1회 · 월 4회 제작·배포</strong><br>회당 이미지 20장<br>장당 영상 3–5초</td><td>Veo 3.1 Fast 1080p 생성·동일 마스터 타임라인 기준 멀티 포맷 납품</td></tr>
+            <tr><td>멀티 프리미엄</td><td class="money"><span class="regular-price">799,000원</span><br>749,000원 <span class="promo-label">PROMO</span></td><td><strong>9:16 · 1:1 · 16:9</strong><br>1080×1920 · 1080×1080 · 1920×1080 · FHD</td><td>고품질 기획·대본<br><strong>최상급 4K 원본 이미지</strong><br>Veo Standard 1080p I2V</td><td><strong>주 1회 · 월 4회 제작·배포</strong><br>회당 이미지 20장<br>장당 영상 3–5초</td><td>최종 영상은 1080p FHD·동일 마스터 타임라인 기준 멀티 포맷 납품</td></tr>
+          </tbody>
+        </table></div>
+        <p class="matrix-foot">멀티 상품의 3개 포맷은 동일한 대본·장면·마스터 타임라인을 플랫폼별 화면비로 최적화한 납품본입니다. 포맷별 별도 대본 작성이나 AI 영상 재생성은 현재 원가에 포함하지 않습니다.</p>
+      </div>
+
+      <div class="matrix-group profit-overview">
+        <h3>모델 조합별 월 손익 · 유료 고객 10곳 운영 기준 / 고객 1곳당 원화</h3>
+        <div class="profit-cards">
+          <article class="profit-card">
+            <h4>쇼츠 라이트</h4><p class="format">9:16 숏폼 전용 · 720p</p><span class="cadence">주 1회 · 월 4회 제작·배포</span><p class="supply"><span class="regular-price">정상 299,000원</span><br>279,000원 <span class="promo-label">PROMO</span> <small>VAT 별도</small></p>
+            <div class="revenue-scale" aria-label="프로모션가 기준 고객 수별 월 매출"><span>1곳</span><strong>279,000원</strong><span>10곳</span><strong>2,790,000원</strong><span>50곳</span><strong>13,950,000원</strong><span>100곳</span><strong>27,900,000원</strong><span>500곳</span><strong>139,500,000원</strong><span>1,000곳</span><strong>279,000,000원</strong></div>
+            <div class="profit-model"><div class="api-line"><span class="api-provider">Anthropic</span> Claude Sonnet 5 · 작성 <span class="api-badge">입력 $2 · 출력 $10 / 1M</span></div><div class="api-line"><span class="api-provider">OpenAI</span> GPT-5.6 Sol · 상위 검수 <span class="api-badge">입력 $4 · 출력 $20 / 1M</span></div><div class="api-line"><span class="api-provider">Google</span> Nano Banana 2 · 1K <span class="api-badge">$0.067/장</span></div><div class="api-line"><span class="api-provider">Kling</span> 2.5 Turbo · 720p <span class="api-badge">$0.042/초</span></div></div>
+            <dl><dt>API 원가 상한</dt><dd>38,000원</dd><dt>운영 변동비</dt><dd>70,000원</dd><dt>인프라비 배부</dt><dd>40,000원</dd><dt>결제비 3.3%</dt><dd>9,207원</dd><dt>고객당 총원가</dt><dd>157,207원</dd></dl>
+            <div class="profit-result"><span>고객당 세전 순이익</span><strong class="profit-positive">121,793원</strong><em>10곳 전체 월 순이익 +1,217,930원 · 이익률 43.7%</em></div>
+          </article>
+          <article class="profit-card">
+            <h4>멀티 스탠다드</h4><p class="format">9:16 · 1:1 · 16:9 · 1080p FHD</p><span class="cadence">주 1회 · 월 4회 제작·배포</span><p class="supply"><span class="regular-price">정상 349,000원</span><br>319,000원 <span class="promo-label">PROMO</span> <small>VAT 별도</small></p>
+            <div class="revenue-scale" aria-label="프로모션가 기준 고객 수별 월 매출"><span>1곳</span><strong>319,000원</strong><span>10곳</span><strong>3,190,000원</strong><span>50곳</span><strong>15,950,000원</strong><span>100곳</span><strong>31,900,000원</strong><span>500곳</span><strong>159,500,000원</strong><span>1,000곳</span><strong>319,000,000원</strong></div>
+            <div class="profit-model"><div class="api-line"><span class="api-provider">Anthropic</span> Claude Sonnet 5 · 작성 <span class="api-badge">입력 $2 · 출력 $10 / 1M</span></div><div class="api-line"><span class="api-provider">OpenAI</span> GPT-5.6 Sol · 상위 검수 <span class="api-badge">입력 $4 · 출력 $20 / 1M</span></div><div class="api-line"><span class="api-provider">Google</span> Nano Banana 2 · 2K <span class="api-badge">$0.101/장</span></div><div class="api-line"><span class="api-provider">Kling</span> 2.5 Turbo · 1080p <span class="api-badge">$0.070/초</span></div></div>
+            <dl><dt>API 원가 상한</dt><dd>61,000원</dd><dt>운영 변동비</dt><dd>70,000원</dd><dt>인프라비 배부</dt><dd>40,000원</dd><dt>결제비 3.3%</dt><dd>10,527원</dd><dt>고객당 총원가</dt><dd>181,527원</dd></dl>
+            <div class="profit-result"><span>고객당 세전 순이익</span><strong class="profit-positive">137,473원</strong><em>10곳 전체 월 순이익 +1,374,730원 · 이익률 43.1%</em></div>
+          </article>
+          <article class="profit-card">
+            <h4>멀티 프로</h4><p class="format">9:16 · 1:1 · 16:9 · 1080p FHD</p><span class="cadence">주 1회 · 월 4회 제작·배포</span><p class="supply"><span class="regular-price">정상 449,000원</span><br>399,000원 <span class="promo-label">PROMO</span> <small>VAT 별도</small></p>
+            <div class="revenue-scale" aria-label="고객 수별 월 매출"><span>1곳</span><strong>399,000원</strong><span>10곳</span><strong>3,990,000원</strong><span>50곳</span><strong>19,950,000원</strong><span>100곳</span><strong>39,900,000원</strong><span>500곳</span><strong>199,500,000원</strong><span>1,000곳</span><strong>399,000,000원</strong></div>
+            <div class="profit-model"><div class="api-line"><span class="api-provider">OpenAI</span> GPT-5.6 Terra · 작성 <span class="api-badge">입력 $2 · 출력 $12 / 1M</span></div><div class="api-line"><span class="api-provider">OpenAI</span> GPT-5.6 Sol · 상위 검수 <span class="api-badge">입력 $4 · 출력 $20 / 1M</span></div><div class="api-line"><span class="api-provider">Google</span> Nano Banana 2 · 2K 최상급 <span class="api-badge">$0.101/장</span></div><div class="api-line"><span class="api-provider">Google</span> Veo 3.1 Fast · 1080p FHD <span class="api-badge">$0.120/초</span></div></div>
+            <dl><dt>API 원가 상한</dt><dd>97,000원</dd><dt>운영 변동비</dt><dd>70,000원</dd><dt>인프라비 배부</dt><dd>40,000원</dd><dt>결제비 3.3%</dt><dd>13,167원</dd><dt>고객당 총원가</dt><dd>220,167원</dd></dl>
+            <div class="profit-result"><span>고객당 세전 순이익</span><strong class="profit-positive">178,833원</strong><em>10곳 전체 월 순이익 +1,788,330원 · 이익률 44.8%</em></div>
+          </article>
+          <article class="profit-card">
+            <h4>멀티 프리미엄</h4><p class="format">9:16 · 1:1 · 16:9 · 1080p FHD</p><span class="cadence">주 1회 · 월 4회 제작·배포</span><p class="supply"><span class="regular-price">정상 799,000원</span><br>749,000원 <span class="promo-label">PROMO</span> <small>VAT 별도</small></p>
+            <div class="revenue-scale" aria-label="프로모션가 기준 고객 수별 월 매출"><span>1곳</span><strong>749,000원</strong><span>10곳</span><strong>7,490,000원</strong><span>50곳</span><strong>37,450,000원</strong><span>100곳</span><strong>74,900,000원</strong><span>500곳</span><strong>374,500,000원</strong><span>1,000곳</span><strong>749,000,000원</strong></div>
+            <div class="profit-model"><div class="api-line"><span class="api-provider">Anthropic/OpenAI</span> Sonnet 5 작성 · GPT-5.6 Sol 상위 검수 <span class="api-badge">$2·$10 / $4·$20 per 1M</span></div><div class="api-line"><span class="api-provider">Google</span> Nano Banana 2 · 4K 최상급 <span class="api-badge">$0.151/장</span></div><div class="api-line"><span class="api-provider">Google</span> Veo 3.1 Standard · 1080p <span class="api-badge">$0.400/초</span></div></div>
+            <dl><dt>API 원가 상한</dt><dd>297,000원</dd><dt>운영 변동비</dt><dd>70,000원</dd><dt>인프라비 배부</dt><dd>40,000원</dd><dt>결제비 3.3%</dt><dd>24,717원</dd><dt>고객당 총원가</dt><dd>431,717원</dd></dl>
+            <div class="profit-result"><span>고객당 세전 순이익</span><strong class="profit-positive">317,283원</strong><em>10곳 전체 월 순이익 +3,172,830원 · 이익률 42.4%</em></div>
+          </article>
+        </div>
+        <div class="matrix-group">
+          <h3>사람 외주 대체비용 비교 · 국내 프리랜서 플랫폼 공개가</h3>
+          <div class="matrix-scroll"><table class="cost-matrix profit-matrix">
+            <thead><tr><th>제작 범위</th><th>공개 편당 가격</th><th>일반 구성</th><th>ThinkCast 기준 해석</th><th>근거</th></tr></thead>
+            <tbody>
+              <tr><td>일반 영상 편집</td><td class="money">평균 100,000원<br>30,000–1,000,000원</td><td>제공받은 촬영본 편집 중심</td><td>기획·AI 원본 생성이 없어 직접 비교에는 부족</td><td><a class="source-ref" href="#source-m-01">[M-01]</a></td></tr>
+              <tr><td>기본 AI 숏폼</td><td class="money">150,000–300,000원</td><td>15–30초 · 기획·AI 생성·자막·사운드</td><td>편당 20만~30만원이 보통인 중간 구간</td><td><a class="source-ref" href="#source-m-02">[M-02]</a> <a class="source-ref" href="#source-m-03">[M-03]</a></td></tr>
+              <tr><td>고품질 AI 숏폼</td><td class="money">300,000–500,000원</td><td>30–60초 · 스토리·고급 편집·수정 포함</td><td>브랜드형 제작의 일반 비교 구간</td><td><a class="source-ref" href="#source-m-02">[M-02]</a> <a class="source-ref" href="#source-m-03">[M-03]</a></td></tr>
+              <tr><td>프리미엄 AI 영상</td><td class="money">500,000–800,000원</td><td>45–60초 · 고급 연출·보이스·사운드</td><td>ThinkCast 20컷·60–100초와 가장 가까운 공개 상품군</td><td><a class="source-ref" href="#source-m-04">[M-04]</a></td></tr>
+              <tr class="current"><td><strong>ThinkCast 사람 외주 환산</strong></td><td class="money"><strong>편당 500,000–800,000원</strong><br>월 2,000,000–3,200,000원</td><td>20컷 · 60–100초 · 기획·대본·이미지·I2V·음성·자막·편집</td><td>공개 사례를 제작량에 맞춘 내부 추정. 멀티 포맷·배포 포함 시 월 240만~400만원 검토</td><td><a class="source-ref" href="#source-i-01">[I-01]</a> <a class="source-ref" href="#source-m-02">[M-02]</a> <a class="source-ref" href="#source-m-04">[M-04]</a></td></tr>
+            </tbody>
+          </table></div>
+          <p class="matrix-foot">플랫폼 공개가는 전문가·수정 횟수·러닝타임·촬영 여부에 따라 달라집니다. ThinkCast 환산가는 외부 플랫폼의 확정 견적이 아니라, 주 1회·월 4회 및 회당 20컷 제작량을 공개 사례에 대입한 내부 비교값입니다.</p>
+        </div>
+        <p class="matrix-foot">카드의 손익은 유료 고객 10곳이 모두 해당 상품을 프로모션가로 이용한다고 가정한 고객 1곳당 월 원화 기준입니다. 네 상품 모두 프로모션가에서도 기준 이익률 40–45%를 확보하며, 50곳 이상에서 높아지는 이익률은 고객당 인프라 배부액 감소에 따른 규모 효과입니다. 예상 세전 순이익 = 공급가액 − API 원가 − 운영 변동비 − 인프라비 배부 − 결제비.</p>
+      </div>
+
+      <div class="matrix-group">
+        <h3>고객 수별 인프라 증설·고정비 배부</h3>
+        <div class="matrix-scroll"><table class="cost-matrix assumption-matrix">
+          <thead><tr><th>유료 고객 수</th><th>월 제작량</th><th>월 인프라 고정비</th><th>고객당 배부액</th><th>증설 가정</th></tr></thead>
+          <tbody>
+            <tr><td class="money">1곳</td><td class="money">4편</td><td class="money">400,000원</td><td class="money profit-caution">400,000원</td><td>10곳 이하와 동일한 최소 코로케이션·클라우드 구성</td></tr>
+            <tr class="current"><td class="money">10곳</td><td class="money">40편</td><td class="money">400,000원</td><td class="money">40,000원</td><td>M4 mini 1대·코로케이션·기본 클라우드 구성</td></tr>
+            <tr><td class="money">50곳</td><td class="money">200편</td><td class="money">900,000원</td><td class="money">18,000원</td><td>렌더 워커 2대 수준·DB/스토리지 상향</td></tr>
+            <tr><td class="money">100곳</td><td class="money">400편</td><td class="money">1,500,000원</td><td class="money">15,000원</td><td>렌더 워커 4대 수준·회선/백업 이중화</td></tr>
+            <tr><td class="money">500곳</td><td class="money">2,000편</td><td class="money">5,500,000원</td><td class="money">11,000원</td><td>다중 워커·작업 큐·DB/저장소 수평 확장</td></tr>
+            <tr><td class="money">1,000곳</td><td class="money">4,000편</td><td class="money">10,000,000원</td><td class="money">10,000원</td><td>다중 워커 풀·이중화 API/DB·전용 관제</td></tr>
+          </tbody>
+        </table></div>
+        <p class="matrix-foot">인프라 고정비는 장비 상각, IDC 상면·전력·회선, 클라우드 API·DB·객체 저장소·백업·모니터링을 포함한 내부 용량 계획입니다. 실제 동시 작업량, 영상 보존기간 및 회선 계약에 따라 달라집니다. <a class="source-ref" href="#source-i-01">[I-01]</a></p>
+      </div>
+
+      <div class="matrix-group">
+        <h3>가격대별 고객 수 확장 손익 · 원화 기준</h3>
+        <div class="matrix-scroll"><table class="cost-matrix profit-matrix">
+          <thead><tr><th>유료 고객</th><th>상품 단계</th><th>고객당 프로모션가</th><th>API 원가</th><th>운영 변동비</th><th>인프라비 배부</th><th>결제비</th><th>고객당 총원가</th><th>고객당 세전 순이익</th><th>이익률</th><th>전체 월 세전 순이익</th></tr></thead>
+          <tbody>
+            <tr><td class="money" rowspan="4">1곳</td><td>쇼츠 라이트</td><td class="money">279,000원</td><td class="money">38,000원</td><td class="money">70,000원</td><td class="money">400,000원</td><td class="money">9,207원</td><td class="money">517,207원</td><td class="money profit-negative">−238,207원</td><td class="money profit-negative">−85.4%</td><td class="money profit-negative">−238,207원</td></tr>
+            <tr><td>멀티 스탠다드</td><td class="money">319,000원</td><td class="money">61,000원</td><td class="money">70,000원</td><td class="money">400,000원</td><td class="money">10,527원</td><td class="money">541,527원</td><td class="money profit-negative">−222,527원</td><td class="money profit-negative">−69.8%</td><td class="money profit-negative">−222,527원</td></tr>
+            <tr><td>멀티 프로</td><td class="money">399,000원</td><td class="money">97,000원</td><td class="money">70,000원</td><td class="money">400,000원</td><td class="money">13,167원</td><td class="money">580,167원</td><td class="money profit-negative">−181,167원</td><td class="money profit-negative">−45.4%</td><td class="money profit-negative">−181,167원</td></tr>
+            <tr><td>멀티 프리미엄</td><td class="money">749,000원</td><td class="money">297,000원</td><td class="money">70,000원</td><td class="money">400,000원</td><td class="money">24,717원</td><td class="money">791,717원</td><td class="money profit-negative">−42,717원</td><td class="money profit-negative">−5.7%</td><td class="money profit-negative">−42,717원</td></tr>
+
+            <tr class="current"><td class="money" rowspan="4">10곳</td><td>쇼츠 라이트</td><td class="money">279,000원</td><td class="money">38,000원</td><td class="money">70,000원</td><td class="money">40,000원</td><td class="money">9,207원</td><td class="money">157,207원</td><td class="money profit-positive">121,793원</td><td class="money">43.7%</td><td class="money profit-positive">1,217,930원</td></tr>
+            <tr class="current"><td>멀티 스탠다드</td><td class="money">319,000원</td><td class="money">61,000원</td><td class="money">70,000원</td><td class="money">40,000원</td><td class="money">10,527원</td><td class="money">181,527원</td><td class="money profit-positive">137,473원</td><td class="money">43.1%</td><td class="money profit-positive">1,374,730원</td></tr>
+            <tr class="current"><td>멀티 프로</td><td class="money">399,000원</td><td class="money">97,000원</td><td class="money">70,000원</td><td class="money">40,000원</td><td class="money">13,167원</td><td class="money">220,167원</td><td class="money profit-positive">178,833원</td><td class="money">44.8%</td><td class="money profit-positive">1,788,330원</td></tr>
+            <tr class="current"><td>멀티 프리미엄</td><td class="money">749,000원</td><td class="money">297,000원</td><td class="money">70,000원</td><td class="money">40,000원</td><td class="money">24,717원</td><td class="money">431,717원</td><td class="money profit-positive">317,283원</td><td class="money">42.4%</td><td class="money profit-positive">3,172,830원</td></tr>
+
+            <tr><td class="money" rowspan="4">50곳</td><td>쇼츠 라이트</td><td class="money">279,000원</td><td class="money">38,000원</td><td class="money">70,000원</td><td class="money">18,000원</td><td class="money">9,207원</td><td class="money">135,207원</td><td class="money profit-positive">143,793원</td><td class="money">51.5%</td><td class="money profit-positive">7,189,650원</td></tr>
+            <tr><td>멀티 스탠다드</td><td class="money">319,000원</td><td class="money">61,000원</td><td class="money">70,000원</td><td class="money">18,000원</td><td class="money">10,527원</td><td class="money">159,527원</td><td class="money profit-positive">159,473원</td><td class="money">50.0%</td><td class="money profit-positive">7,973,650원</td></tr>
+            <tr><td>멀티 프로</td><td class="money">399,000원</td><td class="money">97,000원</td><td class="money">70,000원</td><td class="money">18,000원</td><td class="money">13,167원</td><td class="money">198,167원</td><td class="money profit-positive">200,833원</td><td class="money">50.3%</td><td class="money profit-positive">10,041,650원</td></tr>
+            <tr><td>멀티 프리미엄</td><td class="money">749,000원</td><td class="money">297,000원</td><td class="money">70,000원</td><td class="money">18,000원</td><td class="money">24,717원</td><td class="money">409,717원</td><td class="money profit-positive">339,283원</td><td class="money">45.3%</td><td class="money profit-positive">16,964,150원</td></tr>
+
+            <tr><td class="money" rowspan="4">100곳</td><td>쇼츠 라이트</td><td class="money">279,000원</td><td class="money">38,000원</td><td class="money">70,000원</td><td class="money">15,000원</td><td class="money">9,207원</td><td class="money">132,207원</td><td class="money profit-positive">146,793원</td><td class="money">52.6%</td><td class="money profit-positive">14,679,300원</td></tr>
+            <tr><td>멀티 스탠다드</td><td class="money">319,000원</td><td class="money">61,000원</td><td class="money">70,000원</td><td class="money">15,000원</td><td class="money">10,527원</td><td class="money">156,527원</td><td class="money profit-positive">162,473원</td><td class="money">50.9%</td><td class="money profit-positive">16,247,300원</td></tr>
+            <tr><td>멀티 프로</td><td class="money">399,000원</td><td class="money">97,000원</td><td class="money">70,000원</td><td class="money">15,000원</td><td class="money">13,167원</td><td class="money">195,167원</td><td class="money profit-positive">203,833원</td><td class="money">51.1%</td><td class="money profit-positive">20,383,300원</td></tr>
+            <tr><td>멀티 프리미엄</td><td class="money">749,000원</td><td class="money">297,000원</td><td class="money">70,000원</td><td class="money">15,000원</td><td class="money">24,717원</td><td class="money">406,717원</td><td class="money profit-positive">342,283원</td><td class="money">45.7%</td><td class="money profit-positive">34,228,300원</td></tr>
+
+            <tr><td class="money" rowspan="4">500곳</td><td>쇼츠 라이트</td><td class="money">279,000원</td><td class="money">38,000원</td><td class="money">70,000원</td><td class="money">11,000원</td><td class="money">9,207원</td><td class="money">128,207원</td><td class="money profit-positive">150,793원</td><td class="money">54.0%</td><td class="money profit-positive">75,396,500원</td></tr>
+            <tr><td>멀티 스탠다드</td><td class="money">319,000원</td><td class="money">61,000원</td><td class="money">70,000원</td><td class="money">11,000원</td><td class="money">10,527원</td><td class="money">152,527원</td><td class="money profit-positive">166,473원</td><td class="money">52.2%</td><td class="money profit-positive">83,236,500원</td></tr>
+            <tr><td>멀티 프로</td><td class="money">399,000원</td><td class="money">97,000원</td><td class="money">70,000원</td><td class="money">11,000원</td><td class="money">13,167원</td><td class="money">191,167원</td><td class="money profit-positive">207,833원</td><td class="money">52.1%</td><td class="money profit-positive">103,916,500원</td></tr>
+            <tr><td>멀티 프리미엄</td><td class="money">749,000원</td><td class="money">297,000원</td><td class="money">70,000원</td><td class="money">11,000원</td><td class="money">24,717원</td><td class="money">402,717원</td><td class="money profit-positive">346,283원</td><td class="money">46.2%</td><td class="money profit-positive">173,141,500원</td></tr>
+
+            <tr><td class="money" rowspan="4">1,000곳</td><td>쇼츠 라이트</td><td class="money">279,000원</td><td class="money">38,000원</td><td class="money">70,000원</td><td class="money">10,000원</td><td class="money">9,207원</td><td class="money">127,207원</td><td class="money profit-positive">151,793원</td><td class="money">54.4%</td><td class="money profit-positive">151,793,000원</td></tr>
+            <tr><td>멀티 스탠다드</td><td class="money">319,000원</td><td class="money">61,000원</td><td class="money">70,000원</td><td class="money">10,000원</td><td class="money">10,527원</td><td class="money">151,527원</td><td class="money profit-positive">167,473원</td><td class="money">52.5%</td><td class="money profit-positive">167,473,000원</td></tr>
+            <tr><td>멀티 프로</td><td class="money">399,000원</td><td class="money">97,000원</td><td class="money">70,000원</td><td class="money">10,000원</td><td class="money">13,167원</td><td class="money">190,167원</td><td class="money profit-positive">208,833원</td><td class="money">52.3%</td><td class="money profit-positive">208,833,000원</td></tr>
+            <tr><td>멀티 프리미엄</td><td class="money">749,000원</td><td class="money">297,000원</td><td class="money">70,000원</td><td class="money">10,000원</td><td class="money">24,717원</td><td class="money">401,717원</td><td class="money profit-positive">347,283원</td><td class="money">46.4%</td><td class="money profit-positive">347,283,000원</td></tr>
+          </tbody>
+        </table></div>
+        <p class="matrix-foot">각 행은 해당 고객 수가 모두 동일 상품을 구독한다고 가정한 비교입니다. 실제 혼합 상품 매출은 상품별 고객 수 × 고객당 순이익을 합산해 계산합니다. 인건비 조직 확대, 영업비, 환불·미수금, 법인세는 포함하지 않았습니다.</p>
+      </div>
+    </section>
+
+    <section class="matrix-section" aria-labelledby="costMatrixTitle">
+      <h2 id="costMatrixTitle">API 공급자 상세 원가</h2>
+      <p class="matrix-intro">2026년 8월 31일 공식 API 공개 단가 기준입니다. 월 4편 · 편당 이미지 20장 · 이미지별 3–5초 영상 · 영상 재시도 20%를 동일하게 적용했습니다. 원화는 1 USD = 1,374.55원 기준이며 품질 평가는 모델 포지션을 이해하기 위한 운영상 분류입니다.</p>
+
+      <div class="matrix-group">
+        <h3>기획·대본·검수 LLM · 월 입력 12만 / 출력 4만 토큰 가정 <a class="source-ref" href="#source-g-01">[G-01]</a> <a class="source-ref" href="#source-o-01">[O-01]</a> <a class="source-ref" href="#source-a-01">[A-01~03]</a></h3>
+        <div class="matrix-scroll"><table class="cost-matrix">
+          <thead><tr><th>공급자</th><th>모델</th><th>공식 단가 / 1M tokens</th><th>월 예상</th><th>운영 포지션</th></tr></thead>
+          <tbody>
+            <tr class="current"><td>Google</td><td>Gemini 3.7 Flash · 프로모션</td><td>입력 $0.75 · 출력 $3.75</td><td class="money">$0.24 · 약 330원</td><td><span class="quality-chip">효율형</span> 빠른 초안·반복 기획</td></tr>
+            <tr><td>Google</td><td>Gemini 3.5 Flash</td><td>입력 $1.50 · 출력 $9</td><td class="money">$0.54 · 약 742원</td><td><span class="quality-chip">균형형</span> 대본·멀티모달 검수</td></tr>
+            <tr><td>Google</td><td>Gemini 3.1 Pro</td><td>입력 $2 · 출력 $12</td><td class="money">$0.72 · 약 990원</td><td><span class="quality-chip">고품질</span> 복합 기획·멀티모달 검수</td></tr>
+            <tr><td>OpenAI</td><td>GPT-5.6 Luna</td><td>입력 $0.20 · 출력 $1.20</td><td class="money">$0.07 · 약 99원</td><td><span class="quality-chip">효율형</span> 대량 구조화</td></tr>
+            <tr><td>OpenAI</td><td>GPT-5.6 Terra</td><td>입력 $2 · 출력 $12</td><td class="money">$0.72 · 약 990원</td><td><span class="quality-chip">균형형</span> 기획·카피·검수</td></tr>
+            <tr><td>OpenAI</td><td>GPT-5.6 Sol</td><td>입력 $4 · 출력 $20</td><td class="money">$1.28 · 약 1,759원</td><td><span class="quality-chip">최상위</span> 난도 높은 최종 검수</td></tr>
+            <tr><td>Anthropic</td><td>Claude Haiku 4.5</td><td>입력 $1 · 출력 $5</td><td class="money">$0.32 · 약 440원</td><td><span class="quality-chip">효율형</span> 요약·변형·초안</td></tr>
+            <tr><td>Anthropic</td><td>Claude Sonnet 4.6</td><td>입력 $3 · 출력 $15</td><td class="money">$0.96 · 약 1,320원</td><td><span class="quality-chip">고품질</span> 서사·장문 대본</td></tr>
+            <tr class="current"><td>Anthropic</td><td>Claude Sonnet 5</td><td>입력 $2 · 출력 $10</td><td class="money">$0.64 · 약 880원</td><td><span class="quality-chip">최신 권장</span> 서사·최종 대본</td></tr>
+          </tbody>
+        </table></div>
+        <p class="matrix-foot">월 입력 12만·출력 4만은 작성과 상위 모델 검수 호출을 합친 총 운영 목표입니다. 고정 템플릿, 캐시, 스키마·로컬 린트, 실패 필드 부분 수정이 적용되지 않으면 초과할 수 있으므로 실제 작업의 provider usage를 기록해 월별로 보정합니다. Claude는 이미지나 영상을 생성하는 모델이 아니며 기획·대본·비전 검수 역할로만 비교합니다.</p>
+      </div>
+
+      <div class="matrix-group">
+        <h3>TTS · 대본→음성 · 월 4–6.7분 가정 <a class="source-ref" href="#source-tc-01">[TC-01]</a> <a class="source-ref" href="#source-o-05">[O-05]</a> <a class="source-ref" href="#source-g-02">[G-02]</a></h3>
+        <div class="matrix-scroll"><table class="cost-matrix">
+          <thead><tr><th>공급자</th><th>모델·플랜</th><th>공식 단가</th><th>월 사용량 원가</th><th>실제 최소 지출</th><th>운영 메모</th></tr></thead>
+          <tbody>
+            <tr class="current"><td>Typecast</td><td>SSFM 3.0 API · Lite</td><td>$15/월 · 200K credits<br>1 credit = 1문자</td><td class="money">약 $0.09–0.15 상당</td><td class="money profit-caution">$15/월 · 약 20,618원</td><td>한국어 감정 보이스 강점. Timestamp TTS 사용 시 자막용 STT 생략 가능</td></tr>
+            <tr><td>Typecast</td><td>SSFM 3.0 API · Plus</td><td>$280/월 · 4M credits</td><td class="money">약 $0.08–0.14 상당</td><td class="money profit-caution">$280/월 · 약 384,874원</td><td>동시성 15, 다고객 대량 운영용</td></tr>
+            <tr><td>OpenAI</td><td>GPT-4o Mini TTS</td><td>텍스트 $0.60/M · 오디오 $12/M tokens</td><td class="money">약 $0.06–0.10*</td><td class="money">사용량 과금</td><td>다국어·지시 기반. 실제 audio token usage로 정산</td></tr>
+            <tr><td>Google</td><td>Gemini 2.5 Flash TTS</td><td>텍스트 $0.50/M · 오디오 $10/M tokens<br>25 audio tokens/초</td><td class="money">$0.06–0.10 · 약 82–137원</td><td class="money">사용량 과금</td><td>비용 효율형, 별도 TTS 워커에 적합</td></tr>
+            <tr><td>Google</td><td>Gemini 3.1 Flash TTS</td><td>텍스트 $1/M · 오디오 $20/M tokens<br>25 audio tokens/초</td><td class="money">$0.12–0.20 · 약 165–275원</td><td class="money">사용량 과금</td><td>표현력 우선 Preview</td></tr>
+            <tr><td>Google Cloud</td><td>Chirp 3 HD</td><td>$30/M characters<br>첫 1M characters 무료</td><td class="money">무료 구간 가능</td><td class="money">사용량 과금</td><td>문자 기반 과금, 클라우드 계정 조건 확인</td></tr>
+            <tr><td>내부</td><td>자체 TTS / 고정 보이스</td><td>외부 API 호출비 없음</td><td class="money">실측 필요</td><td class="money">GPU·서버·운영비</td><td>API비가 고정비로 이동. 품질·한국어 발음 E2E 테스트 필요</td></tr>
+          </tbody>
+        </table></div>
+        <p class="matrix-foot">* OpenAI TTS의 월 추정치는 공식 토큰 단가에 공개된 분당 추정치를 적용한 값이며, 말하기 속도와 실제 오디오 토큰에 따라 달라집니다. Typecast 월 사용량 원가는 약 1,200–2,000자 가정이며 구독료보다 작아 초기에는 최소 $15 현금 지출이 원가에 더 중요합니다.</p>
+      </div>
+
+      <div class="matrix-group">
+        <h3>STT · 음성→자막·검수 · 월 4–6.7분 가정 <a class="source-ref" href="#source-o-06">[O-06]</a> <a class="source-ref" href="#source-g-03">[G-03]</a></h3>
+        <div class="matrix-scroll"><table class="cost-matrix">
+          <thead><tr><th>공급자</th><th>모델·방식</th><th>공식 단가</th><th>월 예상</th><th>운영 메모</th></tr></thead>
+          <tbody>
+            <tr class="current"><td>OpenAI</td><td>GPT Transcribe</td><td class="money">$0.0045/분</td><td class="money">$0.018–0.030 · 약 25–41원</td><td>고정확도 파일·스트리밍 전사, 키워드·언어 힌트 지원</td></tr>
+            <tr><td>Google Cloud</td><td>Speech-to-Text V2 · Standard</td><td class="money">$0.016/분</td><td class="money">$0.064–0.107 · 약 88–147원</td><td>초 단위 측정, 범용 실시간·파일 전사</td></tr>
+            <tr><td>Google Cloud</td><td>Speech-to-Text V2 · Dynamic Batch</td><td class="money">$0.003/분</td><td class="money">$0.012–0.020 · 약 16–27원</td><td>비실시간 자막 생성에 비용 효율적</td></tr>
+            <tr><td>내부</td><td>Whisper 계열 자체 호스팅</td><td>외부 API 호출비 없음</td><td class="money">실측 필요</td><td>GPU·CPU 시간과 운영비로 이동. 배치 처리에 적합</td></tr>
+            <tr><td>생략</td><td>TTS 타임스탬프 직접 사용</td><td class="money">$0 추가</td><td class="money">0원</td><td>Typecast Timestamp TTS 등 단어 타이밍이 있으면 별도 STT 불필요</td></tr>
+          </tbody>
+        </table></div>
+        <p class="matrix-foot">대본에서 바로 TTS를 만드는 정상 경로에는 STT가 필수는 아닙니다. STT는 사용자가 녹음한 음성을 받거나 최종 오디오와 자막의 QA를 다시 수행할 때만 켜는 조건부 원가로 보는 것이 적절합니다.</p>
+      </div>
+
+      <div class="matrix-group">
+        <h3>이미지 생성 · 월 80장 기준 <a class="source-ref" href="#source-g-01">[G-01]</a> <a class="source-ref" href="#source-o-02">[O-02~03]</a></h3>
+        <div class="matrix-scroll"><table class="cost-matrix">
+          <thead><tr><th>공급자</th><th>모델·설정</th><th>공식 장당/토큰 단가</th><th>월 80장</th><th>운영 포지션</th></tr></thead>
+          <tbody>
+            <tr><td>Google</td><td>Nano Banana 2 Lite · 1K</td><td class="money">$0.0336/장</td><td class="money">$2.69 · 약 3,695원</td><td><span class="quality-chip">저비용</span> 후보·초안</td></tr>
+            <tr><td>Google</td><td>Nano Banana 2 · 1K</td><td class="money">$0.067/장</td><td class="money">$5.36 · 약 7,367원</td><td><span class="quality-chip">쇼츠 라이트</span> 720p 단일 포맷 원본</td></tr>
+            <tr class="current"><td>Google</td><td>Nano Banana 2 · 2K</td><td class="money">$0.101/장</td><td class="money">$8.08 · 약 11,106원</td><td><span class="quality-chip">권장</span> FHD 영상 원본</td></tr>
+            <tr><td>Google</td><td>Nano Banana 2 · 4K</td><td class="money">$0.151/장</td><td class="money">$12.08 · 약 16,604원</td><td><span class="quality-chip">고해상도</span> 크롭 여유</td></tr>
+            <tr class="legacy"><td>OpenAI</td><td>GPT Image 1 Mini · High 1536×1024</td><td class="money">$0.052/장</td><td class="money">$4.16 · 약 5,718원</td><td>저비용 · 현재 deprecated</td></tr>
+            <tr class="legacy"><td>OpenAI</td><td>GPT Image 1.5 · Medium 1536×1024</td><td class="money">$0.05/장</td><td class="money">$4.00 · 약 5,498원</td><td>중간 품질 · 현재 deprecated</td></tr>
+            <tr class="legacy"><td>OpenAI</td><td>GPT Image 1.5 · High 1536×1024</td><td class="money">$0.20/장</td><td class="money">$16.00 · 약 21,993원</td><td>고품질 · 현재 deprecated</td></tr>
+            <tr><td>OpenAI</td><td>GPT Image 2 · 최대 2K</td><td>이미지 입력 $8/M · 출력 $30/M tokens</td><td class="money">응답 usage 실측 필요</td><td><span class="quality-chip">최상위</span> 브랜드·텍스트 정확도</td></tr>
+          </tbody>
+        </table></div>
+        <p class="matrix-foot">GPT Image 2는 공식 페이지가 토큰 단가를 공개하지만 해상도·품질별 고정 장당값은 계산기/실제 usage에 따라 달라져 임의 환산하지 않았습니다. 참조 이미지 편집은 입력 이미지 토큰이 추가됩니다.</p>
+      </div>
+
+      <div class="matrix-group">
+        <h3>이미지→영상 · 월 최종 240–400초 + 재시도 20% <a class="source-ref" href="#source-k-01">[K-01]</a> <a class="source-ref" href="#source-g-01">[G-01]</a> <a class="source-ref" href="#source-g-04">[G-04]</a> <a class="source-ref" href="#source-b-01">[B-01]</a> <a class="source-ref" href="#source-o-04">[O-04]</a></h3>
+        <div class="matrix-scroll"><table class="cost-matrix">
+          <thead><tr><th>공급자</th><th>모델·설정</th><th>공식 단가</th><th>월 예상 USD</th><th>월 예상 원화</th><th>운영 포지션</th></tr></thead>
+          <tbody>
+            <tr class="current"><td>Kling</td><td>Kling 2.5 Turbo · 720p · 무음</td><td class="money">$0.042/초</td><td class="money">$12.10–20.16</td><td class="money">약 1.66만–2.77만원</td><td><span class="quality-chip">비용 효율</span></td></tr>
+            <tr><td>Kling</td><td>Kling 2.5 Turbo · 1080p · 무음</td><td class="money">$0.070/초</td><td class="money">$20.16–33.60</td><td class="money">약 2.77만–4.62만원</td><td><span class="quality-chip">균형형</span></td></tr>
+            <tr><td>Kling</td><td>Kling 3.0 · 1080p · 무음</td><td class="money">$0.112/초</td><td class="money">$32.26–53.76</td><td class="money">약 4.43만–7.39만원</td><td><span class="quality-chip">고품질</span></td></tr>
+            <tr><td>Google</td><td>Veo 3.1 Lite · 720p · 오디오</td><td class="money">$0.050/초</td><td class="money">$14.40–24.00</td><td class="money">약 1.98만–3.30만원</td><td><span class="quality-chip">저비용</span></td></tr>
+            <tr><td>Google</td><td>Veo 3.1 Fast · 720p · 오디오</td><td class="money">$0.100/초</td><td class="money">$28.80–48.00</td><td class="money">약 3.96만–6.60만원</td><td><span class="quality-chip">균형형</span></td></tr>
+            <tr class="current"><td>Google</td><td>Veo 3.1 Fast · 1080p · 오디오</td><td class="money">$0.120/초</td><td class="money">$34.56–57.60</td><td class="money">약 4.75만–7.92만원</td><td><span class="quality-chip">프로 FHD</span></td></tr>
+            <tr><td>Google</td><td>Veo 3.1 Standard · 1080p · 오디오</td><td class="money">$0.400/초</td><td class="money">$115.20–192.00</td><td class="money">약 15.83만–26.39만원</td><td><span class="quality-chip">프리미엄</span></td></tr>
+            <tr><td>BytePlus</td><td>Seedance 2.0 Mini · 720p</td><td class="money">약 $0.080/초</td><td class="money">$23.04–38.40</td><td class="money">약 3.17만–5.28만원</td><td><span class="quality-chip">효율형</span></td></tr>
+            <tr><td>BytePlus</td><td>Seedance 2.0 Fast · 720p</td><td class="money">약 $0.120/초</td><td class="money">$34.56–57.60</td><td class="money">약 4.75만–7.92만원</td><td><span class="quality-chip">균형형</span></td></tr>
+            <tr><td>BytePlus</td><td>Seedance 2.0 · 720p</td><td class="money">약 $0.150/초</td><td class="money">$43.20–72.00</td><td class="money">약 5.94만–9.90만원</td><td><span class="quality-chip">고품질</span></td></tr>
+            <tr class="legacy"><td>OpenAI</td><td>Sora 2 · 720p · 오디오</td><td class="money">$0.100/초</td><td class="money">$28.80–48.00</td><td class="money">약 3.96만–6.60만원</td><td>고품질 · 현재 legacy</td></tr>
+            <tr class="legacy"><td>OpenAI</td><td>Sora 2 Pro · 720p · 오디오</td><td class="money">$0.300/초</td><td class="money">$86.40–144.00</td><td class="money">약 11.88만–19.79만원</td><td>프리미엄 · 현재 legacy</td></tr>
+          </tbody>
+        </table></div>
+        <p class="matrix-foot">Seedance는 공식 5초 16:9 예시의 초당 환산값이며 실제 청구는 해상도·프레임·입력 유형에 따른 토큰 사용량으로 결정됩니다. 3초 요청이 공급자 최소 길이 때문에 5초로 청구되면 상한 쪽 원가를 적용해야 합니다.</p>
+      </div>
+    </section>
+
+    <section class="matrix-section" aria-labelledby="sourceRegistryTitle">
+      <h2 id="sourceRegistryTitle">근거 문서 레지스트리</h2>
+      <p class="matrix-intro">공식 공급자 문서를 우선 사용했습니다. `문서일`은 페이지가 공개한 최종 수정일·기사 수정일·모델 스냅샷 날짜이며, 공개하지 않은 경우 날짜를 추정하지 않고 `미표기`로 기록했습니다. 모든 문서는 2026년 8월 31일에 다시 확인했습니다.</p>
+      <div class="matrix-scroll"><table class="cost-matrix profit-matrix">
+        <thead><tr><th>코드</th><th>공급자</th><th>문서명</th><th>문서일</th><th>확인일</th><th>적용 항목</th><th>공식 URL</th></tr></thead>
+        <tbody>
+          <tr id="source-g-01"><td class="money">G-01</td><td>Google</td><td>Gemini Developer API pricing</td><td class="money">최종 수정 2026-08-28 UTC</td><td class="money">2026-08-31</td><td>Gemini LLM, Nano Banana, Veo, TTS 단가</td><td><a class="source-link" href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener">ai.google.dev/gemini-api/docs/pricing</a></td></tr>
+          <tr id="source-g-04"><td class="money">G-04</td><td>Google Cloud</td><td>Agent Platform Generative AI pricing · Veo</td><td class="money">접속일 기준 현행</td><td class="money">2026-08-31</td><td>Veo 3.1 Fast 720p·1080p 및 Standard 1080p 초당 단가</td><td><a class="source-link" href="https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing" target="_blank" rel="noopener">cloud.google.com/.../generative-ai/pricing</a></td></tr>
+          <tr id="source-o-01"><td class="money">O-01</td><td>OpenAI</td><td>OpenAI API model catalog / compare models</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>GPT-5.6 Luna·Terra·Sol 토큰 단가</td><td><a class="source-link" href="https://developers.openai.com/api/docs/models/compare" target="_blank" rel="noopener">developers.openai.com/api/docs/models/compare</a></td></tr>
+          <tr id="source-o-02"><td class="money">O-02</td><td>OpenAI</td><td>GPT Image 1.5 model</td><td class="money">스냅샷 2025-12-16</td><td class="money">2026-08-31</td><td>GPT Image 1.5 해상도·품질별 장당 단가, deprecated 상태</td><td><a class="source-link" href="https://developers.openai.com/api/docs/models/gpt-image-1.5" target="_blank" rel="noopener">developers.openai.com/api/docs/models/gpt-image-1.5</a></td></tr>
+          <tr id="source-o-03"><td class="money">O-03</td><td>OpenAI</td><td>GPT Image 2 model / pricing</td><td class="money">스냅샷 2026-04-21</td><td class="money">2026-08-31</td><td>GPT Image 2 최신 상태와 이미지 토큰 단가</td><td><a class="source-link" href="https://developers.openai.com/api/docs/models/gpt-image-2" target="_blank" rel="noopener">developers.openai.com/api/docs/models/gpt-image-2</a></td></tr>
+          <tr id="source-o-04"><td class="money">O-04</td><td>OpenAI</td><td>Sora 2 / Sora 2 Pro model pages</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>Sora 초당 단가와 legacy 상태</td><td><a class="source-link" href="https://developers.openai.com/api/docs/models/sora-2" target="_blank" rel="noopener">developers.openai.com/api/docs/models/sora-2</a></td></tr>
+          <tr id="source-a-01"><td class="money">A-01</td><td>Anthropic</td><td>Claude Haiku 4.5</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>Haiku 4.5 입력·출력 토큰 단가</td><td><a class="source-link" href="https://www.anthropic.com/claude/haiku" target="_blank" rel="noopener">anthropic.com/claude/haiku</a></td></tr>
+          <tr id="source-a-02"><td class="money">A-02</td><td>Anthropic</td><td>Introducing Claude Sonnet 4.6</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>Sonnet 4.6 입력·출력 토큰 단가</td><td><a class="source-link" href="https://www.anthropic.com/news/claude-sonnet-4-6" target="_blank" rel="noopener">anthropic.com/news/claude-sonnet-4-6</a></td></tr>
+          <tr id="source-a-03"><td class="money">A-03</td><td>Anthropic</td><td>Introducing Claude Sonnet 5</td><td class="money">가격 수정 2026-08-10</td><td class="money">2026-08-31</td><td>Sonnet 5 입력·출력 토큰 단가</td><td><a class="source-link" href="https://www.anthropic.com/research/claude-sonnet-5" target="_blank" rel="noopener">anthropic.com/research/claude-sonnet-5</a></td></tr>
+          <tr id="source-k-01"><td class="money">K-01</td><td>Kling AI</td><td>Open Platform · Video billing method</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>Kling 모델·해상도별 초당 단가</td><td><a class="source-link" href="https://kling.ai/document-api/productBilling/billingMethod" target="_blank" rel="noopener">kling.ai/document-api/productBilling/billingMethod</a></td></tr>
+          <tr id="source-b-01"><td class="money">B-01</td><td>BytePlus</td><td>ModelArk Pricing</td><td class="money">최종 수정 2026-08-27 16:00:25</td><td class="money">2026-08-31</td><td>Seedance 토큰 공식·5초 예시·초당 환산</td><td><a class="source-link" href="https://docs.byteplus.com/en/docs/ModelArk/1544106" target="_blank" rel="noopener">docs.byteplus.com/en/docs/ModelArk/1544106</a></td></tr>
+          <tr id="source-tc-01"><td class="money">TC-01</td><td>Typecast</td><td>Typecast TTS API pricing</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>Free·Lite·Plus 구독료, 크레딧, 글자당 과금, Timestamp TTS</td><td><a class="source-link" href="https://typecast.ai/developers/api/" target="_blank" rel="noopener">typecast.ai/developers/api</a></td></tr>
+          <tr id="source-o-05"><td class="money">O-05</td><td>OpenAI</td><td>GPT-4o Mini TTS model</td><td class="money">스냅샷 2025-12-15</td><td class="money">2026-08-31</td><td>TTS 텍스트·오디오 토큰 단가</td><td><a class="source-link" href="https://developers.openai.com/api/docs/models/gpt-4o-mini-tts" target="_blank" rel="noopener">developers.openai.com/api/docs/models/gpt-4o-mini-tts</a></td></tr>
+          <tr id="source-o-06"><td class="money">O-06</td><td>OpenAI</td><td>GPT Transcribe model</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>STT 분당 $0.0045</td><td><a class="source-link" href="https://developers.openai.com/api/docs/models/gpt-transcribe" target="_blank" rel="noopener">developers.openai.com/api/docs/models/gpt-transcribe</a></td></tr>
+          <tr id="source-g-02"><td class="money">G-02</td><td>Google Cloud</td><td>Text-to-Speech pricing</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>Gemini TTS 토큰, 25 tokens/초, Chirp 문자 단가</td><td><a class="source-link" href="https://cloud.google.com/text-to-speech/pricing" target="_blank" rel="noopener">cloud.google.com/text-to-speech/pricing</a></td></tr>
+          <tr id="source-g-03"><td class="money">G-03</td><td>Google Cloud</td><td>Speech-to-Text pricing</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>STT V2 Standard·Dynamic Batch 분당 단가</td><td><a class="source-link" href="https://cloud.google.com/speech-to-text/pricing" target="_blank" rel="noopener">cloud.google.com/speech-to-text/pricing</a></td></tr>
+          <tr id="source-fx-01"><td class="money">FX-01</td><td>Frankfurter</td><td>Latest currency rates API · USD/KRW</td><td class="money">환율 기준 2026-08-28</td><td class="money">2026-08-31</td><td>USD→KRW 환산 1,374.55원</td><td><a class="source-link" href="https://api.frankfurter.app/latest?from=USD&amp;to=KRW" target="_blank" rel="noopener">api.frankfurter.app/latest?from=USD&amp;to=KRW</a></td></tr>
+          <tr id="source-m-01"><td class="money">M-01</td><td>숨고</td><td>영상 편집 예상 견적</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>영상 편집 평균 10만원·최저 3만원·최고 100만원</td><td><a class="source-link" href="https://soomgo.com/prices/%EC%98%81%EC%83%81-%ED%8E%B8%EC%A7%91" target="_blank" rel="noopener">soomgo.com/prices/영상-편집</a></td></tr>
+          <tr id="source-m-02"><td class="money">M-02</td><td>크몽</td><td>AI 영상 제작 · 광고/쇼츠/릴스/틱톡</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>20초 19.9만원·30초 29.9만원·60초 49.9만원 공개 패키지</td><td><a class="source-link" href="https://kmong.com/gig/738812" target="_blank" rel="noopener">kmong.com/gig/738812</a></td></tr>
+          <tr id="source-m-03"><td class="money">M-03</td><td>크몽</td><td>고퀄리티 AI 광고·숏폼 영상 제작</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>15초 15만원·30초 29만원·45초 49만원 공개 패키지</td><td><a class="source-link" href="https://kmong.com/gig/759104" target="_blank" rel="noopener">kmong.com/gig/759104</a></td></tr>
+          <tr id="source-m-04"><td class="money">M-04</td><td>크몽</td><td>AI 숏폼 기획·제작·편집</td><td>페이지 수정일 미표기</td><td class="money">2026-08-31</td><td>15초 25만원·30초 40만원·60초 80만원 공개 패키지</td><td><a class="source-link" href="https://kmong.com/gig/775330" target="_blank" rel="noopener">kmong.com/gig/775330</a></td></tr>
+          <tr id="source-i-01"><td class="money">I-01</td><td>내부 가정</td><td>ThinkCast 초기 사업성·검증 게이트 가정</td><td class="money">작성 2026-08-31</td><td class="money">2026-08-31</td><td>운영비 7만원, 10곳 기준 인프라 40만원, PG 3.3%, 프로모션가 40–45% 이익률, 상위 모델 검수·토큰 하네스·단계 차단</td><td>공식 외부 단가 아님 · 실제 계약 및 usage 실측 후 교체</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+  </section>
+</main>
+</body>
+</html>

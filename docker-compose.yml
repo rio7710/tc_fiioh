@@ -1,0 +1,72 @@
+name: tc_temp
+
+services:
+  web:
+    container_name: tc_temp_web
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "127.0.0.1:43110:3000"
+    depends_on:
+      - api
+    networks:
+      - tc_temp_internal
+    security_opt:
+      - no-new-privileges:true
+
+  api:
+    container_name: tc_temp_api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PORT: "10000"
+      DATA_DIR: "/data"
+      SQLITE_PATH: "/data/tc.sqlite"
+      EXPORTS_DIR: "/data/exports"
+      DEMO_DATA_PATH: "/data/demo_data.json"
+      CAPTION_REGISTRY_PATH: "/data/caption_artifacts.json"
+      KLING_ARTIFACT_DIR: "/data/generated/kling"
+      PROJECT_KLING_JOBS_PATH: "/data/project_kling_jobs.json"
+      VOICE_ARTIFACT_DIR: "/data/generated/voice"
+      STORYBOARD_IMAGE_DIR: "/data/generated/storyboard"
+      BRAND_ASSET_DIR: "/data/generated/brand"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      KLING_API_KEY: "${KLING_API_KEY:-}"
+      KLING_API_BASE_URL: "${KLING_API_BASE_URL:-https://api-singapore.klingai.com}"
+      KLING_VIDEO_MODEL: "${KLING_VIDEO_MODEL:-kling-v2-5-turbo}"
+      OPENAI_SCRIPT_MODEL: "${OPENAI_SCRIPT_MODEL:-gpt-5.6-luna}"
+      OPENAI_TTS_MODEL: "${OPENAI_TTS_MODEL:-gpt-4o-mini-tts}"
+      ARUN_TTS_WORKER_URL: "${ARUN_TTS_WORKER_URL:-http://host.docker.internal:28795}"
+      ARUN_TTS_WORKER_KEY: "${ARUN_TTS_WORKER_KEY:-}"
+    volumes:
+      - tc_temp_data:/data
+    networks:
+      - tc_temp_internal
+    security_opt:
+      - no-new-privileges:true
+
+  worker:
+    container_name: tc_temp_worker
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      DATA_DIR: "/data"
+      SQLITE_PATH: "/data/tc.sqlite"
+      WORKER_HEALTH_PATH: "/data/worker_health.json"
+    volumes:
+      - tc_temp_data:/data
+    networks:
+      - tc_temp_internal
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  tc_temp_data:
+    name: tc_temp_data
+
+networks:
+  tc_temp_internal:
+    name: tc_temp_internal
