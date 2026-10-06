@@ -12,7 +12,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterator, Mapping
+from typing import Any, Callable, Iterator, Mapping
 
 
 SCHEMA_VERSION = "1.0.0"
@@ -125,6 +125,7 @@ class JobStore:
             raise JobError(f"cannot read job store: {self.path}") from exc
         if document.get("schema_version") != SCHEMA_VERSION or not isinstance(document.get("jobs"), dict):
             raise JobError("unsupported or invalid job store schema")
+        document.setdefault("tombstones", {})
         return document
 
     def _write(self, document: dict[str, Any]) -> None:
@@ -189,12 +190,51 @@ class JobStore:
         }
         with self._guard():
             document = self._read()
+            if project_id in document["tombstones"]:
+                raise JobConflict(f"project {project_id} has been deleted")
             for existing in document["jobs"].values():
                 if existing["idempotency_key"] == unique_key:
                     return self._copy_job(existing)
             document["jobs"][job["job_id"]] = job
             self._write(document)
         return self._copy_job(job)
+
+    def is_project_tombstoned(self, project_id: str) -> bool:
+        with self._guard():
+            return project_id in self._read()["tombstones"]
+
+    def tombstone_project(
+        self,
+        project_id: str,
+        *,
+        reason: str = "project_deleted",
+        now: datetime | str | None = None,
+    ) -> dict[str, Any]:
+        """Persist deletion and cancel all work that could outlive a project."""
+        if not project_id or not isinstance(project_id, str):
+            raise JobValidationError("project_id must be a non-empty string")
+        deleted_at = _timestamp(now)
+        with self._guard():
+            document = self._read()
+            document["tombstones"].setdefault(
+                project_id,
+                {"deleted_at": deleted_at, "reason": reason},
+            )
+            for job in document["jobs"].values():
+                if job["project_id"] != project_id:
+                    continue
+                job["deleted_at"] = document["tombstones"][project_id]["deleted_at"]
+                if job["status"] in ("queued", "running", "failed", "stale"):
+                    job.update(
+                        status="cancelled",
+                        updated_at=deleted_at,
+                        lease_expires_at=None,
+                        worker_id=None,
+                        result=None,
+                        error={"code": reason, "message": "프로젝트가 삭제되어 작업이 취소되었습니다."},
+                    )
+            self._write(document)
+            return copy.deepcopy(document["tombstones"][project_id])
 
     def get(self, job_id: str) -> dict[str, Any]:
         with self._guard():
@@ -314,6 +354,7 @@ class JobStore:
         worker_id: str,
         trace_id: str | None = None,
         lease_seconds: float = 300,
+        cancellation_check: Callable[[], bool] | None = None,
     ) -> dict[str, Any]:
         """Create or resume one logical job, then execute it at most once per claim.
 
@@ -329,22 +370,51 @@ class JobStore:
             raise JobConflict(f"job {job['job_id']} was cancelled")
         if job["status"] == "running":
             raise JobConflict(f"job {job['job_id']} is already running")
-        return self.execute(job["job_id"], worker_id, adapter, lease_seconds=lease_seconds)
+        return self.execute(
+            job["job_id"],
+            worker_id,
+            adapter,
+            lease_seconds=lease_seconds,
+            cancellation_check=cancellation_check,
+        )
 
-    def execute(self, job_id: str, worker_id: str, adapter: Any, *, lease_seconds: float = 300) -> dict[str, Any]:
+    def execute(
+        self,
+        job_id: str,
+        worker_id: str,
+        adapter: Any,
+        *,
+        lease_seconds: float = 300,
+        cancellation_check: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
         """Claim, execute through an adapter, and persist the terminal state."""
         job = self.claim(job_id, worker_id, lease_seconds=lease_seconds)
         try:
             result = adapter.run(self._copy_job(job))
             if not isinstance(result, Mapping):
                 raise JobValidationError("adapter result must be an object")
+            if cancellation_check and cancellation_check():
+                current = self.get(job_id)
+                if current["status"] == "cancelled":
+                    return current
+                return self.transition(
+                    job_id,
+                    "cancelled",
+                    error={"code": "cancelled", "message": "작업이 취소되었습니다."},
+                )
         except InterruptedError:
+            current = self.get(job_id)
+            if current["status"] == "cancelled":
+                return current
             return self.transition(
                 job_id,
                 "cancelled",
                 error={"code": "cancelled", "message": "작업이 취소되었습니다."},
             )
         except Exception as exc:
+            current = self.get(job_id)
+            if current["status"] == "cancelled":
+                return current
             safe_message = (
                 str(exc)
                 if isinstance(exc, JobValidationError)

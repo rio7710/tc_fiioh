@@ -105,6 +105,76 @@ class WorkerJobCoreTests(unittest.TestCase):
         with self.assertRaises(JobConflict):
             self.store.retry(job["job_id"], now=NOW)
 
+    def test_project_tombstone_cancels_work_and_blocks_recreation(self):
+        queued = self.create({"scene_id": "queued"})
+        running = self.store.create("project-1", "final_composite", {"render": "running"})
+        self.store.claim(running["job_id"], "worker-a", now=NOW)
+
+        tombstone = self.store.tombstone_project("project-1", now=NOW)
+
+        self.assertEqual(tombstone["reason"], "project_deleted")
+        self.assertEqual(self.store.get(queued["job_id"])["status"], "cancelled")
+        self.assertEqual(self.store.get(running["job_id"])["status"], "cancelled")
+        with self.assertRaises(JobConflict):
+            self.store.create("project-1", "scene_image", {"scene_id": "new"})
+        with self.assertRaises(JobConflict):
+            self.store.retry(running["job_id"])
+
+    def test_late_adapter_completion_cannot_resurrect_tombstoned_project(self):
+        job = self.create({"scene_id": "late"})
+
+        class LateAdapter:
+            def run(self, snapshot):
+                self.store.tombstone_project(snapshot["project_id"], now=NOW)
+                return {"artifact_uri": "memory://must-not-complete"}
+
+            def __init__(self, store):
+                self.store = store
+
+        result = self.store.execute(
+            job["job_id"],
+            "worker-a",
+            LateAdapter(self.store),
+            cancellation_check=lambda: self.store.is_project_tombstoned("project-1"),
+        )
+
+        self.assertEqual(result["status"], "cancelled")
+        self.assertIsNone(result["result"])
+
+    def test_tombstone_then_adapter_interrupted_error_keeps_cancelled_state(self):
+        job = self.create({"scene_id": "interrupted-after-delete"})
+
+        class InterruptedAdapter:
+            def run(self, snapshot):
+                self.store.tombstone_project(snapshot["project_id"], now=NOW)
+                raise InterruptedError("provider stopped")
+
+            def __init__(self, store):
+                self.store = store
+
+        result = self.store.execute(job["job_id"], "worker-a", InterruptedAdapter(self.store))
+
+        self.assertEqual(result["status"], "cancelled")
+        self.assertIsNone(result["result"])
+        self.assertEqual(self.store.get(job["job_id"])["status"], "cancelled")
+
+    def test_tombstone_then_adapter_generic_error_keeps_cancelled_state(self):
+        job = self.create({"scene_id": "generic-after-delete"})
+
+        class GenericAdapter:
+            def run(self, snapshot):
+                self.store.tombstone_project(snapshot["project_id"], now=NOW)
+                raise RuntimeError("provider failed after delete")
+
+            def __init__(self, store):
+                self.store = store
+
+        result = self.store.execute(job["job_id"], "worker-a", GenericAdapter(self.store))
+
+        self.assertEqual(result["status"], "cancelled")
+        self.assertIsNone(result["result"])
+        self.assertEqual(self.store.get(job["job_id"])["status"], "cancelled")
+
     def test_execute_persists_adapter_result_and_safe_failure(self):
         job = self.create()
         adapter = FixtureAdapter()

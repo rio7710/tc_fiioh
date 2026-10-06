@@ -201,6 +201,52 @@ class WorkerJobIntegrationTests(unittest.TestCase):
         self.assertEqual(recovered["status"], "stale")
         self.assertEqual(recovered["error"]["code"], "lease_expired")
 
+    def test_cancellation_during_provider_call_finishes_job_and_run_as_cancelled(self):
+        job_store = JobStore(self.root / "worker_jobs.json")
+        automation_store = self.store
+
+        class CancellingAPI(FixtureAPI):
+            def call(self, path, payload):
+                if path == "/api/storyboard/image-generate":
+                    automation_store.configure(
+                        self.user,
+                        "cancel",
+                        {"action": "cancel", "request_id": "late-cancel-request", "version": 0, "run_id": self.run_id},
+                        NOW,
+                    )
+                return super().call(path, payload)
+
+        def factory(auth, user):
+            api = CancellingAPI(auth, user)
+            api.run_id = self.run["run_id"]
+            api.user = self.user
+            return api
+
+        AutomationRunner(self.store, factory, job_store=job_store, worker_id="fixture-worker").execute(self.run)
+
+        self.assertEqual(job_store.list(status="cancelled")[0]["error"]["code"], "cancelled")
+        self.assertEqual(self.store.snapshot(self.user)["runs"][0]["status"], "cancelled")
+
+    def test_project_delete_during_provider_call_tombstones_job(self):
+        job_store = JobStore(self.root / "worker_jobs.json")
+        auth = self.auth
+
+        class DeletingAPI(FixtureAPI):
+            def call(self, path, payload):
+                if path == "/api/storyboard/image-generate":
+                    auth.delete_project(self.user, self.run_id)
+                return super().call(path, payload)
+
+        def factory(auth_store, user):
+            api = DeletingAPI(auth_store, user)
+            api.run_id = self.run["project_id"]
+            return api
+
+        AutomationRunner(self.store, factory, job_store=job_store, worker_id="fixture-worker").execute(self.run)
+
+        self.assertTrue(job_store.is_project_tombstoned(self.run["project_id"]))
+        self.assertEqual(job_store.list(status="cancelled")[0]["error"]["code"], "project_deleted")
+
     def test_provider_failure_is_safe_and_persisted_as_failed_job(self):
         job_store = JobStore(self.root / "worker_jobs.json")
 

@@ -79,11 +79,24 @@ class AutomationRunner:
         self.worker_id = worker_id or ('automation-runner-' + str(os.getpid()))
         self.settings = settings or WorkerRuntimeSettings.from_env()
 
+    def _project_deleted(self, project_id):
+        with closing(self.auth._connect()) as db:
+            return db.execute('SELECT 1 FROM projects WHERE project_id=?', (project_id,)).fetchone() is None
+
+    def _tombstone_if_deleted(self, project_id):
+        if self.job_store and self._project_deleted(project_id):
+            self.job_store.tombstone_project(project_id)
+            return True
+        return False
+
     def execute(self, run):
         stop = threading.Event()
         def keep_alive():
             while not stop.wait(self.settings.automation_heartbeat_interval_seconds):
                 try:
+                    if not self.store.check_active(run):
+                        self._tombstone_if_deleted(run['project_id'])
+                        return
                     if not self.store.heartbeat(run['run_id'],run['lease_owner']):
                         return
                 except Exception:
@@ -113,8 +126,16 @@ class AutomationRunner:
         source_revision = None
         def step(key,operation,stage=None,job_input=None):
             resolved_stage = stage or key
+            if not self.store.check_active(run):
+                self._tombstone_if_deleted(project)
             if self.job_store and resolved_stage in ('scene_image','final_composite'):
                 def dispatch():
+                    def cancellation_requested():
+                        if not self.store.check_active(run):
+                            self._tombstone_if_deleted(project)
+                            return True
+                        return self.job_store.is_project_tombstoned(project)
+
                     try:
                         job = self.job_store.dispatch(
                             project,
@@ -124,9 +145,15 @@ class AutomationRunner:
                             worker_id=self.worker_id,
                             trace_id=run['run_id'],
                             lease_seconds=self.settings.job_lease_seconds,
+                            cancellation_check=cancellation_requested,
                         )
                     except JobConflict:
+                        deleted = self._tombstone_if_deleted(project)
+                        if deleted or not self.store.check_active(run) or self.job_store.is_project_tombstoned(project):
+                            raise InterruptedError('자동화가 중지되었거나 프로젝트가 삭제되었습니다.') from None
                         raise AdapterFailure('같은 제작 작업이 이미 실행 중이거나 취소되었습니다.') from None
+                    if job['status'] == 'cancelled':
+                        raise InterruptedError('자동화가 중지되었거나 프로젝트가 삭제되었습니다.')
                     if job['status'] != 'succeeded':
                         raise AdapterFailure('제작 작업을 완료하지 못했습니다. 결과를 확인한 뒤 다시 시도해 주세요.')
                     return (job.get('result') or {}).get('value', {})
@@ -134,6 +161,7 @@ class AutomationRunner:
             return self.store.step(run,key,resolved_stage,operation)
         def call(path,extra=None):
             if not self.store.check_active(run):
+                self._tombstone_if_deleted(project)
                 raise InterruptedError('자동화가 중지되었습니다.')
             if source_revision:
                 current=self.auth.latest_stage_data(user,project,3)
