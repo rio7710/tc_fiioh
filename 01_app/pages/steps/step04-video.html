@@ -1,0 +1,129 @@
+<!-- Step 04 Video Editor Partial Markup -->
+<section class="step-view" id="step4" hidden>
+  <time class="page-date"></time>
+  <header class="heading">
+    <div>
+      <p class="eyebrow">STEP 04 · IMAGE REVIEW &amp; VIDEO DESIGN</p>
+      <h1 id="projectTitle">하루를 보면 마음이 보입니다</h1>
+    </div>
+    <p class="intro">승인 전 장면 이미지 검수용<br>재생으로 음성·BGM·타이틀 싱크를 확인하세요.</p>
+  </header>
+
+  <section class="workspace">
+    <div>
+      <div class="preview-toolbar">
+        <span class="preview-label">타이포 타입</span>
+        <div class="type-options" role="group" aria-label="타이틀 디자인 선택">
+          <button class="type-btn" type="button" data-type="card" aria-pressed="false">01 브랜드 카드</button>
+          <button class="type-btn" type="button" data-type="minimal" aria-pressed="false">02 시네마틱</button>
+          <button class="type-btn active" type="button" data-type="editorial" aria-pressed="true">03 에디토리얼</button>
+          <button class="type-btn" type="button" data-type="bubble" aria-pressed="false">04 버블 팝</button>
+          <button class="type-btn" type="button" data-type="block" aria-pressed="false">05 그린 블록</button>
+          <button class="type-btn" type="button" data-type="action" aria-pressed="false">06 액션 이탤릭</button>
+        </div>
+      </div>
+      <div class="music-toolbar">
+        <button class="music-btn" id="aiPersonCrop" type="button">AI 사람 위치 · 좌우 맞춤</button><span id="aiPersonCropStatus" role="status" aria-live="polite"></span>
+        <span class="preview-label">배경음악</span>
+        <div class="music-options" role="group" aria-label="배경음악 선택">
+          <button class="music-btn" type="button" data-music="none" aria-pressed="false">음악 없음</button>
+          <button class="music-btn active" type="button" data-music="satie" aria-pressed="true">01 사티</button>
+          <button class="music-btn" type="button" data-music="debussy" aria-pressed="false">02 드뷔시</button>
+          <button class="music-btn" type="button" data-music="bach" aria-pressed="false">03 바흐</button>
+          <button class="music-btn active" id="narrationBtn" type="button" aria-pressed="true">STT 내레이션 켬</button>
+        </div>
+        <label class="volume-wrap">음악 크기 <input id="musicVolume" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+      </div>
+      <div class="brand-toolbar" aria-label="개인 브랜드 리소스 적용">
+        <label class="brand-choice"><input id="brandIntroEnabled" type="checkbox"><span>인트로 포함</span><select id="brandIntroVersion" aria-label="인트로 버전"></select></label>
+        <label class="brand-choice"><input id="brandOutroEnabled" type="checkbox"><span>아웃트로 포함</span><select id="brandOutroVersion" aria-label="아웃트로 버전"></select></label>
+        <label class="brand-choice"><input id="brandWatermarkEnabled" type="checkbox"><span>워터마크 포함</span><select id="brandWatermarkVersion" aria-label="워터마크 버전"></select><input id="brandWatermarkOpacity" type="range" min="0.1" max="1" step="0.05" value="0.8" aria-label="워터마크 투명도"></label>
+      </div>
+      <div class="stage-card" id="stageCard">
+        <div class="preview-format-badge" id="previewFormatBadge">YouTube · 16:9</div>
+        <div class="stage type-editorial" id="stage">
+          <video class="timeline-clock" id="video" src="/02_media/video/P1_merged.mp4" preload="metadata" playsinline muted aria-hidden="true"></video>
+          <img class="scene-image" id="sceneImage" src="/02_media/images/scenes/scene_01.webp" alt="생활실 도입 장면 이미지">
+          <video class="scene-video" id="sceneVideo" preload="metadata" playsinline muted aria-label="생성된 장면 영상"></video>
+          <div class="stage-media-controls" aria-label="장면 재생 조작">
+            <button id="prevBtn" type="button" aria-label="이전 장면" title="이전 장면"></button>
+            <button id="playBtn" class="stage-play-btn" type="button" aria-label="재생" title="재생·일시정지"></button>
+            <button id="nextBtn" type="button" aria-label="다음 장면" title="다음 장면"></button>
+          </div>
+          <div class="image-generation-mosaic" id="imageGenerationMosaic" aria-hidden="true" hidden></div>
+          <div class="image-generation-status" id="imageGenerationStatus" role="status" aria-live="polite" hidden><span class="image-generation-spinner" aria-hidden="true"></span><span id="imageGenerationStatusText">생성 중입니다.</span></div>
+          <button class="image-regenerate-btn" id="imageRegenerateBtn" type="button"><span>이미지 재생성</span><span class="image-variant-count" id="imageVariantCount">후보 1</span></button>
+          <audio id="bgm" preload="metadata"></audio>
+          <div class="scene-resource-badge" id="sceneResourceBadge">사진</div>
+          <div class="crop-hint" id="cropHint">손으로 좌우 위치 조정</div>
+          <div class="format-safe-zone" id="formatSafeZone" data-label=""></div>
+          <div class="shade"></div>
+          <div class="title-wrap" aria-live="polite">
+            <div class="title-card"><p class="title-text" id="titleText"></p></div>
+          </div>
+          <img class="brand-watermark-preview" id="brandWatermarkPreview" alt="" hidden>
+          <div class="brand-outro-preview" id="brandOutroPreview" hidden><img id="brandOutroPreviewImage" alt=""><video id="brandOutroPreviewVideo" muted playsinline></video></div>
+        </div>
+        <div class="controlbar">
+          <div class="progress" id="progress" aria-label="재생 위치"><div class="progress-fill" id="progressFill"></div></div>
+          <span class="clock" id="clock">00:00 / --:--</span>
+        </div>
+      </div>
+      <div class="caption-status" id="captionStatus"><span class="status-dot"></span><span id="statusText">문장 대기 구간</span></div>
+      <div class="caption-size-toolbar" aria-label="자막 글자 크기 조절">
+        <span>자막 글자 크기</span>
+        <button id="captionSizeDown" type="button" aria-label="자막 글자 작게">−</button>
+        <output class="caption-size-value" id="captionSizeValue" aria-live="polite">기본</output>
+        <button id="captionSizeUp" type="button" aria-label="자막 글자 크게">+</button>
+      </div>
+      <div class="distribution-panel" aria-labelledby="distributionTitle">
+        <div class="distribution-head"><div class="distribution-title-wrap"><strong id="distributionTitle">배포 플랫폼 TOP 9</strong><button class="distribution-help-btn" id="distributionHelp" type="button" aria-label="플랫폼별 API 게시 지원 안내" title="플랫폼별 API 게시 지원 안내">?</button></div><small>아이콘을 눌러 다중 선택</small></div>
+        <div class="distribution-support-legend" aria-label="현재 계정 연결 상태 테두리"><span><i class="unsupported"></i>미지원</span><span><i class="conditional"></i>조건 승인</span><span><i class="approved"></i>완전 승인</span><span><i class="review"></i>검토</span></div>
+        <div class="distribution-options" id="distributionPlatforms">
+          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="youtube" data-api-support="review" aria-pressed="true"><span class="platform-icon"></span><span>YouTube</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="youtube" aria-pressed="true" aria-label="YouTube 16:9 미리보기" title="16:9 미리보기"></button></div>
+          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="instagram" data-api-support="review" aria-pressed="true"><span class="platform-icon"></span><span>Instagram</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="instagram" aria-pressed="false" aria-label="Instagram Reels 9:16 미리보기" title="9:16 미리보기"></button></div>
+          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="facebook" data-api-support="review" aria-pressed="false"><span class="platform-icon"></span><span>Facebook</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="facebook" aria-pressed="false" aria-label="Facebook Feed 4:5 미리보기" title="4:5 미리보기"></button></div>
+          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="tiktok" data-api-support="review" aria-pressed="false"><span class="platform-icon"></span><span>TikTok</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="tiktok" aria-pressed="false" aria-label="TikTok 9:16 미리보기" title="9:16 미리보기"></button></div>
+          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="naver" data-api-support="unsupported" aria-pressed="true"><span class="platform-icon"></span><span>네이버 블로그</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="naver" aria-pressed="false" aria-label="네이버 블로그 16:9 미리보기" title="16:9 미리보기"></button></div>
+          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="kakaotalk" data-api-support="conditional" aria-pressed="false"><span class="platform-icon"></span><span>카카오톡 채널</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="kakaotalk" aria-pressed="false" aria-label="카카오톡 채널 16:9 미리보기" title="16:9 미리보기"></button></div>
+          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="threads" data-api-support="review" aria-pressed="false"><span class="platform-icon"></span><span>Threads</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="threads" aria-pressed="false" aria-label="Threads 9:16 미리보기" title="9:16 · 720×1280 미리보기"></button></div>
+          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="x" data-api-support="review" aria-pressed="false"><span class="platform-icon"></span><span>X</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="x" aria-pressed="false" aria-label="X 16:9 미리보기" title="16:9 · 1280×720 미리보기"></button></div>
+          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="linkedin" data-api-support="review" aria-pressed="false"><span class="platform-icon"></span><span>LinkedIn</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="linkedin" aria-pressed="false" aria-label="LinkedIn 4:5 미리보기" title="4:5 · 720×900 미리보기"></button></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel" aria-label="장면 목록">
+      <div class="panel-head"><strong>장면 순서</strong><span id="sceneTimelineSummary">이전 단계 타임라인 불러오는 중</span></div>
+      <div class="mobile-scene-nav" aria-label="모바일 장면 이동">
+        <label class="mobile-scene-select"><select id="mobileSceneSelect" aria-label="장면 선택"></select></label>
+        <button id="mobilePrevScene" type="button">← 이전 장면</button>
+        <button id="mobileNextScene" type="button">다음 장면 →</button>
+      </div>
+      <div class="scene-list" id="sceneList"></div>
+      <div class="export-toolbar">
+        <div class="export-copy"><strong>최종 영상 제작</strong><span class="export-status" id="renderStatus">승인 이미지로 영상을 생성하고 MP4로 합성합니다.</span></div>
+        <button class="render-btn publish-render-btn" id="renderBtn" type="button" aria-label="승인 이미지로 최종 영상 제작" title="승인 이미지로 최종 영상 제작">최종 영상 제작</button>
+      </div>
+    </aside>
+  </section>
+  <div class="flow-actions step4-actions"><button class="flow-btn editor-back" type="button" data-go="3-1">이전 · 콘티</button><button class="flow-btn calendar-next" type="button" data-go="5">배포 캘린더</button></div>
+</section>
+
+<div class="image-regeneration-modal" id="imageRegenerationModal" role="dialog" aria-modal="true" aria-labelledby="imageRegenerationTitle" hidden>
+  <div class="image-regeneration-dialog">
+    <div class="image-regeneration-head"><small id="imageRegenerationSceneNo">SCENE 01 · IMAGE VARIATION</small><h2 id="imageRegenerationTitle">장면 이미지 후보 추가</h2></div>
+    <div class="image-regeneration-body">
+      <div class="image-base-guide"><strong>기본 장면 가이드 · 유지</strong><p id="imageBaseGuide"></p></div>
+      <label class="image-prompt-field">추가 프롬프트<textarea id="imageAdditionalPrompt" maxlength="500" placeholder="예: 인물의 표정을 조금 더 밝게 하고, 카메라 구도를 넓게 보여주세요."></textarea></label>
+      <div class="image-prompt-examples" aria-label="추가 프롬프트 예시">
+        <button class="image-prompt-chip" type="button">표정을 더 밝게</button>
+        <button class="image-prompt-chip" type="button">구도를 조금 더 넓게</button>
+        <button class="image-prompt-chip" type="button">따뜻한 오전 햇살 추가</button>
+      </div>
+      <p class="image-preserve-note">기존 이미지와 기본 콘티 가이드는 그대로 보존됩니다. 입력한 내용은 추가 지시로만 결합되고 새 결과는 별도 후보로 저장됩니다.</p>
+      <p class="image-regeneration-feedback" id="imageRegenerationFeedback" role="status" aria-live="polite"></p>
+    </div>
+    <div class="image-regeneration-actions"><button id="imageRegenerationCancel" type="button">취소</button><button class="create" id="imageRegenerationCreate" type="button">새 후보 추가</button></div>
+  </div>
+</div>

@@ -9,6 +9,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Serif+KR:wght@700;900&family=Song+Myung&display=swap" rel="stylesheet">
 <script src="/01_app/assets/components/thinkcast-top-nav.js?v=3"></script>
+<script src="/01_app/assets/video-editor/index.js"></script>
+<script src="/01_app/assets/steps/step04/step04-video.js"></script>
+
+<link rel="stylesheet" href="/01_app/assets/video-editor/video-editor.css">
+<link rel="stylesheet" href="/01_app/assets/steps/step04/step04-video.css">
 <style>
 :root{
   --green:#174f48;
@@ -1017,118 +1022,9 @@ body::before{content:"";position:fixed;z-index:-1;inset:-3px;background-image:li
     </div>
   </section>
 
-  <section class="step-view" id="step4" hidden>
-  <time class="page-date"></time>
-  <header class="heading">
-    <div>
-      <p class="eyebrow">STEP 04 · IMAGE REVIEW &amp; VIDEO DESIGN</p>
-      <h1 id="projectTitle">하루를 보면 마음이 보입니다</h1>
-    </div>
-    <p class="intro">승인 전 장면 이미지 검수용<br>재생으로 음성·BGM·타이틀 싱크를 확인하세요.</p>
-  </header>
+  <div id="step4Container"></div>
 
-  <section class="workspace">
-    <div>
-      <div class="preview-toolbar">
-        <span class="preview-label">타이포 타입</span>
-        <div class="type-options" role="group" aria-label="타이틀 디자인 선택">
-          <button class="type-btn" type="button" data-type="card" aria-pressed="false">01 브랜드 카드</button>
-          <button class="type-btn" type="button" data-type="minimal" aria-pressed="false">02 시네마틱</button>
-          <button class="type-btn active" type="button" data-type="editorial" aria-pressed="true">03 에디토리얼</button>
-          <button class="type-btn" type="button" data-type="bubble" aria-pressed="false">04 버블 팝</button>
-          <button class="type-btn" type="button" data-type="block" aria-pressed="false">05 그린 블록</button>
-          <button class="type-btn" type="button" data-type="action" aria-pressed="false">06 액션 이탤릭</button>
-        </div>
-      </div>
-      <div class="music-toolbar">
-        <button class="music-btn" id="aiPersonCrop" type="button">AI 사람 위치 · 좌우 맞춤</button><span id="aiPersonCropStatus" role="status" aria-live="polite"></span>
-        <span class="preview-label">배경음악</span>
-        <div class="music-options" role="group" aria-label="배경음악 선택">
-          <button class="music-btn" type="button" data-music="none" aria-pressed="false">음악 없음</button>
-          <button class="music-btn active" type="button" data-music="satie" aria-pressed="true">01 사티</button>
-          <button class="music-btn" type="button" data-music="debussy" aria-pressed="false">02 드뷔시</button>
-          <button class="music-btn" type="button" data-music="bach" aria-pressed="false">03 바흐</button>
-          <button class="music-btn active" id="narrationBtn" type="button" aria-pressed="true">STT 내레이션 켬</button>
-        </div>
-        <label class="volume-wrap">음악 크기 <input id="musicVolume" type="range" min="0" max="1" step="0.01" value="0.5"></label>
-      </div>
-      <div class="brand-toolbar" aria-label="개인 브랜드 리소스 적용">
-        <label class="brand-choice"><input id="brandIntroEnabled" type="checkbox"><span>인트로 포함</span><select id="brandIntroVersion" aria-label="인트로 버전"></select></label>
-        <label class="brand-choice"><input id="brandOutroEnabled" type="checkbox"><span>아웃트로 포함</span><select id="brandOutroVersion" aria-label="아웃트로 버전"></select></label>
-        <label class="brand-choice"><input id="brandWatermarkEnabled" type="checkbox"><span>워터마크 포함</span><select id="brandWatermarkVersion" aria-label="워터마크 버전"></select><input id="brandWatermarkOpacity" type="range" min="0.1" max="1" step="0.05" value="0.8" aria-label="워터마크 투명도"></label>
-      </div>
-      <div class="stage-card">
-        <div class="preview-format-badge" id="previewFormatBadge">YouTube · 16:9</div>
-        <div class="stage type-editorial" id="stage">
-          <video class="timeline-clock" id="video" src="/02_media/video/P1_merged.mp4" preload="metadata" playsinline muted aria-hidden="true"></video>
-          <img class="scene-image" id="sceneImage" src="/02_media/images/scenes/scene_01.webp" alt="생활실 도입 장면 이미지">
-          <video class="scene-video" id="sceneVideo" preload="metadata" playsinline muted aria-label="생성된 장면 영상"></video>
-          <div class="stage-media-controls" aria-label="장면 재생 조작">
-            <button id="prevBtn" type="button" aria-label="이전 장면" title="이전 장면"></button>
-            <button id="playBtn" class="stage-play-btn" type="button" aria-label="재생" title="재생·일시정지"></button>
-            <button id="nextBtn" type="button" aria-label="다음 장면" title="다음 장면"></button>
-          </div>
-          <div class="image-generation-mosaic" id="imageGenerationMosaic" aria-hidden="true" hidden></div>
-          <div class="image-generation-status" id="imageGenerationStatus" role="status" aria-live="polite" hidden><span class="image-generation-spinner" aria-hidden="true"></span><span id="imageGenerationStatusText">생성 중입니다.</span></div>
-          <button class="image-regenerate-btn" id="imageRegenerateBtn" type="button"><span>이미지 재생성</span><span class="image-variant-count" id="imageVariantCount">후보 1</span></button>
-          <audio id="bgm" preload="metadata"></audio>
-          <div class="scene-resource-badge" id="sceneResourceBadge">사진</div>
-          <div class="crop-hint" id="cropHint">손으로 좌우 위치 조정</div>
-          <div class="format-safe-zone" id="formatSafeZone" data-label=""></div>
-          <div class="shade"></div>
-          <div class="title-wrap" aria-live="polite">
-            <div class="title-card"><p class="title-text" id="titleText"></p></div>
-          </div>
-          <img class="brand-watermark-preview" id="brandWatermarkPreview" alt="" hidden>
-          <div class="brand-outro-preview" id="brandOutroPreview" hidden><img id="brandOutroPreviewImage" alt=""><video id="brandOutroPreviewVideo" muted playsinline></video></div>
-        </div>
-        <div class="controlbar">
-          <div class="progress" id="progress" aria-label="재생 위치"><div class="progress-fill" id="progressFill"></div></div>
-          <span class="clock" id="clock">00:00 / --:--</span>
-        </div>
-      </div>
-      <div class="caption-status" id="captionStatus"><span class="status-dot"></span><span id="statusText">문장 대기 구간</span></div>
-      <div class="caption-size-toolbar" aria-label="자막 글자 크기 조절">
-        <span>자막 글자 크기</span>
-        <button id="captionSizeDown" type="button" aria-label="자막 글자 작게">−</button>
-        <output class="caption-size-value" id="captionSizeValue" aria-live="polite">기본</output>
-        <button id="captionSizeUp" type="button" aria-label="자막 글자 크게">+</button>
-      </div>
-      <div class="distribution-panel" aria-labelledby="distributionTitle">
-        <div class="distribution-head"><div class="distribution-title-wrap"><strong id="distributionTitle">배포 플랫폼 TOP 9</strong><button class="distribution-help-btn" id="distributionHelp" type="button" aria-label="플랫폼별 API 게시 지원 안내" title="플랫폼별 API 게시 지원 안내">?</button></div><small>아이콘을 눌러 다중 선택</small></div>
-        <div class="distribution-support-legend" aria-label="현재 계정 연결 상태 테두리"><span><i class="unsupported"></i>미지원</span><span><i class="conditional"></i>조건 승인</span><span><i class="approved"></i>완전 승인</span><span><i class="review"></i>검토</span></div>
-        <div class="distribution-options" id="distributionPlatforms">
-          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="youtube" data-api-support="review" aria-pressed="true"><span class="platform-icon"></span><span>YouTube</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="youtube" aria-pressed="true" aria-label="YouTube 16:9 미리보기" title="16:9 미리보기"></button></div>
-          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="instagram" data-api-support="review" aria-pressed="true"><span class="platform-icon"></span><span>Instagram</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="instagram" aria-pressed="false" aria-label="Instagram Reels 9:16 미리보기" title="9:16 미리보기"></button></div>
-          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="facebook" data-api-support="review" aria-pressed="false"><span class="platform-icon"></span><span>Facebook</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="facebook" aria-pressed="false" aria-label="Facebook Feed 4:5 미리보기" title="4:5 미리보기"></button></div>
-          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="tiktok" data-api-support="review" aria-pressed="false"><span class="platform-icon"></span><span>TikTok</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="tiktok" aria-pressed="false" aria-label="TikTok 9:16 미리보기" title="9:16 미리보기"></button></div>
-          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="naver" data-api-support="unsupported" aria-pressed="true"><span class="platform-icon"></span><span>네이버 블로그</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="naver" aria-pressed="false" aria-label="네이버 블로그 16:9 미리보기" title="16:9 미리보기"></button></div>
-          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="kakaotalk" data-api-support="conditional" aria-pressed="false"><span class="platform-icon"></span><span>카카오톡 채널</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="kakaotalk" aria-pressed="false" aria-label="카카오톡 채널 16:9 미리보기" title="16:9 미리보기"></button></div>
-          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="threads" data-api-support="review" aria-pressed="false"><span class="platform-icon"></span><span>Threads</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="threads" aria-pressed="false" aria-label="Threads 9:16 미리보기" title="9:16 · 720×1280 미리보기"></button></div>
-          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="x" data-api-support="review" aria-pressed="false"><span class="platform-icon"></span><span>X</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="x" aria-pressed="false" aria-label="X 16:9 미리보기" title="16:9 · 1280×720 미리보기"></button></div>
-          <div class="distribution-item"><button class="distribution-btn" type="button" data-platform="linkedin" data-api-support="review" aria-pressed="false"><span class="platform-icon"></span><span>LinkedIn</span><span class="platform-check">✓</span></button><button class="platform-preview-btn" type="button" data-platform="linkedin" aria-pressed="false" aria-label="LinkedIn 4:5 미리보기" title="4:5 · 720×900 미리보기"></button></div>
-        </div>
-      </div>
-    </div>
-
-    <aside class="panel" aria-label="장면 목록">
-      <div class="panel-head"><strong>장면 순서</strong><span id="sceneTimelineSummary">이전 단계 타임라인 불러오는 중</span></div>
-      <div class="mobile-scene-nav" aria-label="모바일 장면 이동">
-        <label class="mobile-scene-select"><select id="mobileSceneSelect" aria-label="장면 선택"></select></label>
-        <button id="mobilePrevScene" type="button">← 이전 장면</button>
-        <button id="mobileNextScene" type="button">다음 장면 →</button>
-      </div>
-      <div class="scene-list" id="sceneList"></div>
-      <div class="export-toolbar">
-        <div class="export-copy"><strong>최종 영상 제작</strong><span class="export-status" id="renderStatus">승인 이미지로 영상을 생성하고 MP4로 합성합니다.</span></div>
-        <button class="render-btn publish-render-btn" id="renderBtn" type="button" aria-label="승인 이미지로 최종 영상 제작" title="승인 이미지로 최종 영상 제작">최종 영상 제작</button>
-      </div>
-    </aside>
-  </section>
-  <div class="flow-actions step4-actions"><button class="flow-btn editor-back" type="button" data-go="3-1">이전 · 콘티</button><button class="flow-btn calendar-next" type="button" data-go="5">배포 캘린더</button></div>
-  </section>
-
-  <section class="step-view flow-page" id="step5" hidden>
+ <section class="step-view flow-page" id="step5" hidden>
     <div class="flow-card calendar-card">
       <time class="page-date"></time>
       <div class="calendar-heading">
@@ -1305,23 +1201,6 @@ body::before{content:"";position:fixed;z-index:-1;inset:-3px;background-image:li
   </div>
 </div>
 
-<div class="image-regeneration-modal" id="imageRegenerationModal" role="dialog" aria-modal="true" aria-labelledby="imageRegenerationTitle" hidden>
-  <div class="image-regeneration-dialog">
-    <div class="image-regeneration-head"><small id="imageRegenerationSceneNo">SCENE 01 · IMAGE VARIATION</small><h2 id="imageRegenerationTitle">장면 이미지 후보 추가</h2></div>
-    <div class="image-regeneration-body">
-      <div class="image-base-guide"><strong>기본 장면 가이드 · 유지</strong><p id="imageBaseGuide"></p></div>
-      <label class="image-prompt-field">추가 프롬프트<textarea id="imageAdditionalPrompt" maxlength="500" placeholder="예: 인물의 표정을 조금 더 밝게 하고, 카메라 구도를 넓게 보여주세요."></textarea></label>
-      <div class="image-prompt-examples" aria-label="추가 프롬프트 예시">
-        <button class="image-prompt-chip" type="button">표정을 더 밝게</button>
-        <button class="image-prompt-chip" type="button">구도를 조금 더 넓게</button>
-        <button class="image-prompt-chip" type="button">따뜻한 오전 햇살 추가</button>
-      </div>
-      <p class="image-preserve-note">기존 이미지와 기본 콘티 가이드는 그대로 보존됩니다. 입력한 내용은 추가 지시로만 결합되고 새 결과는 별도 후보로 저장됩니다.</p>
-      <p class="image-regeneration-feedback" id="imageRegenerationFeedback" role="status" aria-live="polite"></p>
-    </div>
-    <div class="image-regeneration-actions"><button id="imageRegenerationCancel" type="button">취소</button><button class="create" id="imageRegenerationCreate" type="button">새 후보 추가</button></div>
-  </div>
-</div>
 
 <div class="ai-modal" id="aiWorkflowModal" role="dialog" aria-modal="true" aria-labelledby="aiWorkflowTitle" hidden>
   <div class="ai-dialog">
@@ -1380,90 +1259,6 @@ function applyTimeline(timeline){
   scenes.forEach(scene=>{if(scene.image){const preload=new Image();preload.src=scene.image}});
 }
 
-const video=document.querySelector('#video');
-const sceneImage=document.querySelector('#sceneImage');
-const sceneVideo=document.querySelector('#sceneVideo');
-const sceneResourceBadge=document.querySelector('#sceneResourceBadge');
-const stage=document.querySelector('#stage');
-const titleText=document.querySelector('#titleText');
-const sceneList=document.querySelector('#sceneList');
-const sceneTimelineSummary=document.querySelector('#sceneTimelineSummary');
-const mobileSceneSelect=document.querySelector('#mobileSceneSelect');
-const mobilePrevScene=document.querySelector('#mobilePrevScene');
-const mobileNextScene=document.querySelector('#mobileNextScene');
-const playBtn=document.querySelector('#playBtn');
-const prevBtn=document.querySelector('#prevBtn');
-const nextBtn=document.querySelector('#nextBtn');
-const imageRegenerateBtn=document.querySelector('#imageRegenerateBtn');
-const imageVariantCount=document.querySelector('#imageVariantCount');
-const imageGenerationMosaic=document.querySelector('#imageGenerationMosaic');
-const imageGenerationStatus=document.querySelector('#imageGenerationStatus');
-const imageGenerationStatusText=document.querySelector('#imageGenerationStatusText');
-const imageRegenerationModal=document.querySelector('#imageRegenerationModal');
-const imageRegenerationSceneNo=document.querySelector('#imageRegenerationSceneNo');
-const imageBaseGuide=document.querySelector('#imageBaseGuide');
-const imageAdditionalPrompt=document.querySelector('#imageAdditionalPrompt');
-const imageRegenerationFeedback=document.querySelector('#imageRegenerationFeedback');
-const imageRegenerationCreate=document.querySelector('#imageRegenerationCreate');
-const progress=document.querySelector('#progress');
-const progressFill=document.querySelector('#progressFill');
-const clock=document.querySelector('#clock');
-const captionStatus=document.querySelector('#captionStatus');
-const statusText=document.querySelector('#statusText');
-const typeButtons=[...document.querySelectorAll('.type-btn')];
-const musicButtons=[...document.querySelectorAll('.music-btn[data-music]')];
-const bgm=document.querySelector('#bgm');
-const musicVolume=document.querySelector('#musicVolume');
-const musicTracks={
-  satie:'/02_media/music/01_Satie_Gymnopedie_No1_CC-BY-3.0.mp3',
-  debussy:'/02_media/music/02_Debussy_Clair_de_lune_CC-BY-3.0.mp3',
-  bach:'/02_media/music/03_Bach_Air_BWV1068_Public_Domain.mp3'
-};
-let narrationTracks=[
-  {rate:1,src:'/02_media/narration/audio_0_좋은_돌봄은___.mp3'},
-  {rate:1.1,src:'/02_media/narration/audio_1__한_사람의_하루를_바라보는_일에서_시작합니다__.mp3'},
-  {rate:1,src:'/02_media/narration/audio_2__햇살을_맞는_작은_순간부터__.mp3'},
-  {rate:1,src:'/02_media/narration/audio_3__반가운_인사를_건네고__.mp3'},
-  {rate:1,src:'/02_media/narration/audio_4___눈높이를_맞춰_마음의_이야기를_듣습니다__.mp3'},
-  {rate:1,src:'/02_media/narration/audio_5___그리고_함께___.mp3'},
-  {rate:1,src:'/02_media/narration/audio_6__오늘의_몸과_마음을_세심히_살핍니다__.mp3'},
-  {rate:1.02,src:'/02_media/narration/audio_7__돌봄의_마음은_자연스럽게_이어지고__.mp3'},
-  {rate:1.02,src:'/02_media/narration/audio_8__편안한_발걸음은_새로운_하루로_향합니다__.mp3'},
-  {rate:1,src:'/02_media/narration/audio_9__익숙한_미소가_기다리는_곳에서__.mp3'},
-  {rate:1,src:'/02_media/narration/audio_10___오늘_하고_싶은_일을_스스로_고르고__.mp3'},
-  {rate:1.1,src:'/02_media/narration/audio_11___함께하는_즐거움_속으로_천천히_들어갑니다__.mp3'},
-  {rate:1.16,src:'/02_media/narration/audio_13__행복한_하루를_함께_만드는_곳__그린힐_재활실버케어_요양원입니다___.mp3'}
-];
-let narrations=[];
-let narrationAudios=narrationTracks.map(item=>{
-  const audio=new Audio(item.src);
-  audio.preload='auto';
-  audio.volume=.95;
-  audio.playbackRate=item.rate;
-  return audio;
-});
-function setNarrationTracks(tracks){
-  narrationAudios.forEach(audio=>audio.pause());
-  activeNarration=-1;
-  narrationTracks=tracks.map(item=>({rate:Number(item.rate)||1,src:String(item.src||'')}));
-  narrationAudios=narrationTracks.map(item=>{const audio=new Audio(item.src);audio.preload=item.src?'auto':'none';audio.volume=.95;audio.playbackRate=item.rate;return audio});
-}
-const narrationBtn=document.querySelector('#narrationBtn');
-const renderBtn=document.querySelector('#renderBtn');
-const renderStatus=document.querySelector('#renderStatus');
-const platformButtons=[...document.querySelectorAll('.distribution-btn')];
-const platformPreviewButtons=[...document.querySelectorAll('.platform-preview-btn')];
-const selectedPlatforms=new Set(platformButtons.filter(btn=>btn.getAttribute('aria-pressed')==='true').map(btn=>btn.dataset.platform));
-let brandAssets=[];let watermarkPosition='top-right';let watermarkWidthRatio=.15;let watermarkProfiles={};let outroPosition='center-center';let outroWidthRatio=1;let outroBackground='none';let outroBackgroundOpacity=.8;let outroProfiles={};
-let brandSelections=[];
-const stageCard=document.querySelector('.stage-card');
-const previewFormatBadge=document.querySelector('#previewFormatBadge');
-const formatSafeZone=document.querySelector('#formatSafeZone');
-const captionSizeDown=document.querySelector('#captionSizeDown');
-const captionSizeUp=document.querySelector('#captionSizeUp');
-const captionSizeValue=document.querySelector('#captionSizeValue');
-const previewColumn=document.querySelector('.workspace>div');
-const scenePanel=document.querySelector('.workspace>.panel');
 const SETTINGS_STORAGE_KEY='greenhill-p1-editor-settings-v1';
 let apiConnectionConfig=null;
 let activeApiStep=1;
@@ -3421,380 +3216,19 @@ document.querySelector('#scriptSaveBtn').addEventListener('click',async()=>{
   try{await saveScriptChanges()}catch(error){document.querySelector('#scriptMessage').textContent=error.message}
 });
 
-function timelineDuration(){return scenes.length?scenes[scenes.length-1].end:0}
-function sceneAt(t){return Math.max(0,scenes.findIndex((s,i)=>t>=s.start&&(t<s.end||i===scenes.length-1)))}
-function snapshotSceneMedia(){
-  if(currentScene<0)return null;
-  const showingVideo=stage.classList.contains('has-scene-video');
-  const source=showingVideo?sceneVideo:sceneImage;
-  if(showingVideo&&sceneVideo.readyState<2)return null;
-  if(!showingVideo&&!sceneImage.naturalWidth)return null;
-  let overlay;
-  if(showingVideo){
-    overlay=document.createElement('canvas');
-    overlay.width=sceneVideo.videoWidth;overlay.height=sceneVideo.videoHeight;
-    try{overlay.getContext('2d').drawImage(sceneVideo,0,0,overlay.width,overlay.height)}catch(error){return null}
-  }else{
-    overlay=document.createElement('img');overlay.src=sceneImage.currentSrc||sceneImage.src;overlay.alt='';
-  }
-  overlay.className='scene-dissolve-overlay';
-  overlay.style.objectPosition=getComputedStyle(source).objectPosition;
-  overlay.setAttribute('aria-hidden','true');
-  stage.append(overlay);
-  return overlay;
-}
-function finishSceneDissolve(){
-  const overlay=pendingDissolveOverlay;
-  if(!overlay)return;
-  pendingDissolveOverlay=null;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>overlay.classList.add('is-leaving')));
-  overlay.addEventListener('transitionend',()=>overlay.remove(),{once:true});
-  setTimeout(()=>overlay.remove(),sceneDissolveSeconds*1000+150);
-}
-function syncSceneMedia(scene,t,sourceChanged=false){
-  const generated=scene?.generatedVideo;
-  if(!generated?.uri){
-    stage.classList.remove('has-scene-video');
-    sceneResourceBadge.classList.remove('is-video');sceneResourceBadge.textContent='사진';
-    sceneVideo.pause();
-    return;
-  }
-  stage.classList.add('has-scene-video');
-  sceneResourceBadge.classList.add('is-video');sceneResourceBadge.textContent='영상';
-  sceneVideo.muted=true;
-  sceneVideo.defaultMuted=true;
-  if(sourceChanged||sceneVideo.dataset.uri!==generated.uri){
-    sceneVideo.dataset.uri=generated.uri;
-    sceneVideo.src=generated.uri;
-    sceneVideo.load();
-  }
-  if(sceneVideo.readyState>=1&&Number.isFinite(sceneVideo.duration)&&sceneVideo.duration>0){
-    const sceneDuration=Math.max(.001,scene.end-scene.start);
-    const target=Math.min(Math.max(0,sceneVideo.duration-.03),Math.max(0,t-scene.start)/sceneDuration*sceneVideo.duration);
-    if(Math.abs(sceneVideo.currentTime-target)>.2)sceneVideo.currentTime=target;
-  }
-  if(video.paused)sceneVideo.pause();
-  else sceneVideo.play().catch(()=>{});
-}
-function sync(){
-  if(!scenes.length)return;
-  const t=video.currentTime||0;
-  applyMusicEnvelope(t);
-  const idx=sceneAt(t);
-  if(idx!==currentScene){
-    pendingDissolveOverlay?.remove();
-    pendingDissolveOverlay=snapshotSceneMedia();
-    currentScene=idx;
-    if(sceneImage.getAttribute('src')!==scenes[idx].image){
-      sceneImage.src=scenes[idx].image;
-    }
-    sceneImage.alt=`${scenes[idx].name} 장면 이미지`;
-    document.querySelectorAll('.scene-btn').forEach((el,i)=>el.classList.toggle('active',i===idx));
-    document.querySelector('.scene-btn.active')?.scrollIntoView({block:'nearest'});
-    mobileSceneSelect.value=String(idx);
-    mobilePrevScene.disabled=idx===0;
-    mobileNextScene.disabled=idx===scenes.length-1;
-    prevBtn.disabled=idx===0;
-    nextBtn.disabled=idx===scenes.length-1;
-    prevBtn.title='이전 장면';nextBtn.title='다음 장면';
-    prevBtn.setAttribute('aria-label','이전 장면');nextBtn.setAttribute('aria-label','다음 장면');
-    applyStoredSceneCrop();
-    updateImageVariantCount();
-    syncSceneMedia(scenes[idx],t,true);
-    if(stage.classList.contains('has-scene-video')){
-      if(sceneVideo.readyState>=2)finishSceneDissolve();
-    }else if(sceneImage.complete&&sceneImage.naturalWidth)finishSceneDissolve();
-  }
-  else syncSceneMedia(scenes[idx],t);
-  const timed=scenes.find(s=>s.text&&t>=s.cueStart&&t<s.cueEnd);
-  const preview=video.paused&&scenes[idx]?.text?scenes[idx]:null;
-  const active=timed||preview;
-  stage.classList.toggle('has-title',Boolean(active));
-  titleText.innerText=active?.text||'';
-  captionStatus.classList.toggle('on',Boolean(active));
-  statusText.textContent=active?'타이틀 노출 중':'문장 대기 구간';
-  const duration=timelineDuration();
-  const outroHolder=document.querySelector('#brandOutroPreview');const showOutro=outroHolder.dataset.enabled==='true'&&t>=Math.max(0,duration-2);outroHolder.hidden=!showOutro;stage.classList.toggle('has-outro-preview',showOutro);const outroClip=document.querySelector('#brandOutroPreviewVideo');if(showOutro&&!outroClip.hidden&&!video.paused)outroClip.play().catch(()=>{});else outroClip.pause();
-  document.querySelectorAll('.scene-btn').forEach(el=>el.classList.toggle('active',showOutro?el.dataset.outro==='true':Number(el.dataset.index)===idx));
-  mobileSceneSelect.value=showOutro?'outro':String(idx);
-  progressFill.style.width=`${duration?Math.min(100,t/duration*100):0}%`;
-  clock.textContent=`${fmt(t)} / ${fmt(duration)}`;
-  syncNarration(t);
-  if(!video.paused) requestAnimationFrame(sync);
-}
-function seekScene(index){
-  const safe=Math.max(0,Math.min(scenes.length-1,index));
-  const scene=scenes[safe];
-  video.currentTime=scene.text?scene.cueStart+.05:scene.start+.05;
-  sync();
-}
-function seekOutroPreview(){video.currentTime=Math.max(0,timelineDuration()-.05);sync()}
-function togglePlay(){video.paused?video.play():video.pause()}
-function stopNarration(){
-  if(activeNarration>=0)narrationAudios[activeNarration].pause();
-  activeNarration=-1;
-}
-function startNarration(index,t){
-  stopNarration();
-  activeNarration=index;
-  const item=narrations[index];
-  const audio=narrationAudios[index];
-  if(!item?.src||!audio)return;
-  const begin=()=>{
-    if(video.paused||!narrationEnabled||activeNarration!==index)return;
-    audio.playbackRate=item.rate;
-    audio.currentTime=Math.max(0,(t-item.start)*item.rate);
-    audio.play().catch(()=>{});
-  };
-  if(audio.readyState>=1)begin();
-  else{audio.addEventListener('loadedmetadata',begin,{once:true});audio.load()}
-}
-function syncNarration(t,force=false){
-  if(!narrationEnabled||video.paused){stopNarration();return}
-  const index=narrations.findIndex(item=>t>=item.start&&t<item.end);
-  if(index<0){stopNarration();return}
-  const item=narrations[index];
-  const audio=narrationAudios[index];
-  const target=(t-item.start)*item.rate;
-  if(force||activeNarration!==index)startNarration(index,t);
-  else if(Math.abs(audio.currentTime-target)>.35)audio.currentTime=target;
-}
-function alignMusic(){
-  if(selectedMusic==='none'||!Number.isFinite(bgm.duration))return;
-  bgm.currentTime=Math.min(video.currentTime+2,Math.max(0,bgm.duration-.05));
-  applyMusicEnvelope(video.currentTime);
-}
-function applyMusicEnvelope(time){
-  const baseVolume=Number(musicVolume.value);
-  const lastNarrationEnd=narrations.reduce((latest,item)=>Math.max(latest,Number(item.end)||0),0);
-  const fadeIn=Math.max(0,Math.min(1,Number(time||0)/2));
-  const fadeOut=lastNarrationEnd&&time>=lastNarrationEnd?Math.max(0,1-(time-lastNarrationEnd)/2):1;
-  bgm.volume=Math.max(0,Math.min(1,baseVolume*Math.min(fadeIn,fadeOut)));
-}
-function saveEditorSettings(){
-  if(!settingsReady)return;
-  const settings={
-    type:currentType,
-    music:selectedMusic,
-    volume:Number(musicVolume.value),
-    narration:narrationEnabled,
-    captionSize:captionSizeLevel,
-    videoPanX,
-    platforms:[...selectedPlatforms],
-    previewPlatform:currentPreviewPlatform
-  };
-  try{
-    localStorage.setItem(SETTINGS_STORAGE_KEY,JSON.stringify(settings));
-    if(activeProjectId)localStorage.setItem(`thinkcast-scene-crops-${activeProjectId}`,JSON.stringify(sceneCropPositions));
-  }catch(error){}
-}
-function loadProjectCropPositions(projectId=activeProjectId){
-  try{sceneCropPositions=JSON.parse(localStorage.getItem(`thinkcast-scene-crops-${projectId}`)||'{}')||{}}catch(error){sceneCropPositions={}}
-}
-function loadEditorSettings(){
-  try{return JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)||'null')}catch(error){return null}
-}
-function setMusic(track){
-  selectedMusic=track;
-  bgm.pause();
-  video.muted=true;
-  if(track==='none'){
-    bgm.removeAttribute('src');
-    bgm.load();
-  }else{
-    bgm.src=musicTracks[track];
-    applyMusicEnvelope(video.currentTime);
-    bgm.addEventListener('loadedmetadata',()=>{
-      alignMusic();
-      if(!video.paused)bgm.play().catch(()=>{});
-    },{once:true});
-    bgm.load();
-  }
-  musicButtons.forEach(btn=>{
-    const selected=btn.dataset.music===track;
-    btn.classList.toggle('active',selected);
-    btn.setAttribute('aria-pressed',String(selected));
-  });
-  saveEditorSettings();
-}
-function setType(type){
-  currentType=type;
-  stage.classList.remove('type-card','type-minimal','type-editorial','type-bubble','type-block','type-action');
-  stage.classList.add(`type-${type}`);
-  typeButtons.forEach(btn=>{
-    const selected=btn.dataset.type===type;
-    btn.classList.toggle('active',selected);
-    btn.setAttribute('aria-pressed',String(selected));
-  });
-  saveEditorSettings();
-}
 
-const platformPreviewFormats={
-  youtube:{className:'preview-landscape',label:'YouTube · 16:9',safe:''},
-  instagram:{className:'preview-portrait',label:'Instagram Reels · 9:16',safe:'REELS SAFE AREA'},
-  facebook:{className:'preview-feed',label:'Facebook Feed · 4:5',safe:'FEED SAFE AREA'},
-  tiktok:{className:'preview-portrait',label:'TikTok · 9:16',safe:'SHORT-FORM SAFE AREA'},
-  naver:{className:'preview-landscape',label:'네이버 블로그 · 16:9',safe:''},
-  kakaotalk:{className:'preview-landscape',label:'카카오톡 채널 · 16:9',safe:''},
-  threads:{className:'preview-portrait',label:'Threads · 9:16 · 720×1280',safe:'VERTICAL SAFE AREA'},
-  x:{className:'preview-landscape',label:'X · 16:9 · 1280×720',safe:''},
-  linkedin:{className:'preview-feed',label:'LinkedIn · 4:5 · 720×900',safe:'FEED SAFE AREA'}
-};
-function setPlatformPreview(platform){
-  const format=platformPreviewFormats[platform]||platformPreviewFormats.youtube;
-  currentPreviewPlatform=platform;
-  stageCard.classList.remove('preview-landscape','preview-portrait','preview-feed');
-  stageCard.classList.add(format.className);
-  previewFormatBadge.textContent=format.label;
-  formatSafeZone.dataset.label=format.safe;
-  platformPreviewButtons.forEach(btn=>btn.setAttribute('aria-pressed',String(btn.dataset.platform===platform)));
-  applyStoredSceneCrop();
-  updateWatermarkPreview();
-  updateCommonOutroPreview();
-  updatePanAvailability();
-  saveEditorSettings();
-}
+// Thin Adapter Bridge for Step 04 Video Editor
+function applyTimeline(tl){return window.Step04VideoEditor?.applyTimeline(tl);}
+function sync(){return window.Step04VideoEditor?.sync();}
+function seekScene(idx){return window.Step04VideoEditor?.seekScene(idx);}
+function seekOutroPreview(){return window.Step04VideoEditor?.seekOutroPreview();}
+function togglePlay(){return window.Step04VideoEditor?.togglePlay();}
+function renderSceneList(){return window.Step04VideoEditor?.renderSceneList();}
+function setPlatformPreview(p){return window.Step04VideoEditor?.setPlatformPreview(p);}
+function setMusic(m){return window.Step04VideoEditor?.setMusic(m);}
+function setType(t){return window.Step04VideoEditor?.setType(t);}
+function restoreEditorSettings(){return window.Step04VideoEditor?.restoreEditorSettings();}
 
-function updatePanAvailability(){
-  const portraitPreview=stageCard.classList.contains('preview-portrait')||stageCard.classList.contains('preview-feed');
-  const landscapeSource=stage.classList.contains('has-scene-video')
-    ?sceneVideo.videoWidth>sceneVideo.videoHeight:sceneImage.naturalWidth>sceneImage.naturalHeight;
-  stage.classList.toggle('can-pan',portraitPreview&&landscapeSource);
-}
-
-function setVideoPan(value){
-  videoPanX=Math.max(0,Math.min(100,value));
-  stage.style.setProperty('--video-pan-x',`${videoPanX}%`);
-}
-function currentCropFormat(){
-  if(stageCard.classList.contains('preview-portrait'))return '9x16';
-  if(stageCard.classList.contains('preview-feed'))return '4x5';
-  return '16x9';
-}
-function applyStoredSceneCrop(){
-  const scene=scenes[currentScene];const format=currentCropFormat();
-  setVideoPan(format==='16x9'?50:Number(sceneCropPositions?.[scene?.id]?.[format]??50));
-}
-function storeCurrentSceneCrop(){
-  const scene=scenes[currentScene];const format=currentCropFormat();
-  if(!scene||format==='16x9')return null;
-  sceneCropPositions[scene.id]={...(sceneCropPositions[scene.id]||{}),[format]:videoPanX};
-  return {project_id:activeProjectId,scene_id:scene.id,format,pan_x:videoPanX};
-}
-
-async function persistCurrentSceneCrop(){
-  const position=storeCurrentSceneCrop();
-  saveEditorSettings();
-  if(!position?.project_id)return;
-  try{
-    await api('/api/project/crop-position',{method:'POST',body:JSON.stringify(position)});
-  }catch(error){
-    console.error('씬 크롭 위치 저장 실패',error);
-  }
-}
-document.querySelector('#aiPersonCrop').addEventListener('click',async event=>{
-  const projectId=activeProjectId,sceneId=scenes[currentScene]?.id,button=event.currentTarget,message=document.querySelector('#aiPersonCropStatus');
-  if(!projectId||!sceneId){message.textContent='분석할 콘텐츠와 장면을 먼저 선택해 주세요.';return;}
-  if(button.disabled)return;
-  button.disabled=true;button.setAttribute('aria-busy','true');button.textContent='사람 위치 분석 중…';message.textContent='현재 장면의 9:16·4:5 좌우 위치를 계산합니다.';
-  try{
-    const result=await api('/api/project/auto-crop',{method:'POST',body:JSON.stringify({project_id:projectId,scene_id:sceneId,apply:true})});
-    if(activeProjectId!==projectId||scenes[currentScene]?.id!==sceneId)return;
-    if(result.applied){sceneCropPositions[sceneId]={...(sceneCropPositions[sceneId]||{}),...result.positions};applyStoredSceneCrop();saveEditorSettings();}
-    message.textContent=result.needs_review?'직접 확인 필요 · '+result.reason:result.applied?'좌우 위치를 저장했습니다.':result.reason;
-  }catch(error){if(activeProjectId===projectId&&scenes[currentScene]?.id===sceneId)message.textContent=error.message;}
-  finally{button.disabled=false;button.removeAttribute('aria-busy');button.textContent='AI 사람 위치 · 좌우 맞춤';}
-});
-
-stage.addEventListener('pointerdown',event=>{
-  if(event.target.closest('.stage-media-controls,button,a,input,select,textarea')||!stage.classList.contains('can-pan')||event.button>0)return;
-  activePanPointer=event.pointerId;
-  panStartX=event.clientX;
-  panStartValue=videoPanX;
-  stage.classList.add('is-panning');
-  stage.setPointerCapture(event.pointerId);
-  event.preventDefault();
-});
-stage.addEventListener('pointermove',event=>{
-  if(event.pointerId!==activePanPointer)return;
-  const width=Math.max(1,stage.getBoundingClientRect().width);
-  setVideoPan(panStartValue-(event.clientX-panStartX)/width*100);
-});
-function endVideoPan(event){
-  if(event.pointerId!==activePanPointer)return;
-  activePanPointer=null;
-  stage.classList.remove('is-panning');
-  persistCurrentSceneCrop();
-}
-stage.addEventListener('pointerup',endVideoPan);
-stage.addEventListener('pointercancel',event=>{
-  if(event.pointerId!==activePanPointer)return;
-  activePanPointer=null;
-  stage.classList.remove('is-panning');
-  setVideoPan(panStartValue);
-});
-
-function setCaptionSize(level){
-  captionSizeLevel=Math.max(-5,Math.min(5,level));
-  stage.style.setProperty('--caption-size-offset',`${captionSizeLevel*.278}cqmin`);
-  captionSizeValue.textContent=captionSizeLevel===0?'기본':`${captionSizeLevel>0?'+':''}${captionSizeLevel}`;
-  captionSizeDown.disabled=captionSizeLevel===-5;
-  captionSizeUp.disabled=captionSizeLevel===5;
-  saveEditorSettings();
-}
-
-function setNarration(enabled){
-  narrationEnabled=Boolean(enabled);
-  narrationBtn.classList.toggle('active',narrationEnabled);
-  narrationBtn.setAttribute('aria-pressed',String(narrationEnabled));
-  narrationBtn.textContent=narrationEnabled?'STT 내레이션 켬':'STT 내레이션 끔';
-  narrationEnabled?syncNarration(video.currentTime,true):stopNarration();
-  saveEditorSettings();
-}
-
-function restoreEditorSettings(){
-  const saved=loadEditorSettings()||{};
-  const validTypes=new Set(typeButtons.map(btn=>btn.dataset.type));
-  const validMusic=new Set(musicButtons.map(btn=>btn.dataset.music));
-  const validPlatforms=new Set(platformButtons.map(btn=>btn.dataset.platform));
-  const restoredPlatforms=Array.isArray(saved.platforms)?saved.platforms.filter(item=>validPlatforms.has(item)):null;
-  sceneCropPositions={};
-  if(restoredPlatforms){
-    selectedPlatforms.clear();
-    restoredPlatforms.forEach(item=>selectedPlatforms.add(item));
-  }
-  platformButtons.forEach(btn=>btn.setAttribute('aria-pressed',String(selectedPlatforms.has(btn.dataset.platform))));
-  musicVolume.value=String(Math.max(0,Math.min(1,Number.isFinite(Number(saved.volume))?Number(saved.volume):0.5)));
-  setVideoPan(Number.isFinite(Number(saved.videoPanX))?Number(saved.videoPanX):50);
-  setCaptionSize(Number.isFinite(Number(saved.captionSize))?Number(saved.captionSize):0);
-  setNarration(saved.narration!==false);
-  setType(validTypes.has(saved.type)?saved.type:'editorial');
-  setMusic(validMusic.has(saved.music)?saved.music:'satie');
-  setPlatformPreview(validPlatforms.has(saved.previewPlatform)?saved.previewPlatform:'youtube');
-  settingsReady=true;
-  saveEditorSettings();
-}
-
-function syncScenePanelHeight(){
-  scenePanel.style.height=window.matchMedia('(min-width:981px)').matches?`${previewColumn.offsetHeight}px`:'';
-}
-new ResizeObserver(syncScenePanelHeight).observe(previewColumn);
-window.addEventListener('resize',syncScenePanelHeight);
-
-sceneList.addEventListener('click',e=>{const btn=e.target.closest('.scene-btn');if(!btn)return;if(btn.dataset.outro==='true')seekOutroPreview();else seekScene(Number(btn.dataset.index))});
-typeButtons.forEach(btn=>btn.addEventListener('click',()=>setType(btn.dataset.type)));
-musicButtons.forEach(btn=>btn.addEventListener('click',()=>setMusic(btn.dataset.music)));
-platformButtons.forEach(btn=>btn.addEventListener('click',()=>{
-  const platform=btn.dataset.platform;
-  selectedPlatforms.has(platform)?selectedPlatforms.delete(platform):selectedPlatforms.add(platform);
-  btn.setAttribute('aria-pressed',String(selectedPlatforms.has(platform)));
-  saveEditorSettings();
-}));
-platformPreviewButtons.forEach(btn=>btn.addEventListener('click',()=>setPlatformPreview(btn.dataset.platform)));
-captionSizeDown.addEventListener('click',()=>setCaptionSize(captionSizeLevel-1));
-captionSizeUp.addEventListener('click',()=>setCaptionSize(captionSizeLevel+1));
-narrationBtn.addEventListener('click',()=>setNarration(!narrationEnabled));
-musicVolume.addEventListener('input',()=>{applyMusicEnvelope(video.currentTime);saveEditorSettings()});
 document.querySelector('#calendarPrev').addEventListener('click',()=>moveCalendarPeriod(-1));
 document.querySelector('#calendarNext').addEventListener('click',()=>moveCalendarPeriod(1));
 document.querySelectorAll('.calendar-view-btn').forEach(button=>button.addEventListener('click',()=>{
@@ -4071,7 +3505,40 @@ restoreEditorSettings();
 refreshApiConnections().catch(()=>{});
 syncScenePanelHeight();
 sync();
-async function boot(){await initDemo();await restoreLoginSession()}
+
+async function ensureStep4Loaded() {
+  if (document.querySelector('#step4')) {
+    if (window.Step04VideoEditor) window.Step04VideoEditor.initStep4UI();
+    return true;
+  }
+  const container = document.querySelector('#step4Container') || document.body;
+  if (!container) return false;
+  try {
+    if (typeof fetch === 'function') {
+      const res = await fetch('/01_app/pages/steps/step04-video.html');
+      if (res.ok) {
+        container.innerHTML = await res.text();
+        if (window.Step04VideoEditor) window.Step04VideoEditor.initStep4UI();
+        return true;
+      }
+    }
+  } catch (e) {}
+  if (typeof require === 'function' && typeof process !== 'undefined') {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const fp = path.resolve('01_app/pages/steps/step04-video.html');
+      if (fs.existsSync(fp)) {
+        container.innerHTML = fs.readFileSync(fp, 'utf8');
+        if (window.Step04VideoEditor) window.Step04VideoEditor.initStep4UI();
+        return true;
+      }
+    } catch (e) {}
+  }
+  return false;
+}
+
+async function boot(){await ensureStep4Loaded();await initDemo();await restoreLoginSession()}
 boot();
 // Server-owned automation settings; runs require explicit start confirmation.
 (()=>{
