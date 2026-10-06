@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 from urllib.parse import quote
 
 from automation_store import STAGES
-from worker_core import JobConflict
+from worker_core import JobConflict, WorkerRuntimeSettings
 
 
 class AdapterFailure(RuntimeError):
@@ -19,11 +19,12 @@ class AdapterFailure(RuntimeError):
 
 
 class InternalAPI:
-    def __init__(self, auth, user_id):
+    def __init__(self, auth, user_id, settings=None):
         self.auth = auth
         self.user_id = user_id
         self.token = auth.create_session(user_id, days=1/8)
         self.base = os.environ.get('AUTOMATION_API_URL', 'http://api:10000').rstrip('/')
+        self.settings = settings or WorkerRuntimeSettings.from_env()
 
     def close(self):
         self.auth.delete_session(self.token)
@@ -34,17 +35,17 @@ class InternalAPI:
         body = json.dumps(payload, ensure_ascii=False).encode() if payload is not None else None
         # 409 means the local API did not start this request. Other errors may have
         # incurred provider cost; never automatically replay an ambiguous request.
-        for attempt in range(3):
+        for attempt in range(self.settings.api_retry_count):
             req = Request(self.base + path, body, headers={'Content-Type':'application/json', 'Cookie':'thinkcast_session='+self.token}, method='POST' if body is not None else 'GET')
             try:
-                with urlopen(req, timeout=7200) as response:
+                with urlopen(req, timeout=self.settings.api_timeout_seconds) as response:
                     result = json.load(response)
                 if result.get('ok') is not True:
                     raise AdapterFailure('기존 제작 API가 작업을 완료하지 못했습니다.')
                 return result
             except HTTPError as exc:
-                if exc.code == 409 and attempt < 2:
-                    time.sleep(2 ** attempt)
+                if exc.code == 409 and attempt + 1 < self.settings.api_retry_count:
+                    time.sleep(self.settings.api_retry_backoff_seconds * (2 ** attempt))
                     continue
                 raise AdapterFailure(f'제작 API 요청이 실패했습니다 (HTTP {exc.code}). 결과 확인 후 다시 시도해 주세요.') from None
             except (URLError, TimeoutError, ConnectionError, json.JSONDecodeError):
@@ -52,16 +53,17 @@ class InternalAPI:
 
 
 class AutomationRunner:
-    def __init__(self, store, api_factory=InternalAPI, base_keywords=None, job_store=None, worker_id=None):
+    def __init__(self, store, api_factory=InternalAPI, base_keywords=None, job_store=None, worker_id=None, settings=None):
         self.store, self.auth, self.api_factory = store, store.auth, api_factory
         self.base_keywords = base_keywords
         self.job_store = job_store
         self.worker_id = worker_id or ('automation-runner-' + str(os.getpid()))
+        self.settings = settings or WorkerRuntimeSettings.from_env()
 
     def execute(self, run):
         stop = threading.Event()
         def keep_alive():
-            while not stop.wait(15):
+            while not stop.wait(self.settings.automation_heartbeat_interval_seconds):
                 try:
                     if not self.store.heartbeat(run['run_id'],run['lease_owner']):
                         return
@@ -71,7 +73,7 @@ class AutomationRunner:
         thread.start()
         api = None
         try:
-            api = self.api_factory(self.auth,run['user_id'])
+            api = self.api_factory(self.auth,run['user_id'],self.settings) if self.api_factory is InternalAPI else self.api_factory(self.auth,run['user_id'])
             self.pipeline(run,api)
             self.store.finish(run,'succeeded')
         except InterruptedError:
@@ -102,6 +104,7 @@ class AutomationRunner:
                             _OperationAdapter(operation),
                             worker_id=self.worker_id,
                             trace_id=run['run_id'],
+                            lease_seconds=self.settings.job_lease_seconds,
                         )
                     except JobConflict:
                         raise AdapterFailure('같은 제작 작업이 이미 실행 중이거나 취소되었습니다.') from None
@@ -179,13 +182,13 @@ class AutomationRunner:
                     job=submitted.get('video_job') or submitted.get('scene_video_job')
                     if not isinstance(job,dict):raise AdapterFailure('Kling 작업 정보를 확인하지 못했습니다.')
                     if job['status']=='succeeded':return job
-                    deadline=time.monotonic()+3600
+                    deadline=time.monotonic()+self.settings.i2v_timeout_seconds
                     while time.monotonic()<deadline:
                         if not self.store.check_active(run):raise InterruptedError('자동화가 중지되었습니다.')
                         result=api.call('/api/storyboard/video-status?task_id='+quote(job['task_id'],safe=''),None)
                         if result['status']=='succeeded':return result
                         if result['status'] in ('failed','cancelled'):raise AdapterFailure('Kling 장면 생성이 실패했습니다. 같은 장면으로 다시 시도할 수 있습니다.')
-                        time.sleep(5)
+                        time.sleep(self.settings.i2v_poll_interval_seconds)
                     raise AdapterFailure('Kling 완료 대기 시간이 초과되었습니다. 저장된 작업 ID로 다시 확인해 주세요.')
                 step('video_complete_'+sid,convert,stage='image_to_video')
         if level==3:
@@ -217,12 +220,20 @@ class AutomationRunner:
                 return {'reused':True,'exports':[{'url':row['uri']} for row in rows]}
             if rows:
                 raise AdapterFailure('일부 출력이 이미 저장되어 있습니다. 중복 출력을 피하기 위해 콘텐츠에서 나머지를 확인해 주세요.')
+            render_config=config.get('render',{}) if isinstance(config.get('render',{}),dict) else {}
+            render_type=render_config.get('type',self.settings.render_type)
+            render_music=render_config.get('music',self.settings.render_music)
+            render_volume=render_config.get('volume',self.settings.render_volume)
+            render_pan_x=render_config.get('pan_x',self.settings.render_pan_x)
             return call('/render',{'job_id':job_id,'platforms':config['channels'],'preview_platform':config['channels'][0],
-                                   'type':'editorial','music':'satie','volume':0.5,'narration':True,'video_pan_x':0.5,
+                                   'type':render_type,'music':render_music,'volume':render_volume,'narration':True,'video_pan_x':render_pan_x,
                                    'scene_crop_positions':self.auth.scene_crop_positions(user,project)})
+        render_config=config.get('render',{}) if isinstance(config.get('render',{}),dict) else {}
         export_input={'render_job_id':'automation-'+run['run_id'],'platforms':config['channels'],
-                      'preview_platform':config['channels'][0],'type':'editorial','music':'satie',
-                      'volume':0.5,'narration':True,'video_pan_x':0.5,
+                      'preview_platform':config['channels'][0],'type':render_config.get('type',self.settings.render_type),
+                      'music':render_config.get('music',self.settings.render_music),
+                      'volume':render_config.get('volume',self.settings.render_volume),'narration':True,
+                      'video_pan_x':render_config.get('pan_x',self.settings.render_pan_x),
                       'scene_crop_positions':self.auth.scene_crop_positions(user,project)}
         step('final_export_calendar',export,stage='final_composite',job_input=export_input)
 

@@ -8,6 +8,7 @@ from .jobs import (
     JobValidationError,
     compute_input_hash,
 )
+from .settings import ConfigurationError, WorkerRuntimeSettings
 
 __all__ = [
     "JobConflict",
@@ -16,4 +17,6 @@ __all__ = [
     "JobValidationError",
     "WorkerAdapter",
     "compute_input_hash",
+    "ConfigurationError",
+    "WorkerRuntimeSettings",
 ]

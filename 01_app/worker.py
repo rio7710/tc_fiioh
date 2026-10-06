@@ -5,7 +5,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from worker_core import JobStore
+from worker_core import JobStore, WorkerRuntimeSettings
 from auth_store import AuthStore
 from automation_store import AutomationStore
 from automation_runner import AutomationRunner
@@ -145,9 +145,10 @@ def create_job_store(path: Path = JOB_STORE_PATH) -> JobStore:
 
 def main() -> None:
     print("[tc_temp_worker] Starting scheduled content automation")
+    settings = WorkerRuntimeSettings.from_env()
     init_db(SQLITE_PATH)
     store = AutomationStore(AuthStore(SQLITE_PATH))
-    runner = AutomationRunner(store, job_store=create_job_store())
+    runner = AutomationRunner(store, job_store=create_job_store(), settings=settings)
     owner = str(uuid.uuid4())
     def health_loop():
         while True:
@@ -155,7 +156,7 @@ def main() -> None:
                 update_health(HEALTH_PATH)
             except Exception:
                 pass
-            time.sleep(15)
+            time.sleep(settings.heartbeat_interval_seconds)
     threading.Thread(target=health_loop, daemon=True).start()
     while True:
         try:
@@ -166,7 +167,7 @@ def main() -> None:
                 store.enqueue_due()
         except Exception as exc:
             print(f"[tc_temp_worker] Health update failed: {type(exc).__name__}", file=sys.stderr)
-        time.sleep(5.0)
+        time.sleep(settings.idle_poll_seconds)
 
 
 if __name__ == "__main__":

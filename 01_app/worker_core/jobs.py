@@ -313,6 +313,7 @@ class JobStore:
         *,
         worker_id: str,
         trace_id: str | None = None,
+        lease_seconds: float = 300,
     ) -> dict[str, Any]:
         """Create or resume one logical job, then execute it at most once per claim.
 
@@ -328,9 +329,9 @@ class JobStore:
             raise JobConflict(f"job {job['job_id']} was cancelled")
         if job["status"] == "running":
             raise JobConflict(f"job {job['job_id']} is already running")
-        return self.execute(job["job_id"], worker_id, adapter)
+        return self.execute(job["job_id"], worker_id, adapter, lease_seconds=lease_seconds)
 
-    def execute(self, job_id: str, worker_id: str, adapter: Any, *, lease_seconds: int = 300) -> dict[str, Any]:
+    def execute(self, job_id: str, worker_id: str, adapter: Any, *, lease_seconds: float = 300) -> dict[str, Any]:
         """Claim, execute through an adapter, and persist the terminal state."""
         job = self.claim(job_id, worker_id, lease_seconds=lease_seconds)
         try:
