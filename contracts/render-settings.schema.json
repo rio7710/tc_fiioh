@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://thinkcast.local/contracts/render-settings.schema.json",
+  "title": "ThinkCast render settings overrides",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "overrides"],
+  "properties": {
+    "schema_version": {"const": "render-settings.v1"},
+    "overrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {"type": "string", "minLength": 1},
+        "music": {"type": "string", "minLength": 1},
+        "volume": {"type": "number", "minimum": 0, "maximum": 1},
+        "narration": {"type": "boolean"},
+        "video_pan_x": {"type": "number", "minimum": 0, "maximum": 1},
+        "caption_size": {"type": "integer", "minimum": -5, "maximum": 5},
+        "preview_platform": {"type": "string", "minLength": 1},
+        "platforms": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true, "minItems": 1},
+        "scene_dissolve_seconds": {"type": "number", "minimum": 0, "maximum": 5}
+      }
+    }
+  }
+}

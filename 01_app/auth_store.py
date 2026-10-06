@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 import secrets
 import sqlite3
 import re
@@ -13,6 +14,18 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from migrations.brand_variant_v1 import ensure_brand_variant_schema
+from migrations.render_settings_v1 import ensure_render_settings_schema
+
+
+def _safe_env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(maximum, value))
+
+
+SQLITE_TIMEOUT_SECONDS = _safe_env_int("SQLITE_TIMEOUT_SECONDS", 15, 1, 120)
 
 
 def _now() -> datetime:
@@ -32,7 +45,7 @@ class AuthStore:
         self._initialize()
 
     def _connect(self):
-        connection = sqlite3.connect(self.path, timeout=15)
+        connection = sqlite3.connect(self.path, timeout=SQLITE_TIMEOUT_SECONDS)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
@@ -359,7 +372,49 @@ class AuthStore:
                 if column not in automated_columns:
                     connection.execute(f'ALTER TABLE automated_projects ADD COLUMN {column} {definition}')
             ensure_brand_variant_schema(connection)
+            ensure_render_settings_schema(connection)
             connection.commit()
+
+    def get_render_settings(self, user_id: str) -> dict:
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT overrides_json FROM user_render_settings WHERE user_id=?", (user_id,)
+            ).fetchone()
+        if not row:
+            return {}
+        try:
+            value = json.loads(row["overrides_json"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("렌더 설정을 읽을 수 없습니다.") from exc
+        return value if isinstance(value, dict) else {}
+
+    def save_render_settings(self, user_id: str, overrides: dict, merge: bool = False) -> dict:
+        if not isinstance(overrides, dict):
+            raise ValueError("렌더 설정 형식이 올바르지 않습니다.")
+        encoded = json.dumps(overrides, ensure_ascii=False, sort_keys=True, allow_nan=False)
+        now = _now().isoformat()
+        with closing(self._connect()) as connection:
+            if not connection.execute("SELECT 1 FROM users WHERE user_id=?", (user_id,)).fetchone():
+                raise ValueError("사용자를 찾을 수 없습니다.")
+            current = connection.execute(
+                "SELECT version, overrides_json FROM user_render_settings WHERE user_id=?", (user_id,)
+            ).fetchone()
+            if merge and current:
+                previous = json.loads(current["overrides_json"] or "{}")
+                if not isinstance(previous, dict):
+                    previous = {}
+                merged = {**previous, **overrides}
+                encoded = json.dumps(merged, ensure_ascii=False, sort_keys=True, allow_nan=False)
+            version = int(current["version"]) + 1 if current else 1
+            connection.execute(
+                """INSERT INTO user_render_settings(user_id,version,overrides_json,updated_at)
+                   VALUES(?,?,?,?)
+                   ON CONFLICT(user_id) DO UPDATE SET version=excluded.version,
+                     overrides_json=excluded.overrides_json, updated_at=excluded.updated_at""",
+                (user_id, version, encoded, now),
+            )
+            connection.commit()
+        return json.loads(encoded)
 
     def ensure_user(self, username: str, password: str) -> dict:
         username = username.strip()

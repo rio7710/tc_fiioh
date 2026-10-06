@@ -1,0 +1,57 @@
+{
+  "schema_version": "render-catalog.v1",
+  "music": {
+    "none": {"label": "음악 없음", "uri": null},
+    "satie": {"label": "Gymnopédie No. 1", "uri": "02_media/music/01_Satie_Gymnopedie_No1_CC-BY-3.0.mp3"},
+    "debussy": {"label": "Clair de lune", "uri": "02_media/music/02_Debussy_Clair_de_lune_CC-BY-3.0.mp3"},
+    "bach": {"label": "Air BWV1068", "uri": "02_media/music/03_Bach_Air_BWV1068_Public_Domain.mp3"}
+  },
+  "styles": {
+    "card": ["Malgun Gothic", 58, "&H00FFFFFF", "&H00284F17", "&H50000000", 3, 2, 0, 2, 120, 120, 86, 0],
+    "minimal": ["Batang", 62, "&H00FFFFFF", "&H00101010", "&H70000000", 1, 2, 2, 2, 120, 120, 92, 0],
+    "editorial": ["Batang", 54, "&H002C300B", "&H00EDF6F9", "&H30000000", 3, 14, 0, 1, 145, 520, 90, 0],
+    "bubble": ["Malgun Gothic", 62, "&H007FC1FF", "&H00141B2A", "&H50000000", 1, 3, 4, 2, 120, 120, 90, 0],
+    "block": ["Malgun Gothic", 60, "&H00D0F1D4", "&H00223517", "&H50000000", 1, 3, 4, 2, 120, 120, 90, 0],
+    "action": ["Malgun Gothic", 60, "&H00EDD981", "&H001B1918", "&H50000000", 1, 3, 4, 2, 120, 120, 90, -1]
+  },
+  "platforms": {
+    "youtube": {"width": 1280, "height": 720, "format": "16x9"},
+    "instagram": {"width": 720, "height": 1280, "format": "9x16"},
+    "facebook": {"width": 720, "height": 900, "format": "4x5"},
+    "tiktok": {"width": 720, "height": 1280, "format": "9x16"},
+    "naver": {"width": 1280, "height": 720, "format": "16x9"},
+    "kakaotalk": {"width": 1280, "height": 720, "format": "16x9"},
+    "threads": {"width": 720, "height": 1280, "format": "9x16"},
+    "x": {"width": 1280, "height": 720, "format": "16x9"},
+    "linkedin": {"width": 720, "height": 900, "format": "4x5"}
+  },
+  "platform_preview_formats": {
+    "youtube": {"formatKey": "16x9", "className": "preview-landscape", "label": "YouTube · 16:9", "safe": ""},
+    "instagram": {"formatKey": "9x16", "className": "preview-portrait", "label": "Instagram Reels · 9:16", "safe": "REELS SAFE AREA"},
+    "facebook": {"formatKey": "4x5", "className": "preview-feed", "label": "Facebook Feed · 4:5", "safe": "FEED SAFE AREA"},
+    "tiktok": {"formatKey": "9x16", "className": "preview-portrait", "label": "TikTok · 9:16", "safe": "SHORT-FORM SAFE AREA"},
+    "naver": {"formatKey": "16x9", "className": "preview-landscape", "label": "네이버 블로그 · 16:9", "safe": ""},
+    "kakaotalk": {"formatKey": "16x9", "className": "preview-landscape", "label": "카카오톡 채널 · 16:9", "safe": ""},
+    "threads": {"formatKey": "9x16", "className": "preview-portrait", "label": "Threads · 9:16 · 720×1280", "safe": "VERTICAL SAFE AREA"},
+    "x": {"formatKey": "16x9", "className": "preview-landscape", "label": "X · 16:9 · 1280×720", "safe": ""},
+    "linkedin": {"formatKey": "4x5", "className": "preview-feed", "label": "LinkedIn · 4:5 · 720×900", "safe": "FEED SAFE AREA"},
+    "square": {"formatKey": "1x1", "className": "preview-square", "label": "Square Feed · 1:1 · 1080×1080", "safe": "SQUARE SAFE AREA"}
+  },
+  "ratio_profiles": {
+    "16x9": {"key": "16x9", "label": "16:9 Landscape", "aspectRatio": 1.7777777778, "width": 1920, "height": 1080, "defaultWidth": 1280, "defaultHeight": 720, "className": "preview-landscape", "safeZoneLabel": "", "platforms": ["youtube", "naver", "kakaotalk", "x"]},
+    "9x16": {"key": "9x16", "label": "9:16 Vertical / Short-form", "aspectRatio": 0.5625, "width": 1080, "height": 1920, "defaultWidth": 720, "defaultHeight": 1280, "className": "preview-portrait", "safeZoneLabel": "REELS SAFE AREA", "platforms": ["instagram", "tiktok", "threads"]},
+    "4x5": {"key": "4x5", "label": "4:5 Feed Portrait", "aspectRatio": 0.8, "width": 1080, "height": 1350, "defaultWidth": 720, "defaultHeight": 900, "className": "preview-feed", "safeZoneLabel": "FEED SAFE AREA", "platforms": ["facebook", "linkedin"]},
+    "1x1": {"key": "1x1", "label": "1:1 Square", "aspectRatio": 1.0, "width": 1080, "height": 1080, "defaultWidth": 720, "defaultHeight": 720, "className": "preview-square", "safeZoneLabel": "SQUARE SAFE AREA", "platforms": ["instagram_post", "square"]}
+  },
+  "defaults": {
+    "type": "editorial",
+    "music": "satie",
+    "volume": 0.5,
+    "narration": true,
+    "caption_size": 0,
+    "video_pan_x": 0.5,
+    "preview_platform": "youtube",
+    "platforms": ["youtube", "instagram", "naver"],
+    "scene_dissolve_seconds": 0.5
+  }
+}

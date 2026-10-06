@@ -19,6 +19,17 @@
       "type": "object", "additionalProperties": false, "required": ["scene_count", "crop"],
       "properties": {"scene_count": {"type": "integer", "minimum": 0, "maximum": 200}, "crop": {"enum": ["default", "manual", "ai"]}}
     },
+    "render": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "type": {"type": "string", "minLength": 1},
+        "music": {"type": "string", "minLength": 1},
+        "volume": {"type": "number", "minimum": 0, "maximum": 1},
+        "narration": {"type": "boolean"},
+        "video_pan_x": {"type": "number", "minimum": 0, "maximum": 1},
+        "caption_size": {"type": "integer", "minimum": -5, "maximum": 5}
+      }
+    },
     "voice": {
       "type": "object", "additionalProperties": false, "required": ["profile_id"],
       "properties": {"profile_id": {"enum": ["warm_female", "bright_female", "steady_male", "qwen_narrator", "qwen_etp"]}}

@@ -40,6 +40,7 @@ ROOT = APP_DIR.parent
 EXPORTS = Path(os.environ.get("EXPORTS_DIR", str(ROOT / "04_exports")))
 DATA_FILE = Path(os.environ.get("DEMO_DATA_PATH", str(APP_DIR / "data" / "demo_data.json")))
 CAPTION_REGISTRY_FILE = Path(os.environ.get("CAPTION_REGISTRY_PATH", str(APP_DIR / "data" / "caption_artifacts.json")))
+RENDER_CATALOG_PATH = ROOT / "config" / "render-catalog.json"
 SOURCE_CLIPS = ROOT / "02_media" / "video" / "source_clips"
 MERGED_DEMO_VIDEO = ROOT / "02_media" / "video" / "P1_merged.mp4"
 PORT = int(os.environ.get("PORT", "8765"))
@@ -306,7 +307,7 @@ def test_provider_connection(provider, values):
     else:
         raise ValueError("지원하지 않는 API 공급자입니다.")
     try:
-        with urlopen(request, timeout=15) as response:
+        with urlopen(request, timeout=RUNTIME_CONFIG["provider_probe_timeout"]) as response:
             if not 200 <= response.status < 300:
                 raise ValueError(f"연결 확인 실패 (HTTP {response.status})")
     except HTTPError as exc:
@@ -372,7 +373,7 @@ def openai_seasonal_keywords(api_key, local_date, existing_labels, count=None):
         method="POST",
     )
     try:
-        with urlopen(request, timeout=60) as response:
+        with urlopen(request, timeout=RUNTIME_CONFIG["openai_keywords_timeout"]) as response:
             result = json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         safe = {400: "시즌 추천 요청 형식을 확인해 주세요.", 401: "OpenAI API 키 인증에 실패했습니다.", 429: "OpenAI API 요청 한도 또는 결제 상태를 확인해 주세요."}
@@ -433,7 +434,7 @@ def openai_tts_audio(api_key, text, profile_id, response_format="wav"):
         method="POST",
     )
     try:
-        with urlopen(request, timeout=120) as response:
+        with urlopen(request, timeout=RUNTIME_CONFIG["openai_tts_timeout"]) as response:
             payload = response.read()
             content_type = response.headers.get("Content-Type", "")
             usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
@@ -520,7 +521,7 @@ def media_duration(path):
     completed = subprocess.run(
         [ffprobe, "-v", "error", "-show_entries", "format=duration",
          "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
-        capture_output=True, text=True, timeout=20, check=True,
+        capture_output=True, text=True, timeout=RUNTIME_CONFIG["ffprobe_timeout"], check=True,
     )
     return max(.1, float(completed.stdout.strip()))
 
@@ -594,7 +595,7 @@ def openai_reference_image(api_key, model, prompt, reference_paths):
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": content_type}, method="POST",
     )
     try:
-        with urlopen(request, timeout=300) as response:
+        with urlopen(request, timeout=RUNTIME_CONFIG["openai_image_timeout"]) as response:
             return json.loads(response.read().decode("utf-8")), response.headers.get("x-request-id", "")
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:500]
@@ -615,7 +616,7 @@ def qwen_clone_audio(text, worker_profile):
         headers=headers, method="POST",
     )
     try:
-        with urlopen(request, timeout=15) as response:
+        with urlopen(request, timeout=RUNTIME_CONFIG["qwen_submit_timeout"]) as response:
             job = json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         if exc.code == 429:
@@ -627,11 +628,11 @@ def qwen_clone_audio(text, worker_profile):
     if not job_id:
         raise RuntimeError("Qwen 워커가 작업 ID를 반환하지 않았습니다.")
     status_headers = {"X-ARUN-TTS-Key": api_key}
-    deadline = time.monotonic() + 360
+    deadline = time.monotonic() + RUNTIME_CONFIG["qwen_deadline"]
     while time.monotonic() < deadline:
-        time.sleep(2)
+        time.sleep(RUNTIME_CONFIG["qwen_poll_interval"])
         try:
-            with urlopen(Request(f"{base_url}/v1/voice-clone/jobs/{job_id}", headers=status_headers), timeout=10) as response:
+            with urlopen(Request(f"{base_url}/v1/voice-clone/jobs/{job_id}", headers=status_headers), timeout=RUNTIME_CONFIG["qwen_poll_timeout"]) as response:
                 status = json.loads(response.read().decode("utf-8"))
         except (HTTPError, URLError, TimeoutError):
             continue
@@ -640,7 +641,7 @@ def qwen_clone_audio(text, worker_profile):
         if status.get("status") != "succeeded":
             continue
         try:
-            with urlopen(Request(f"{base_url}/v1/voice-clone/jobs/{job_id}/audio", headers=status_headers), timeout=30) as response:
+            with urlopen(Request(f"{base_url}/v1/voice-clone/jobs/{job_id}/audio", headers=status_headers), timeout=RUNTIME_CONFIG["qwen_audio_timeout"]) as response:
                 return response.read(), job_id, "Qwen/Qwen3-TTS-12Hz-0.6B-Base", {
                     "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
                 }
@@ -766,7 +767,7 @@ def _generate_voice_clips(api_key, user_id, project_id, script_revision, documen
             "usage": usage,
         }
 
-    worker_count = 1 if profile.get("provider") == "qwen_clone" else min(3, len(cues))
+    worker_count = 1 if profile.get("provider") == "qwen_clone" else min(RUNTIME_CONFIG["voice_workers"], len(cues))
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
         clips = list(executor.map(generate, cues))
     clips.sort(key=lambda item: item["target_start"] if item["target_start"] is not None else 0)
@@ -873,7 +874,7 @@ lines는 반드시 {len(scene_specs)}개이며 각 항목은 비어 있지 않�
         method="POST",
     )
     try:
-        with urlopen(request, timeout=120) as response:
+        with urlopen(request, timeout=RUNTIME_CONFIG["openai_script_timeout"]) as response:
             result = json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         safe = {400: "대본 생성 요청 형식을 확인해 주세요.", 401: "OpenAI API 키 인증에 실패했습니다.", 429: "OpenAI API 요청 한도 또는 결제 상태를 확인해 주세요."}
@@ -939,7 +940,7 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage):
             data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}, method="POST")
         try:
-            with urlopen(request, timeout=300) as response:
+            with urlopen(request, timeout=RUNTIME_CONFIG["openai_script_timeout"]) as response:
                 result = json.loads(response.read().decode("utf-8"))
         except HTTPError as exc:
             raise RuntimeError(f"OpenAI 1차 대본 응답 오류 (HTTP {exc.code})") from None
@@ -1015,7 +1016,7 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
             method="POST",
         )
         try:
-            with urlopen(request, timeout=300) as response:
+            with urlopen(request, timeout=RUNTIME_CONFIG["openai_script_timeout"]) as response:
                 result = json.loads(response.read().decode("utf-8"))
         except HTTPError as exc:
             safe = {400: "최종대본 생성 요청 형식을 확인해 주세요.", 401: "OpenAI API 키 인증에 실패했습니다.", 429: "OpenAI API 요청 한도 또는 결제 상태를 확인해 주세요."}
@@ -1184,7 +1185,8 @@ def apply_script_edits(document, script):
     return updated
 
 
-def kling_api_request(api_key, path, payload=None, timeout=60):
+def kling_api_request(api_key, path, payload=None, timeout=None):
+    timeout = timeout or RUNTIME_CONFIG["provider_probe_timeout"] * 4
     if not api_key:
         raise ValueError("Kling API 키를 입력하거나 KLING_API_KEY 환경변수를 설정해 주세요.")
     base_url = os.environ.get("KLING_API_BASE_URL", "https://api-singapore.klingai.com").rstrip("/")
@@ -1335,7 +1337,7 @@ def save_kling_artifact(task_id, task, media_type):
         temporary = target.with_suffix(target.suffix + ".part")
         request = Request(source_url, headers={"User-Agent": "ThinkCast-Kling-Lab/1.0"})
         try:
-            with urlopen(request, timeout=120) as response, temporary.open("wb") as output:
+            with urlopen(request, timeout=RUNTIME_CONFIG["media_download_timeout"]) as response, temporary.open("wb") as output:
                 maximum = 500 * 1024 * 1024
                 total = 0
                 while True:
@@ -1369,11 +1371,20 @@ def local_scene_data_url(scene_id):
     encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
     return f"data:{mime_type};base64,{encoded}", scene
 
+def load_render_catalog() -> dict:
+    catalog = json.loads(RENDER_CATALOG_PATH.read_text(encoding="utf-8"))
+    if catalog.get("schema_version") != "render-catalog.v1":
+        raise RuntimeError("지원하지 않는 렌더 카탈로그 버전입니다.")
+    for section in ("music", "styles", "platforms", "platform_preview_formats", "ratio_profiles", "defaults"):
+        if not isinstance(catalog.get(section), dict):
+            raise RuntimeError(f"렌더 카탈로그의 {section} 항목이 올바르지 않습니다.")
+    return catalog
+
+
+RENDER_CATALOG = load_render_catalog()
 MUSIC = {
-    "none": None,
-    "satie": ROOT / "02_media" / "music" / "01_Satie_Gymnopedie_No1_CC-BY-3.0.mp3",
-    "debussy": ROOT / "02_media" / "music" / "02_Debussy_Clair_de_lune_CC-BY-3.0.mp3",
-    "bach": ROOT / "02_media" / "music" / "03_Bach_Air_BWV1068_Public_Domain.mp3",
+    key: (ROOT / value["uri"] if value.get("uri") else None)
+    for key, value in RENDER_CATALOG["music"].items()
 }
 
 NARRATION_TRACKS = [
@@ -1392,26 +1403,139 @@ NARRATION_TRACKS = [
     (1.16, "audio_13__행복한_하루를_함께_만드는_곳__그린힐_재활실버케어_요양원입니다___.mp3"),
 ]
 
-ASS_STYLES = {
-    "card": ("Malgun Gothic", 58, "&H00FFFFFF", "&H00284F17", "&H50000000", 3, 2, 0, 2, 120, 120, 86, 0),
-    "minimal": ("Batang", 62, "&H00FFFFFF", "&H00101010", "&H70000000", 1, 2, 2, 2, 120, 120, 92, 0),
-    "editorial": ("Batang", 54, "&H002C300B", "&H00EDF6F9", "&H30000000", 3, 14, 0, 1, 145, 520, 90, 0),
-    "bubble": ("Malgun Gothic", 62, "&H007FC1FF", "&H00141B2A", "&H50000000", 1, 3, 4, 2, 120, 120, 90, 0),
-    "block": ("Malgun Gothic", 60, "&H00D0F1D4", "&H00223517", "&H50000000", 1, 3, 4, 2, 120, 120, 90, 0),
-    "action": ("Malgun Gothic", 60, "&H00EDD981", "&H001B1918", "&H50000000", 1, 3, 4, 2, 120, 120, 90, -1),
+ASS_STYLES = {key: tuple(value) for key, value in RENDER_CATALOG["styles"].items()}
+PLATFORM_FORMATS = {
+    key: (value["width"], value["height"], value["format"])
+    for key, value in RENDER_CATALOG["platforms"].items()
+}
+RENDER_DEFAULTS = dict(RENDER_CATALOG["defaults"])
+RENDER_SETTING_KEYS = frozenset({
+    "type", "music", "volume", "narration", "video_pan_x", "caption_size", "preview_platform",
+    "platforms", "scene_dissolve_seconds",
+})
+
+
+def safe_env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(maximum, value))
+
+
+def safe_env_choice(name: str, default: str, allowed: set[str]) -> str:
+    value = os.environ.get(name, default)
+    return value if value in allowed else default
+
+
+RUNTIME_CONFIG = {
+    "provider_probe_timeout": safe_env_int("PROVIDER_PROBE_TIMEOUT", 15, 1, 120),
+    "openai_keywords_timeout": safe_env_int("OPENAI_KEYWORDS_TIMEOUT", 60, 1, 600),
+    "openai_tts_timeout": safe_env_int("OPENAI_TTS_TIMEOUT", 120, 1, 600),
+    "openai_image_timeout": safe_env_int("OPENAI_IMAGE_TIMEOUT", 300, 1, 900),
+    "openai_script_timeout": safe_env_int("OPENAI_SCRIPT_TIMEOUT", 300, 1, 900),
+    "qwen_submit_timeout": safe_env_int("QWEN_SUBMIT_TIMEOUT", 15, 1, 120),
+    "qwen_poll_timeout": safe_env_int("QWEN_POLL_TIMEOUT", 10, 1, 120),
+    "qwen_audio_timeout": safe_env_int("QWEN_AUDIO_TIMEOUT", 30, 1, 300),
+    "qwen_deadline": safe_env_int("QWEN_DEADLINE_SECONDS", 360, 10, 1800),
+    "qwen_poll_interval": safe_env_int("QWEN_POLL_INTERVAL_SECONDS", 2, 1, 30),
+    "ffprobe_timeout": safe_env_int("FFPROBE_TIMEOUT", 20, 1, 120),
+    "media_download_timeout": safe_env_int("MEDIA_DOWNLOAD_TIMEOUT", 120, 1, 900),
+    "kling_generation_timeout": safe_env_int("KLING_GENERATION_TIMEOUT", 90, 1, 900),
+    "browser_render_timeout": safe_env_int("BROWSER_RENDER_TIMEOUT", 30, 1, 300),
+    "voice_workers": safe_env_int("VOICE_RENDER_WORKERS", 3, 1, 8),
+    "caption_batch_size": safe_env_int("CAPTION_RENDER_BATCH_SIZE", 4, 1, 32),
+    "caption_workers": safe_env_int("CAPTION_RENDER_WORKERS", 2, 1, 8),
+    "ffmpeg_threads": safe_env_int("FFMPEG_THREADS", 2, 1, 4),
+    "render_preset": safe_env_choice(
+        "RENDER_PRESET", "medium",
+        {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"},
+    ),
 }
 
-PLATFORM_FORMATS = {
-    "youtube": (1280, 720, "16x9"),
-    "instagram": (720, 1280, "9x16"),
-    "facebook": (720, 900, "4x5"),
-    "tiktok": (720, 1280, "9x16"),
-    "naver": (1280, 720, "16x9"),
-    "kakaotalk": (1280, 720, "16x9"),
-    "threads": (720, 1280, "9x16"),
-    "x": (1280, 720, "16x9"),
-    "linkedin": (720, 900, "4x5"),
-}
+
+def validate_render_overrides(overrides: dict) -> dict:
+    if not isinstance(overrides, dict):
+        raise ValueError("렌더 설정 형식이 올바르지 않습니다.")
+    schema_payload = {"schema_version": "render-settings.v1", "overrides": overrides}
+    validate_json_schema_file(schema_payload, ROOT / "contracts" / "render-settings.schema.json")
+    if set(overrides) - RENDER_SETTING_KEYS:
+        raise ValueError("지원하지 않는 렌더 설정입니다.")
+    if "type" in overrides and overrides["type"] not in ASS_STYLES:
+        raise ValueError("지원하지 않는 자막 스타일입니다.")
+    if "music" in overrides and overrides["music"] not in MUSIC:
+        raise ValueError("지원하지 않는 배경음악입니다.")
+    if "preview_platform" in overrides and overrides["preview_platform"] not in PLATFORM_FORMATS:
+        raise ValueError("지원하지 않는 미리보기 플랫폼입니다.")
+    if "platforms" in overrides and (
+        not overrides["platforms"] or any(platform not in PLATFORM_FORMATS for platform in overrides["platforms"])
+    ):
+        raise ValueError("지원하지 않는 출력 플랫폼입니다.")
+    return json.loads(json.dumps(overrides, ensure_ascii=False, allow_nan=False))
+
+
+def resolve_render_settings(user_id: str, explicit=None) -> dict:
+    stored = validate_render_overrides(get_auth_store().get_render_settings(user_id))
+    resolved = {**RENDER_DEFAULTS, **stored}
+    explicit = explicit or {}
+    for key in RENDER_SETTING_KEYS:
+        if key not in explicit:
+            continue
+        value = explicit[key]
+        if key == "type":
+            if value not in ASS_STYLES:
+                raise ValueError("선택 설정이 올바르지 않습니다.")
+        elif key == "music":
+            if value not in MUSIC:
+                raise ValueError("선택 설정이 올바르지 않습니다.")
+        elif key == "preview_platform":
+            if value not in PLATFORM_FORMATS:
+                raise ValueError("미리보기 플랫폼 설정이 올바르지 않습니다.")
+        elif key == "volume":
+            value = max(0.0, min(1.0, float(value)))
+        elif key == "video_pan_x":
+            value = max(0.0, min(1.0, float(value)))
+        elif key == "caption_size":
+            value = max(-5, min(5, int(value)))
+        elif key == "narration":
+            value = bool(value)
+        elif key == "platforms":
+            if not value or any(platform not in PLATFORM_FORMATS for platform in value):
+                raise ValueError("출력 플랫폼 설정이 올바르지 않습니다.")
+            value = list(dict.fromkeys(value))
+        elif key == "scene_dissolve_seconds":
+            value = max(0.0, min(5.0, float(value)))
+        resolved[key] = value
+    return resolved
+
+
+def render_settings_response(user_id: str) -> dict:
+    overrides = validate_render_overrides(get_auth_store().get_render_settings(user_id))
+    return {
+        "catalog": json.loads(json.dumps(RENDER_CATALOG, ensure_ascii=False)),
+        "effective": resolve_render_settings(user_id),
+        "overrides": overrides,
+    }
+
+
+def parse_render_settings_request(payload: dict) -> dict:
+    validate_json_schema_file(payload, ROOT / "contracts" / "render-settings.schema.json")
+    return validate_render_overrides(payload["overrides"])
+
+
+def handle_render_settings_request(handler, merge: bool) -> None:
+    user = handler.current_user()
+    if not user:
+        handler.send_json(401, {"error": "로그인 후 이용해 주세요."});return
+    try:
+        payload = handler.read_json()
+        if not isinstance(payload, dict):
+            raise ValueError("렌더 설정 형식이 올바르지 않습니다.")
+        overrides = parse_render_settings_request(payload)
+        get_auth_store().save_render_settings(user["user_id"], overrides, merge=merge)
+        handler.send_json(200, {"ok": True, **render_settings_response(user["user_id"])}, {"Cache-Control": "no-store"})
+    except (ValueError, TypeError, KeyError) as exc:
+        handler.send_json(400, {"error": str(exc)})
 
 
 def group_platform_formats(platforms):
@@ -1492,7 +1616,7 @@ body{{margin:0}}.stage{{width:{width}px;height:{height}px;aspect-ratio:auto;back
                 f"--screenshot={png_path}", html_path.as_uri(),
             ]
             try:
-                completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+                completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=RUNTIME_CONFIG["browser_render_timeout"])
                 if completed.returncode != 0 or not png_path.is_file():
                     update_caption_artifact(scene, index, style_name, line, width, height, caption_size, png_path, "failed")
                     raise RuntimeError(completed.stderr.strip() or "투명 자막 PNG 생성에 실패했습니다.")
@@ -1502,8 +1626,8 @@ body{{margin:0}}.stage{{width:{width}px;height:{height}px;aspect-ratio:auto;back
         update_caption_artifact(scene, index, style_name, line, width, height, caption_size, png_path, "succeeded")
         return index, (png_path, float(scene["cue_start"]), float(scene["cue_end"]))
 
-    batch_size = 4
-    parallelism = max(1, min(2, int(os.environ.get("CAPTION_RENDER_WORKERS", "2"))))
+    batch_size = RUNTIME_CONFIG["caption_batch_size"]
+    parallelism = RUNTIME_CONFIG["caption_workers"]
     completed_count = 0
     for batch_start in range(0, len(jobs), batch_size):
         batch = jobs[batch_start:batch_start + batch_size]
@@ -1826,8 +1950,8 @@ def render_video(config, job_id=None):
     caption_overlays = config.get("prepared_caption_overlays") or prepare_caption_overlays(config, job_id, output_width, output_height, demo_data)
 
     hosted_mode = os.environ.get("PORT", "8765") != "8765"
-    ffmpeg_threads = 1 if hosted_mode else max(1, min(4, int(os.environ.get("FFMPEG_THREADS", "2"))))
-    render_preset = "ultrafast" if hosted_mode else os.environ.get("RENDER_PRESET", "medium")
+    ffmpeg_threads = 1 if hosted_mode else RUNTIME_CONFIG["ffmpeg_threads"]
+    render_preset = "ultrafast" if hosted_mode else RUNTIME_CONFIG["render_preset"]
     args = [
         ffmpeg, "-y",
         "-filter_threads", str(ffmpeg_threads),
@@ -1911,7 +2035,10 @@ def render_video(config, job_id=None):
 
     filters = []
     video_labels = []
-    dissolve_duration = 0.5
+    dissolve_duration = max(
+        0.0,
+        min(5.0, float(config.get("scene_dissolve_seconds", RENDER_DEFAULTS["scene_dissolve_seconds"]))),
+    )
     for index, scene in enumerate(timeline_scenes):
         duration = scene["end"] - scene["start"]
         video_artifact = None
@@ -1929,7 +2056,7 @@ def render_video(config, job_id=None):
             f"setsar=1,fps=30,format=yuv420p,setpts=PTS/{playback_rate:.6f},tpad=stop_mode=clone:stop_duration={duration:.3f},"
             f"trim=duration={duration:.3f},setpts=PTS-STARTPTS[v{index}]"
         )
-        if index < scene_count - 1:
+        if index < scene_count - 1 and dissolve_duration > 0:
             last_frame = max(0, math.ceil(duration * 30 - 1e-6) - 1)
             filters.append(f"[v{index}]split=2[v{index}base][v{index}tail]")
             filters.append(
@@ -1940,11 +2067,15 @@ def render_video(config, job_id=None):
                 f"setpts=PTS+{float(scene['end']):.3f}/TB[dissolve{index}]"
             )
             video_labels.append(f"[v{index}base]")
+        elif index < scene_count - 1:
+            video_labels.append(f"[v{index}]")
         else:
             video_labels.append(f"[v{index}]")
     filters.append("".join(video_labels) + f"concat=n={scene_count}:v=1:a=0[sequence_base]")
     video_output = "sequence_base"
     for index, scene in enumerate(timeline_scenes[:-1]):
+        if dissolve_duration <= 0:
+            continue
         next_output = "sequence" if index == scene_count - 2 else f"dissolved{index}"
         filters.append(
             f"[{video_output}][dissolve{index}]overlay=0:0:eof_action=pass[{next_output}]"
@@ -2238,6 +2369,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/render-settings":
+            user = self.current_user()
+            if not user:
+                self.send_json(401, {"error": "로그인 후 이용해 주세요."});return
+            self.send_json(200, {"ok": True, **render_settings_response(user["user_id"])}, {"Cache-Control": "no-store"})
+            return
         if parsed.path == '/api/automation':
             user = self.current_user()
             if not user:
@@ -2615,7 +2752,16 @@ class Handler(SimpleHTTPRequestHandler):
         finally:
             kling_submission_lock.release()
 
+    def do_PATCH(self):
+        if self.path != "/api/render-settings":
+            self.send_error(405)
+            return
+        handle_render_settings_request(self, merge=True)
+
     def _do_POST(self):
+        if self.path == "/api/render-settings":
+            handle_render_settings_request(self, merge=False)
+            return
         if self.path in {'/api/storyboard/auto-select', '/api/project/auto-crop'}:
             user = self.current_user()
             if not user:
@@ -2729,7 +2875,8 @@ class Handler(SimpleHTTPRequestHandler):
                         })
                     usage_before = kling_account_usage(api_key)
                     started = time.monotonic()
-                    result = kling_api_request(api_key, "/v1/images/generations", request_payload, timeout=90)
+                    result = kling_api_request(api_key, "/v1/images/generations", request_payload,
+                                               timeout=RUNTIME_CONFIG["kling_generation_timeout"])
                     if str(payload.get("api_key", "")).strip():
                         with provider_credentials_lock:
                             provider_credentials["kling"] = {"api_key": api_key}
@@ -2780,7 +2927,8 @@ class Handler(SimpleHTTPRequestHandler):
                 }
                 usage_before = kling_account_usage(api_key)
                 started = time.monotonic()
-                result = kling_api_request(api_key, "/v1/videos/image2video", request_payload, timeout=90)
+                result = kling_api_request(api_key, "/v1/videos/image2video", request_payload,
+                                           timeout=RUNTIME_CONFIG["kling_generation_timeout"])
                 if str(payload.get("api_key", "")).strip():
                     with provider_credentials_lock:
                         provider_credentials["kling"] = {"api_key": api_key}
@@ -3451,7 +3599,7 @@ class Handler(SimpleHTTPRequestHandler):
                         if output.get("b64_json"):
                             image_bytes = base64.b64decode(output["b64_json"])
                         elif output.get("url"):
-                            with urlopen(output["url"], timeout=120) as image_response:
+                            with urlopen(output["url"], timeout=RUNTIME_CONFIG["media_download_timeout"]) as image_response:
                                 image_bytes = image_response.read()
                         else:
                             raise RuntimeError("OpenAI가 생성 이미지 데이터를 반환하지 않았습니다.")
@@ -3499,7 +3647,7 @@ class Handler(SimpleHTTPRequestHandler):
                             "model_name": model, "prompt": prompt, "negative_prompt": "", "n": 1,
                             "aspect_ratio": "16:9", "image": reference_data,
                             "image_reference": "subject", "image_fidelity": 0.75, "human_fidelity": 0.75,
-                        }, timeout=90)
+                        }, timeout=safe_env_int("KLING_GENERATION_TIMEOUT", 90, 1, 900))
                         task = kling_payload_data(result); task_id = str(task.get("task_id") or task.get("id") or "")
                         if not task_id: raise RuntimeError("Kling이 이미지 작업 ID를 반환하지 않았습니다.")
                         storyboard_image = {"status": "queued", "task_id": task_id, "model": model}
@@ -3571,7 +3719,8 @@ class Handler(SimpleHTTPRequestHandler):
                         if model.startswith("kling-v1"):
                             request_payload["cfg_scale"] = 0.5
                         result = kling_api_request(provider_values("kling").get("api_key", ""),
-                                                   "/v1/videos/image2video", request_payload, timeout=90)
+                                                   "/v1/videos/image2video", request_payload,
+                                                   timeout=safe_env_int("KLING_GENERATION_TIMEOUT", 90, 1, 900))
                         task = kling_payload_data(result); task_id = str(task.get("task_id") or task.get("id") or "")
                         if not task_id:
                             raise RuntimeError("Kling이 영상 작업 ID를 반환하지 않았습니다.")
@@ -3758,10 +3907,12 @@ class Handler(SimpleHTTPRequestHandler):
                 job_id = f"render-{time.time_ns()}"
             scene_total = len(timeline_from_data(content_data))
             update_render_progress(job_id, status="queued", progress=0.0, rendered_seconds=0.0, completed_scenes=0, scene_total=scene_total, detail="변환 작업을 준비하고 있습니다.")
-            style = data.get("type", "editorial")
-            music = data.get("music", "satie")
-            if style not in ASS_STYLES or music not in MUSIC:
-                raise ValueError("선택 설정이 올바르지 않습니다.")
+            explicit_render_settings = {
+                key: data[key] for key in RENDER_SETTING_KEYS if key in data
+            }
+            render_settings = resolve_render_settings(user["user_id"], explicit_render_settings)
+            style = render_settings["type"]
+            music = render_settings["music"]
             raw_crop_positions = data.get("scene_crop_positions") or get_auth_store().scene_crop_positions(user['user_id'], project_id)
             scene_crop_positions = {}
             if isinstance(raw_crop_positions, dict):
@@ -3775,12 +3926,14 @@ class Handler(SimpleHTTPRequestHandler):
             config = {
                 "type": style,
                 "music": music,
-                "volume": max(0.0, min(1.0, float(data.get("volume", 0.5)))),
-                "narration": bool(data.get("narration", True)),
-                "caption_size": max(-5, min(5, int(data.get("caption_size", 0)))),
-                "video_pan_x": max(0.0, min(1.0, float(data.get("video_pan_x", 0.5)))),
+                "volume": render_settings["volume"],
+                "narration": render_settings["narration"],
+                "caption_size": render_settings["caption_size"],
+                "video_pan_x": render_settings["video_pan_x"],
                 "scene_crop_positions": scene_crop_positions,
-                "preview_platform": str(data.get("preview_platform", "youtube")),
+                "preview_platform": render_settings["preview_platform"],
+                "platforms": render_settings["platforms"],
+                "scene_dissolve_seconds": render_settings["scene_dissolve_seconds"],
                 "scene_videos": selected_videos,
                 "scene_images": {item["scene_id"]: item for item in selected_images},
                 "voice_clips": voice_clips,
@@ -3792,7 +3945,7 @@ class Handler(SimpleHTTPRequestHandler):
             started_at = time.monotonic()
             requested_platforms = data.get("platforms")
             if requested_platforms is None:
-                requested_platforms = [config["preview_platform"]]
+                requested_platforms = config["platforms"]
             if not isinstance(requested_platforms, list):
                 raise ValueError("플랫폼 선택 정보가 올바르지 않습니다.")
             platforms = list(dict.fromkeys(str(item) for item in requested_platforms))

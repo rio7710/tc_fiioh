@@ -45,7 +45,7 @@ def next_occurrence(anchor, unit, interval, after):
 
 def validate_config(data):
     validate_json_schema_file(data, ROOT/'contracts'/'automation-settings.schema.json')
-    if not isinstance(data, dict) or set(data) - {'schema_version', 'endpoint', 'repeat', 'keywords', 'video', 'voice', 'brand', 'channels'}:
+    if not isinstance(data, dict) or set(data) - {'schema_version', 'endpoint', 'repeat', 'keywords', 'video', 'voice', 'brand', 'channels', 'render'}:
         raise ValueError('자동화 설정 형식이 올바르지 않습니다.')
     if data.get('schema_version') != '1.0.0' or data.get('endpoint') not in STAGES:
         raise ValueError('자동화 단계 또는 설정 버전이 올바르지 않습니다.')
@@ -65,6 +65,13 @@ def validate_config(data):
     level = STAGES.index(config['endpoint'])
     if level >= 4 and video['crop'] == 'manual':
         raise ValueError('사용자 지정 크롭은 수동 작업이 필요합니다. 기본 또는 AI 크롭을 선택해 주세요.')
+    render = config.get('render')
+    if render is not None:
+        catalog = json.loads((ROOT / 'config' / 'render-catalog.json').read_text(encoding='utf-8'))
+        if 'type' in render and render['type'] not in catalog.get('styles', {}):
+            raise ValueError('지원하지 않는 자막 스타일입니다.')
+        if 'music' in render and render['music'] not in catalog.get('music', {}):
+            raise ValueError('지원하지 않는 배경음악입니다.')
     brand = config.get('brand', {})
     if not isinstance(brand, dict) or set(brand) != {'intro', 'outro', 'watermark'} or any(type(v) is not bool for v in brand.values()):
         raise ValueError('브랜드 옵션이 올바르지 않습니다.')
