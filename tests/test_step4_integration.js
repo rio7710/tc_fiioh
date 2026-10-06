@@ -3,9 +3,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-console.log('--- Step 4 Partial Lifecycle & Single Source of Truth Tests ---');
+console.log('--- Step 4 Partial Lifecycle & Strict Browser Runtime Safety Tests ---');
 
-// 1. Structural File Verification
+// 1. Structural File Integrity Verification
 const partialPath = '01_app/pages/steps/step04-video.html';
 const cssPath = '01_app/assets/steps/step04/step04-video.css';
 const jsPath = '01_app/assets/steps/step04/step04-video.js';
@@ -20,9 +20,9 @@ const partialHtml = fs.readFileSync(partialPath, 'utf8');
 assert.match(partialHtml, /id="step4"/, 'Partial HTML contains #step4');
 assert.match(partialHtml, /id="imageRegenerationModal"/, 'Partial HTML contains #imageRegenerationModal');
 
-console.log('✓ Structural file verification passed');
+console.log('✓ File integrity checks passed');
 
-// 2. Pre-Partial Parse Safety (Zero Null Query Errors at Script Load Time)
+// 2. Headless VM Execution Test: Pre-Partial Script Evaluation MUST NOT Throw (No Null Query Errors)
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 
 assert.match(html, /href="\/01_app\/assets\/video-editor\/video-editor\.css"/, 'HTML links video-editor.css');
@@ -36,20 +36,154 @@ assert.doesNotMatch(html, /const stage=document\.querySelector\('#stage'\);/, 'H
 
 console.log('✓ Pre-partial parse safety verified (No top-level null DOM queries)');
 
-// 3. Post-Partial DOM Insertion & Idempotent Init Test
+// DOM Stub simulating browser environment before partial HTML injection
+function createPrePartialContext() {
+  const elements = new Map();
+  const listeners = new Map();
+
+  const step4OnlyIds = new Set([
+    '#step4', '#projectTitle', '#aiPersonCrop', '#aiPersonCropStatus',
+    '#narrationBtn', '#musicVolume', '#brandIntroEnabled', '#brandIntroVersion',
+    '#brandOutroEnabled', '#brandOutroVersion', '#brandWatermarkEnabled',
+    '#brandWatermarkVersion', '#brandWatermarkOpacity', '#stageCard', '#previewFormatBadge',
+    '#stage', '#video', '#sceneImage', '#sceneVideo', '#prevBtn', '#playBtn', '#nextBtn',
+    '#imageGenerationMosaic', '#imageGenerationStatus', '#imageGenerationStatusText',
+    '#imageRegenerateBtn', '#imageVariantCount', '#bgm', '#sceneResourceBadge',
+    '#cropHint', '#formatSafeZone', '#titleText', '#brandWatermarkPreview',
+    '#brandOutroPreview', '#brandOutroPreviewImage', '#brandOutroPreviewVideo',
+    '#progress', '#progressFill', '#clock', '#captionStatus', '#statusText',
+    '#captionSizeDown', '#captionSizeValue', '#captionSizeUp', '#distributionTitle',
+    '#distributionHelp', '#distributionPlatforms', '#sceneTimelineSummary',
+    '#mobileSceneSelect', '#mobilePrevScene', '#mobileNextScene', '#sceneList',
+    '#renderBtn', '#imageRegenerationModal', '#imageRegenerationCancel', '#imageRegenerationCreate',
+    '#imageAdditionalPrompt', '#imageBaseGuide', '#imageRegenerationFeedback',
+    '#imageRegenerationSceneNo', '#imageRegenerationTitle', '#renderStatus'
+  ]);
+
+  function createGenericStub(selector = '') {
+    const stub = {
+      id: selector.replace(/^#/, ''),
+      classList: {
+        add() {}, remove() {}, toggle() {}, contains() { return false; }
+      },
+      setAttribute() {},
+      getAttribute() { return null; },
+      removeAttribute() {},
+      style: { setProperty() {}, getPropertyValue() { return ''; } },
+      addEventListener(type, fn) {
+        const list = listeners.get(type) || [];
+        list.push(fn);
+        listeners.set(type, list);
+      },
+      removeEventListener(type, fn) {
+        const list = listeners.get(type) || [];
+        listeners.set(type, list.filter(f => f !== fn));
+      },
+      closest() { return null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      replaceChildren() {},
+      textContent: '',
+      innerHTML: '',
+      hidden: false,
+      disabled: false,
+      value: '',
+      files: [],
+      scrollTop: 0,
+      scrollLeft: 0,
+      dataset: new Proxy({}, {
+        get(target, prop) {
+          return target[prop] || '';
+        }
+      }),
+      elements: new Proxy({}, {
+        get(target, prop) {
+          return target[prop] || [];
+        }
+      })
+    };
+    stub.parentElement = stub;
+    return stub;
+  }
+
+  const container = {
+    id: 'step4Container',
+    innerHTML: '',
+    appendChild(child) {},
+    querySelectorAll() { return []; },
+    querySelector() { return null; }
+  };
+  elements.set('#step4Container', container);
+
+  const documentStub = {
+    querySelector(selector) {
+      if (elements.has(selector)) return elements.get(selector);
+      if (step4OnlyIds.has(selector)) return null;
+      return createGenericStub(selector);
+    },
+    querySelectorAll(selector) {
+      if (step4OnlyIds.has(selector)) return [];
+      return [createGenericStub(selector)];
+    },
+    addEventListener(type, fn) {
+      const list = listeners.get(type) || [];
+      list.push(fn);
+      listeners.set(type, list);
+    },
+    removeEventListener(type, fn) {
+      const list = listeners.get(type) || [];
+      listeners.set(type, list.filter(f => f !== fn));
+    },
+    body: { classList: { add() {}, remove() {} } }
+  };
+
+  const context = vm.createContext({
+    console,
+    URL,
+    setInterval: () => 1,
+    clearInterval: () => {},
+    setTimeout: (fn) => {
+      if (typeof fn === 'function') {
+        try { fn(); } catch (e) {}
+      }
+      return 1;
+    },
+    clearTimeout: () => {},
+    document: documentStub,
+    window: { scrollTo() {}, addEventListener() {} },
+    localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
+    location: { href: 'https://tc.test/app.html' },
+    fetch: async () => ({ ok: true, text: async () => partialHtml }),
+    Audio: class { constructor() {} load() {} play() { return Promise.resolve(); } pause() {} },
+    Image: class { constructor() {} },
+    ResizeObserver: class { constructor() {} observe() {} }
+  });
+
+  return { context, elements, listeners };
+}
+
+const prePartialEnv = createPrePartialContext();
+const scriptStart = html.indexOf('<script>') + '<script>'.length;
+const scriptEnd = html.indexOf('async function boot()');
+const scriptMatch = html.slice(scriptStart, scriptEnd > 0 ? scriptEnd : html.lastIndexOf('</script>'));
+
+assert.doesNotThrow(() => {
+  vm.runInContext(scriptMatch, prePartialEnv.context);
+}, 'Script evaluation before partial DOM insertion MUST NOT throw null reference errors');
+
+console.log('✓ Pre-partial headless VM script evaluation completed without errors');
+
+// 3. Post-Partial Load & Idempotent Init Test
 const Step04VideoEditor = require('../01_app/assets/steps/step04/step04-video.js');
 const VideoEditor = require('../01_app/assets/video-editor/index.js');
 
 assert.equal(typeof Step04VideoEditor.initStep4UI, 'function', 'initStep4UI must be a function');
 
-// Simulate DOM Container
+// Simulate Partial Injection into DOM Container
 const mockContainer = {
-  innerHTML: '',
-  appendChild(child) {}
+  innerHTML: partialHtml
 };
 
-// Insert partial HTML into DOM
-mockContainer.innerHTML = partialHtml;
 assert.match(mockContainer.innerHTML, /id="sceneList"/, 'Container contains #sceneList after partial load');
 
 // Test Pure Module Functions with Timeline Data
@@ -90,4 +224,4 @@ assert.equal(mSync.displayLabel, 'SCENE 02 / 02');
   assert.equal(profile.key, fmt);
 });
 
-console.log('✓ Lifecycle, post-partial DOM init, single source of truth tests passed');
+console.log('✓ Strict lifecycle, pre-partial safety, and post-partial init tests passed');

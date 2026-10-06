@@ -441,7 +441,7 @@
     closeImageRegeneration();
   }
 
-  // Initialization after partial HTML insertion into DOM
+  // Initialization strictly after partial HTML insertion into DOM
   function initStep4UI() {
     if (typeof document === 'undefined') return false;
     const step4 = document.querySelector('#step4');
@@ -456,9 +456,11 @@
     const mobilePrevScene = document.querySelector('#mobilePrevScene');
     const mobileNextScene = document.querySelector('#mobileNextScene');
     const sceneList = document.querySelector('#sceneList');
+    const renderBtn = document.querySelector('#renderBtn');
     const imageRegenerateBtn = document.querySelector('#imageRegenerateBtn');
     const imageRegenerationCancel = document.querySelector('#imageRegenerationCancel');
     const imageRegenerationCreate = document.querySelector('#imageRegenerationCreate');
+    const imageRegenerationModal = document.querySelector('#imageRegenerationModal');
 
     if (playBtn) playBtn.addEventListener('click', togglePlay);
     if (prevBtn) prevBtn.addEventListener('click', () => seekScene(currentScene - 1));
@@ -514,9 +516,51 @@
       });
     }
 
+    if (renderBtn) {
+      renderBtn.addEventListener('click', async () => {
+        if (typeof window.startRenderWorkflow === 'function') {
+          await window.startRenderWorkflow();
+        }
+      });
+    }
+
     if (imageRegenerateBtn) imageRegenerateBtn.addEventListener('click', openImageRegeneration);
     if (imageRegenerationCancel) imageRegenerationCancel.addEventListener('click', closeImageRegeneration);
     if (imageRegenerationCreate) imageRegenerationCreate.addEventListener('click', requestImageRegeneration);
+
+    if (imageRegenerationModal) {
+      imageRegenerationModal.addEventListener('pointerdown', event => {
+        if (event.target === imageRegenerationModal) closeImageRegeneration();
+      });
+    }
+
+    const distributionHelp = document.querySelector('#distributionHelp');
+    if (distributionHelp) {
+      distributionHelp.addEventListener('click', () => {
+        const platformGuideModal = document.querySelector('#platformGuideModal');
+        if (platformGuideModal) {
+          platformGuideModal.hidden = false;
+          document.body.classList.add('modal-open');
+        }
+      });
+    }
+
+    document.querySelectorAll('#brandIntroEnabled,#brandIntroVersion,#brandOutroEnabled,#brandOutroVersion,#brandWatermarkEnabled,#brandWatermarkVersion,#brandWatermarkOpacity').forEach(control => {
+      control.addEventListener('change', event => {
+        if (typeof window.ensureOutroRatioAssets === 'function' && event.target.id === 'brandOutroVersion') {
+          const brandAssets = window.brandAssets || [];
+          window.ensureOutroRatioAssets(brandAssets.find(item => item.version_id === event.target.value));
+        }
+        if (typeof window.updateWatermarkPreview === 'function') window.updateWatermarkPreview();
+        if (typeof window.updateCommonOutroPreview === 'function') window.updateCommonOutroPreview();
+        if (typeof window.saveBrandSelections === 'function') {
+          window.saveBrandSelections().catch(error => {
+            const rs = document.querySelector('#renderStatus');
+            if (rs) rs.textContent = error.message;
+          });
+        }
+      });
+    });
 
     document.querySelectorAll('.type-btn').forEach(btn => {
       btn.addEventListener('click', () => setType(btn.dataset.type));
