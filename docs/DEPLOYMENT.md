@@ -1,19 +1,25 @@
 # Access and deployment runbook
 
-Last updated: 2026-08-31 (Asia/Seoul)
+Last updated: 2026-10-06 (Asia/Seoul)
 
 ## Access information
 
 | Purpose | Address |
 |---|---|
+| Active Production / Isolated Proxy Domain | https://fiioh.co.kr (Caddy proxy -> `127.0.0.1:43110` / `127.0.0.1:8765`) |
+| Temporary Docker Compose Port | http://127.0.0.1:43110 |
 | Public workflow demo | https://greenhill-content-demo.onrender.com/01_app/P1_title_design_preview.html |
 | Internal pricing page (`00`) | https://greenhill-content-demo.onrender.com/01_app/P0_pricing_preview.html |
 | Render health check | https://greenhill-content-demo.onrender.com/health |
 | Git repository | https://github.com/rio7710/greenhill-content-demo |
-| Local workflow default | http://127.0.0.1:8765/01_app/P1_title_design_preview.html |
+| Local workflow default (standalone) | http://127.0.0.1:8765/01_app/P1_title_design_preview.html |
 | Local pricing page default | http://127.0.0.1:8765/01_app/P0_pricing_preview.html |
 
-The port may differ when another local server already uses 8765. The server prints the exact local and LAN addresses at startup. A temporary development port is not a permanent product URL and must not be written into UI code or saved project data.
+For site isolation details and architectural plans:
+- Active Plan: [TEMP_SITE_ISOLATION_OPTIMIZATION_PLAN_2026-10-06.md](TEMP_SITE_ISOLATION_OPTIMIZATION_PLAN_2026-10-06.md)
+- Archived Legacy Plan (2026-09-15): [TC_TEMP_ISOLATION_PLAN_2026-09-15.md](TC_TEMP_ISOLATION_PLAN_2026-09-15.md)
+
+The port may differ when another local server already uses 8765 or 43110. The server prints the exact local and LAN addresses at startup. A temporary development port is not a permanent product URL and must not be written into UI code or saved project data.
 
 ## Local execution
 

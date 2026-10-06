@@ -1,3 +1,12 @@
+> [!CAUTION] ARCHIVED / SUPERSEDED DOCUMENT
+> **Note**: This document is an **archived historical plan** from 2026-09-15.
+> The domain `tc.arun.co.kr` mentioned herein was part of an earlier temporary setup and is **no longer active**.
+> - **Active Production / Proxy Domain**: `fiioh.co.kr` (Caddy reverse proxy -> `127.0.0.1:43110` / `127.0.0.1:8765`)
+> - **Current Site Isolation Plan**: [TEMP_SITE_ISOLATION_OPTIMIZATION_PLAN_2026-10-06.md](TEMP_SITE_ISOLATION_OPTIMIZATION_PLAN_2026-10-06.md)
+> - **Current Access & Deployment Runbook**: [DEPLOYMENT.md](DEPLOYMENT.md)
+>
+> *Historical content below is preserved verbatim for audit purposes. Do not use `tc.arun.co.kr` for current operations.*
+
 # TC temporary isolation plan - 2026-09-15
 
 ## Goal
