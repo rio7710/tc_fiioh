@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://thinkcast.local/contracts/brand-assets.schema.json",
+  "title": "ThinkCast brand assets",
+  "oneOf": [
+    {"$ref": "#/$defs/asset_document"},
+    {"$ref": "#/$defs/migration_plan"}
+  ],
+  "$defs": {
+    "asset_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "asset"],
+      "properties": {
+        "schema_version": {"const": "brand-assets.v1"},
+        "asset": {"$ref": "#/$defs/asset"}
+      }
+    },
+    "format": {"enum": ["16x9", "9x16", "4x5", "1x1"]},
+    "role": {"enum": ["intro", "outro", "watermark"]},
+    "media_type": {"enum": ["image", "video"]},
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variant_id", "version_id", "format", "uri", "width", "height", "media_type", "checksum"],
+      "properties": {
+        "variant_id": {"type": "string", "minLength": 1},
+        "version_id": {"type": "string", "minLength": 1},
+        "format": {"$ref": "#/$defs/format"},
+        "uri": {"type": "string", "minLength": 1},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1},
+        "media_type": {"$ref": "#/$defs/media_type"},
+        "mime_type": {"type": "string", "minLength": 1},
+        "checksum": {"type": "string", "minLength": 1}
+      }
+    },
+    "version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version_id", "asset_id", "version", "variants"],
+      "properties": {
+        "version_id": {"type": "string", "minLength": 1},
+        "asset_id": {"type": "string", "minLength": 1},
+        "version": {"type": "integer", "minimum": 1},
+        "variants": {"type": "array", "items": {"$ref": "#/$defs/variant"}}
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "role", "name", "versions"],
+      "properties": {
+        "asset_id": {"type": "string", "minLength": 1},
+        "role": {"$ref": "#/$defs/role"},
+        "name": {"type": "string", "minLength": 1},
+        "versions": {"type": "array", "items": {"$ref": "#/$defs/version"}}
+      }
+    },
+    "migration_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "migration_id", "operations", "unresolved"],
+      "properties": {
+        "schema_version": {"const": "brand-asset-migration-plan.v1"},
+        "migration_id": {"type": "string", "minLength": 1},
+        "operations": {"type": "array", "items": {"type": "object"}},
+        "unresolved": {"type": "array", "items": {"type": "object"}}
+      }
+    }
+  }
+}

@@ -2373,14 +2373,24 @@ class Handler(SimpleHTTPRequestHandler):
             if not user:
                 self.send_json(401, {"error": "로그인 후 이용해 주세요."});return
             version_id = str(parse_qs(parsed.query).get("version_id", [""])[0])
-            item = next((row for row in get_auth_store().list_brand_assets(user["user_id"])
-                         if row["version_id"] == version_id), None)
+            requested_format = str(parse_qs(parsed.query).get("format", [""])[0]).strip()
+            store = get_auth_store()
+            item = None
+            if requested_format:
+                try:
+                    item = store.resolve_brand_variant(user["user_id"], version_id, requested_format)
+                except ValueError as exc:
+                    self.send_json(400, {"error": str(exc)});return
+            else:
+                item = next((row for row in store.list_brand_assets(user["user_id"])
+                             if row["version_id"] == version_id), None)
             if not item:
                 self.send_json(404, {"error": "브랜드 리소스를 찾을 수 없습니다."});return
-            path = BRAND_ASSET_DIR / Path(item["uri"]).name
-            if not path.is_file():
+            path = brand_asset_path(item["uri"])
+            if not path:
                 self.send_json(404, {"error": "브랜드 파일을 찾을 수 없습니다."});return
-            self.send_bytes(200, path.read_bytes(), item["mime_type"], {"Cache-Control": "private, max-age=3600"})
+            self.send_bytes(200, path.read_bytes(), item.get("mime_type") or "application/octet-stream",
+                            {"Cache-Control": "private, max-age=3600"})
             return
         if parsed.path == "/api/project-content":
             user = self.current_user()
@@ -2930,6 +2940,26 @@ class Handler(SimpleHTTPRequestHandler):
                 )
                 self.send_json(200, {"ok": True, "selections": selections})
             except ValueError as exc:self.send_json(400, {"error": str(exc)})
+            return
+        if self.path == "/api/brand-asset-variant":
+            user = self.current_user()
+            if not user:
+                self.send_json(401, {"error": "로그인 후 이용해 주세요."});return
+            try:
+                payload = self.read_json()
+                required = ("version_id", "format", "uri", "width", "height", "media_type", "checksum")
+                if any(key not in payload for key in required):
+                    raise ValueError("브랜드 변형 필드가 부족합니다.")
+                result = get_auth_store().add_brand_asset_variant(
+                    user["user_id"], str(payload["version_id"]), str(payload["format"]),
+                    str(payload["uri"]), payload["width"], payload["height"],
+                    str(payload["media_type"]), str(payload["checksum"]),
+                    str(payload.get("mime_type")) if payload.get("mime_type") else None,
+                    str(payload.get("variant_id")) if payload.get("variant_id") else None,
+                )
+                self.send_json(201, {"ok": True, "variant": result})
+            except (ValueError, TypeError) as exc:
+                self.send_json(400, {"error": str(exc)})
             return
         if self.path == "/api/projects":
             user = self.current_user()

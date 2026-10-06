@@ -12,6 +12,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from migrations.brand_variant_v1 import ensure_brand_variant_schema
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -356,6 +358,7 @@ class AuthStore:
             ):
                 if column not in automated_columns:
                     connection.execute(f'ALTER TABLE automated_projects ADD COLUMN {column} {definition}')
+            ensure_brand_variant_schema(connection)
             connection.commit()
 
     def ensure_user(self, username: str, password: str) -> dict:
@@ -924,12 +927,77 @@ class AuthStore:
                     WHERE a.user_id = ? ORDER BY a.role, a.name, v.version DESC""",
                 (user_id,),
             ).fetchall()
-        return [{**dict(row), "active": bool(row["active"])} for row in rows]
+            variants = connection.execute(
+                """SELECT bv.variant_id, bv.version_id, bv.format, bv.uri, bv.width, bv.height,
+                          bv.media_type, bv.mime_type, bv.checksum
+                     FROM brand_asset_variants bv JOIN brand_asset_versions v ON v.version_id=bv.version_id
+                     JOIN brand_assets a ON a.asset_id=v.asset_id
+                    WHERE a.user_id=? ORDER BY bv.version_id, bv.format""",
+                (user_id,),
+            ).fetchall()
+        grouped = {}
+        for variant in variants:
+            grouped.setdefault(variant["version_id"], []).append(dict(variant))
+        return [{**dict(row), "active": bool(row["active"]), "variants": grouped.get(row["version_id"], [])} for row in rows]
+
+    def resolve_brand_variant(self, user_id: str, version_id: str, format: str) -> dict | None:
+        if format not in {"16x9", "9x16", "4x5", "1x1"}:
+            raise ValueError("브랜드 비율이 올바르지 않습니다.")
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """SELECT bv.variant_id, bv.version_id, bv.format, bv.uri, bv.width, bv.height,
+                          bv.media_type, bv.mime_type, bv.checksum
+                     FROM brand_asset_variants bv
+                     JOIN brand_asset_versions v ON v.version_id=bv.version_id
+                     JOIN brand_assets a ON a.asset_id=v.asset_id
+                    WHERE bv.version_id=? AND bv.format=? AND a.user_id=? AND v.active=1""",
+                (version_id, format, user_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def add_brand_asset_variant(self, user_id: str, version_id: str, format: str, uri: str,
+                                width: int, height: int, media_type: str, checksum: str,
+                                mime_type: str | None = None, variant_id: str | None = None) -> dict:
+        ratios = {"16x9": (16, 9), "9x16": (9, 16), "4x5": (4, 5), "1x1": (1, 1)}
+        if format not in ratios:
+            raise ValueError("브랜드 비율이 올바르지 않습니다.")
+        if type(width) is not int or type(height) is not int or width < 1 or height < 1:
+            raise ValueError("브랜드 치수가 올바르지 않습니다.")
+        ratio_width, ratio_height = ratios[format]
+        if width * ratio_height != height * ratio_width:
+            raise ValueError("브랜드 치수가 선택한 비율과 일치하지 않습니다.")
+        if media_type not in {"image", "video"} or not str(uri).strip() or not str(checksum).strip():
+            raise ValueError("브랜드 변형 메타데이터가 올바르지 않습니다.")
+        now = _now().isoformat()
+        variant_id = variant_id or str(uuid.uuid4())
+        with closing(self._connect()) as connection:
+            owned = connection.execute(
+                """SELECT 1 FROM brand_asset_versions v JOIN brand_assets a ON a.asset_id=v.asset_id
+                    WHERE v.version_id=? AND a.user_id=? AND v.active=1""", (version_id, user_id)
+            ).fetchone()
+            if not owned:
+                raise ValueError("선택할 수 없는 브랜드 리소스 버전입니다.")
+            try:
+                connection.execute(
+                    """INSERT INTO brand_asset_variants
+                       (variant_id,version_id,format,uri,width,height,media_type,mime_type,checksum,created_at)
+                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    (variant_id, version_id, format, str(uri).strip(), width, height, media_type,
+                     str(mime_type).strip() if mime_type else None, str(checksum).strip(), now),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise ValueError("이미 등록된 브랜드 비율 변형입니다.") from exc
+            connection.commit()
+        return self.resolve_brand_variant(user_id, version_id, format) or {}
 
     def save_content_brand_selections(self, user_id: str, project_id: str | None,
                                       selections: list[dict]) -> list[dict]:
         now = _now().isoformat()
         with closing(self._connect()) as connection:
+            if project_id and not connection.execute(
+                "SELECT 1 FROM projects WHERE project_id=? AND owner_user_id=?", (project_id, user_id)
+            ).fetchone():
+                raise ValueError("선택할 수 없는 프로젝트입니다.")
             for item in selections:
                 role = str(item.get("role", ""))
                 raw_version_id = item.get("version_id")
@@ -946,14 +1014,28 @@ class AuthStore:
                         raise ValueError("선택할 수 없는 브랜드 리소스 버전입니다.")
                 settings = item.get("settings") if isinstance(item.get("settings"), dict) else {}
                 profiles = settings.get("profiles") if isinstance(settings.get("profiles"), dict) else {}
-                for profile in profiles.values():
-                    profile_version_id = str((profile or {}).get("version_id", "")).strip() if isinstance(profile, dict) else ""
+                for format, profile in profiles.items():
+                    if format not in {"16x9", "9x16", "4x5", "1x1"} or not isinstance(profile, dict):
+                        raise ValueError("비율별 브랜드 리소스 형식이 올바르지 않습니다.")
+                    profile_variant_id = str(profile.get("variant_id", "")).strip()
+                    profile_version_id = str(profile.get("version_id", "")).strip()
+                    if profile_variant_id:
+                        owned_variant = connection.execute(
+                            """SELECT 1 FROM brand_asset_variants bv
+                                JOIN brand_asset_versions v ON v.version_id=bv.version_id
+                                JOIN brand_assets a ON a.asset_id=v.asset_id
+                               WHERE bv.variant_id=? AND bv.version_id=? AND bv.format=? AND a.user_id=? AND v.active=1""",
+                            (profile_variant_id, version_id or profile_version_id, format, user_id),
+                        ).fetchone()
+                        if not owned_variant:
+                            raise ValueError("선택할 수 없는 브랜드 비율 변형입니다.")
+                        continue
                     if not profile_version_id:
                         continue
                     owned_profile = connection.execute(
                         """SELECT 1 FROM brand_asset_versions v JOIN brand_assets a ON a.asset_id=v.asset_id
                             WHERE v.version_id=? AND a.user_id=? AND a.role=? AND v.active=1""",
-                        (profile_version_id, user_id, role),
+                            (profile_version_id, user_id, role),
                     ).fetchone()
                     if not owned_profile:
                         raise ValueError("비율별 브랜드 리소스 버전을 선택할 수 없습니다.")
@@ -990,12 +1072,42 @@ class AuthStore:
         for row in rows:
             settings = json.loads(row["settings_json"] or "{}")
             profiles = settings.get("profiles") if isinstance(settings.get("profiles"), dict) else {}
-            for profile in profiles.values():
-                if not isinstance(profile, dict):
-                    continue
-                asset = assets.get(profile.get("version_id"))
-                if asset:
-                    profile.update({key: asset[key] for key in ("uri", "media_type", "mime_type")})
+            with closing(self._connect()) as variant_connection:
+                for format, profile in profiles.items():
+                    if not isinstance(profile, dict):
+                        continue
+                    variant_id = str(profile.get("variant_id", "")).strip()
+                    variant = None
+                    if variant_id:
+                        variant = variant_connection.execute(
+                            """SELECT bv.variant_id, bv.uri, bv.media_type, bv.mime_type,
+                                      bv.width, bv.height, bv.checksum, bv.format
+                                 FROM brand_asset_variants bv JOIN brand_asset_versions v ON v.version_id=bv.version_id
+                                 JOIN brand_assets a ON a.asset_id=v.asset_id
+                                WHERE bv.variant_id=? AND a.user_id=? AND v.active=1""",
+                            (variant_id, user_id),
+                        ).fetchone()
+                    elif format in {"16x9", "9x16", "4x5", "1x1"} and row["version_id"]:
+                        variant = variant_connection.execute(
+                            """SELECT bv.variant_id, bv.uri, bv.media_type, bv.mime_type,
+                                      bv.width, bv.height, bv.checksum, bv.format
+                                 FROM brand_asset_variants bv JOIN brand_asset_versions v ON v.version_id=bv.version_id
+                                 JOIN brand_assets a ON a.asset_id=v.asset_id
+                                WHERE bv.version_id=? AND bv.format=? AND a.user_id=? AND v.active=1""",
+                            (row["version_id"], format, user_id),
+                        ).fetchone()
+                    if variant:
+                        profile.update(dict(variant))
+                        continue
+                    profile_version_id = str(profile.get("version_id", "")).strip()
+                    if not profile_version_id:
+                        continue
+                    asset = assets.get(profile_version_id)
+                    if asset:
+                        profile.update({key: asset[key] for key in ("uri", "media_type", "mime_type")})
+            # Keep the legacy flat fields and settings shape intact for existing clients.
+            if not isinstance(settings, dict):
+                continue
             results.append({**dict(row), "enabled": bool(row["enabled"]), "settings": settings})
         return results
 
