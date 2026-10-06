@@ -212,7 +212,7 @@ class JobStore:
         job_id: str,
         worker_id: str,
         *,
-        lease_seconds: int = 300,
+        lease_seconds: float = 300,
         now: datetime | str | None = None,
     ) -> dict[str, Any]:
         if not worker_id:

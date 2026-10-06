@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "01_app"))
 
 from auth_store import AuthStore
-from automation_runner import AutomationRunner
+from automation_runner import AutomationRunner, _render_settings
 from automation_store import AutomationStore
 from worker_core import ConfigurationError, JobStore, WorkerRuntimeSettings
 from worker import create_job_store
@@ -93,14 +93,43 @@ class WorkerJobIntegrationTests(unittest.TestCase):
         tuned = WorkerRuntimeSettings.from_env({
             "WORKER_IDLE_POLL_SECONDS": "1.5",
             "AUTOMATION_API_RETRY_COUNT": "4",
+            "AUTOMATION_IMAGE_MODEL": "fixture-image-model",
             "AUTOMATION_RENDER_VOLUME": "0.25",
         })
         self.assertEqual(tuned.idle_poll_seconds, 1.5)
         self.assertEqual(tuned.api_retry_count, 4)
+        self.assertEqual(tuned.image_model, "fixture-image-model")
         self.assertEqual(tuned.render_volume, 0.25)
         for env in ({"AUTOMATION_API_TIMEOUT_SECONDS": "nope"}, {"AUTOMATION_RENDER_PAN_X": "nan"}, {"WORKER_JOB_LEASE_SECONDS": "0"}):
             with self.assertRaises(ConfigurationError):
                 WorkerRuntimeSettings.from_env(env)
+
+    def test_deployment_examples_list_all_runtime_settings(self):
+        names = (
+            "WORKER_HEARTBEAT_INTERVAL_SECONDS", "WORKER_IDLE_POLL_SECONDS",
+            "AUTOMATION_API_TIMEOUT_SECONDS", "AUTOMATION_API_RETRY_COUNT",
+            "AUTOMATION_API_RETRY_BACKOFF_SECONDS", "AUTOMATION_HEARTBEAT_INTERVAL_SECONDS",
+            "AUTOMATION_I2V_POLL_INTERVAL_SECONDS", "AUTOMATION_I2V_TIMEOUT_SECONDS",
+            "WORKER_JOB_LEASE_SECONDS", "AUTOMATION_RENDER_TYPE", "AUTOMATION_RENDER_MUSIC",
+            "AUTOMATION_RENDER_VOLUME", "AUTOMATION_RENDER_PAN_X",
+        )
+        dotenv = (ROOT / ".env.example").read_text(encoding="utf-8")
+        dockerfile = (ROOT / "Dockerfile.worker").read_text(encoding="utf-8")
+        for name in names:
+            self.assertIn(name, dotenv)
+            self.assertIn(name, dockerfile)
+
+    def test_invalid_render_config_uses_safe_environment_fallback(self):
+        settings = WorkerRuntimeSettings.from_env({
+            "AUTOMATION_RENDER_TYPE": "env-type",
+            "AUTOMATION_RENDER_MUSIC": "env-music",
+            "AUTOMATION_RENDER_VOLUME": "0.1",
+            "AUTOMATION_RENDER_PAN_X": "0.1",
+        })
+        self.assertEqual(
+            _render_settings({"render": {"type": "", "music": None, "volume": "bad", "pan_x": 2}}, settings),
+            ("env-type", "env-music", 0.1, 0.1),
+        )
 
     def test_render_config_overrides_environment_fallback(self):
         job_store = JobStore(self.root / "worker_jobs.json")
@@ -119,6 +148,15 @@ class WorkerJobIntegrationTests(unittest.TestCase):
         self.assertEqual(render["music"], "custom")
         self.assertEqual(render["volume"], 0.25)
         self.assertEqual(render["video_pan_x"], 0.75)
+
+    def test_image_model_uses_settings_single_environment_path(self):
+        job_store = JobStore(self.root / "worker_jobs.json")
+        settings = WorkerRuntimeSettings.from_env({"AUTOMATION_IMAGE_MODEL": "fixture-image-model"})
+        AutomationRunner(self.store, FixtureAPI, job_store=job_store, worker_id="fixture-worker", settings=settings).execute(self.run)
+
+        image_calls = [payload for path, payload in FixtureAPI.calls if path == "/api/storyboard/image-generate"]
+        self.assertTrue(image_calls)
+        self.assertTrue(all(payload["model"] == "fixture-image-model" for payload in image_calls))
 
     def test_scene_and_final_export_dispatch_through_job_store_without_provider_calls(self):
         job_store = JobStore(self.root / "worker_jobs.json")

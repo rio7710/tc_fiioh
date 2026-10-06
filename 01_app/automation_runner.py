@@ -1,5 +1,6 @@
 """Existing HTTP APIs are the production adapters; this module owns sequencing only."""
 import json
+import math
 import os
 import random
 import threading
@@ -16,6 +17,24 @@ from worker_core import JobConflict, WorkerRuntimeSettings
 
 class AdapterFailure(RuntimeError):
     pass
+
+
+def _render_settings(config, settings):
+    render = config.get('render', {}) if isinstance(config.get('render', {}), dict) else {}
+    render_type = render.get('type') if isinstance(render.get('type'), str) and render.get('type').strip() else settings.render_type
+    render_music = render.get('music') if isinstance(render.get('music'), str) and render.get('music').strip() else settings.render_music
+
+    def number_or_default(value, fallback):
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= 1:
+            return fallback
+        return value
+
+    return (
+        render_type,
+        render_music,
+        number_or_default(render.get('volume'), settings.render_volume),
+        number_or_default(render.get('pan_x'), settings.render_pan_x),
+    )
 
 
 class InternalAPI:
@@ -165,8 +184,8 @@ class AutomationRunner:
         if latest['revision_id']!=confirmed['revision_id']:
             raise AdapterFailure('자동화 중 대본이 변경되어 실행을 멈췄습니다.')
         scenes=latest['data']['document']['production']['timeline']['scenes']
+        image_model = self.settings.image_model
         for scene in scenes:
-            image_model = os.environ.get('AUTOMATION_IMAGE_MODEL','gpt-image-2.5-sunburst')
             step('image_'+scene['id'],lambda s=scene:call('/api/storyboard/image-generate',{
                 'scene_id':s['id'],'provider':'openai','model':image_model,'force':False}),stage='scene_image',
                  job_input={'scene_id':scene['id'],'source_revision':source_revision,'provider':'openai','model':image_model,'force':False})
@@ -211,6 +230,7 @@ class AutomationRunner:
         step('video_design',design)
         if level==4:
             return
+        render_type, render_music, render_volume, render_pan_x = _render_settings(config, self.settings)
         def export():
             job_id='automation-'+run['run_id']
             with closing(self.auth._connect()) as db:
@@ -220,20 +240,12 @@ class AutomationRunner:
                 return {'reused':True,'exports':[{'url':row['uri']} for row in rows]}
             if rows:
                 raise AdapterFailure('일부 출력이 이미 저장되어 있습니다. 중복 출력을 피하기 위해 콘텐츠에서 나머지를 확인해 주세요.')
-            render_config=config.get('render',{}) if isinstance(config.get('render',{}),dict) else {}
-            render_type=render_config.get('type',self.settings.render_type)
-            render_music=render_config.get('music',self.settings.render_music)
-            render_volume=render_config.get('volume',self.settings.render_volume)
-            render_pan_x=render_config.get('pan_x',self.settings.render_pan_x)
             return call('/render',{'job_id':job_id,'platforms':config['channels'],'preview_platform':config['channels'][0],
                                    'type':render_type,'music':render_music,'volume':render_volume,'narration':True,'video_pan_x':render_pan_x,
                                    'scene_crop_positions':self.auth.scene_crop_positions(user,project)})
-        render_config=config.get('render',{}) if isinstance(config.get('render',{}),dict) else {}
         export_input={'render_job_id':'automation-'+run['run_id'],'platforms':config['channels'],
-                      'preview_platform':config['channels'][0],'type':render_config.get('type',self.settings.render_type),
-                      'music':render_config.get('music',self.settings.render_music),
-                      'volume':render_config.get('volume',self.settings.render_volume),'narration':True,
-                      'video_pan_x':render_config.get('pan_x',self.settings.render_pan_x),
+                      'preview_platform':config['channels'][0],'type':render_type,'music':render_music,
+                      'volume':render_volume,'narration':True,'video_pan_x':render_pan_x,
                       'scene_crop_positions':self.auth.scene_crop_positions(user,project)}
         step('final_export_calendar',export,stage='final_composite',job_input=export_input)
 

@@ -55,6 +55,7 @@ class WorkerRuntimeSettings:
     i2v_poll_interval_seconds: float = 5.0
     i2v_timeout_seconds: float = 3600.0
     job_lease_seconds: float = 300.0
+    image_model: str = "gpt-image-2.5-sunburst"
     render_type: str = "editorial"
     render_music: str = "satie"
     render_volume: float = 0.5
@@ -73,6 +74,7 @@ class WorkerRuntimeSettings:
             i2v_poll_interval_seconds=float(_number(source, "AUTOMATION_I2V_POLL_INTERVAL_SECONDS", 5.0, minimum=0.1)),
             i2v_timeout_seconds=float(_number(source, "AUTOMATION_I2V_TIMEOUT_SECONDS", 3600.0, minimum=0.1)),
             job_lease_seconds=float(_number(source, "WORKER_JOB_LEASE_SECONDS", 300.0, minimum=0.1)),
+            image_model=_text(source, "AUTOMATION_IMAGE_MODEL", "gpt-image-2.5-sunburst"),
             render_type=_text(source, "AUTOMATION_RENDER_TYPE", "editorial"),
             render_music=_text(source, "AUTOMATION_RENDER_MUSIC", "satie"),
             render_volume=_bounded_float(source, "AUTOMATION_RENDER_VOLUME", 0.5),
