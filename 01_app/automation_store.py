@@ -15,7 +15,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from validate_json_schema import validate_json_schema_file
 STAGES = ('manual', '2', '3', '3-1', '4', '5')
-PLATFORMS = ('youtube', 'instagram', 'facebook', 'tiktok', 'naver', 'kakaotalk', 'threads', 'x', 'linkedin')
+
+
+def _render_catalog() -> dict:
+    return json.loads((ROOT / 'config' / 'render-catalog.json').read_text(encoding='utf-8'))
+
+
+# Compatibility alias; the catalog is the only platform source of truth.
+PLATFORMS = tuple(_render_catalog().get('platforms', {}))
 
 
 def now_iso():
@@ -67,7 +74,7 @@ def validate_config(data):
         raise ValueError('사용자 지정 크롭은 수동 작업이 필요합니다. 기본 또는 AI 크롭을 선택해 주세요.')
     render = config.get('render')
     if render is not None:
-        catalog = json.loads((ROOT / 'config' / 'render-catalog.json').read_text(encoding='utf-8'))
+        catalog = _render_catalog()
         if 'type' in render and render['type'] not in catalog.get('styles', {}):
             raise ValueError('지원하지 않는 자막 스타일입니다.')
         if 'music' in render and render['music'] not in catalog.get('music', {}):

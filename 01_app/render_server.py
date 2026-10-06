@@ -3647,7 +3647,7 @@ class Handler(SimpleHTTPRequestHandler):
                             "model_name": model, "prompt": prompt, "negative_prompt": "", "n": 1,
                             "aspect_ratio": "16:9", "image": reference_data,
                             "image_reference": "subject", "image_fidelity": 0.75, "human_fidelity": 0.75,
-                        }, timeout=safe_env_int("KLING_GENERATION_TIMEOUT", 90, 1, 900))
+                        }, timeout=RUNTIME_CONFIG["kling_generation_timeout"])
                         task = kling_payload_data(result); task_id = str(task.get("task_id") or task.get("id") or "")
                         if not task_id: raise RuntimeError("Kling이 이미지 작업 ID를 반환하지 않았습니다.")
                         storyboard_image = {"status": "queued", "task_id": task_id, "model": model}
@@ -3720,7 +3720,7 @@ class Handler(SimpleHTTPRequestHandler):
                             request_payload["cfg_scale"] = 0.5
                         result = kling_api_request(provider_values("kling").get("api_key", ""),
                                                    "/v1/videos/image2video", request_payload,
-                                                   timeout=safe_env_int("KLING_GENERATION_TIMEOUT", 90, 1, 900))
+                                                   timeout=RUNTIME_CONFIG["kling_generation_timeout"])
                         task = kling_payload_data(result); task_id = str(task.get("task_id") or task.get("id") or "")
                         if not task_id:
                             raise RuntimeError("Kling이 영상 작업 ID를 반환하지 않았습니다.")

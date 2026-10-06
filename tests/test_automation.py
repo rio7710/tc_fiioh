@@ -12,7 +12,7 @@ from unittest import mock
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'01_app'))
 from auth_store import AuthStore
-from automation_store import AutomationStore,VersionConflict,next_occurrence,validate_config
+from automation_store import AutomationStore,PLATFORMS,VersionConflict,next_occurrence,validate_config
 from automation_runner import AutomationRunner,AdapterFailure
 
 NOW='2026-10-01T00:00:00+00:00'
@@ -64,6 +64,8 @@ class AutomationTests(unittest.TestCase):
         self.assertEqual(validate_config(config()),config())
         schema=json.loads((ROOT/'contracts'/'automation-settings.schema.json').read_text())
         self.assertEqual(set(schema['required']),set(config()))
+        catalog=json.loads((ROOT/'config'/'render-catalog.json').read_text())
+        self.assertEqual(tuple(catalog['platforms']), PLATFORMS)
         for key,value in [('repeat',None),('keywords',{}),('brand',[]),('channels',['invalid'])]:
             item=config();item[key]=value
             with self.assertRaises((ValueError,TypeError)):validate_config(item)

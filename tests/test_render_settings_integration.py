@@ -69,6 +69,11 @@ class RenderSettingsIntegrationTests(unittest.TestCase):
         self.assertEqual("9x16", catalog["platform_preview_formats"]["instagram"]["formatKey"])
         self.assertEqual("editorial", SERVER.resolve_render_settings(self.user["user_id"])["type"])
 
+    def test_kling_timeout_uses_one_runtime_setting(self):
+        source = (ROOT / "01_app" / "render_server.py").read_text(encoding="utf-8")
+        self.assertEqual(1, source.count('safe_env_int("KLING_GENERATION_TIMEOUT"'))
+        self.assertEqual(4, source.count('RUNTIME_CONFIG["kling_generation_timeout"]'))
+
     def test_get_post_patch_are_authenticated_and_owner_scoped(self):
         status, result = self.request()
         self.assertEqual(200, status)
