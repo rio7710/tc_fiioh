@@ -5,6 +5,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from worker_core import JobStore
 from auth_store import AuthStore
 from automation_store import AutomationStore
 from automation_runner import AutomationRunner
@@ -14,6 +15,7 @@ import threading
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 SQLITE_PATH = Path(os.environ.get("SQLITE_PATH", str(DATA_DIR / "tc.sqlite")))
 HEALTH_PATH = Path(os.environ.get("WORKER_HEALTH_PATH", str(DATA_DIR / "worker_health.json")))
+JOB_STORE_PATH = Path(os.environ.get("WORKER_JOB_STORE_PATH", str(DATA_DIR / "worker_jobs.json")))
 
 SCHEMA_VERSION = 1
 VALID_STATUSES = ("queued", "running", "succeeded", "failed", "cancelled")
@@ -134,11 +136,18 @@ def update_health(health_path: Path) -> None:
     tmp_path.replace(health_path)
 
 
+def create_job_store(path: Path = JOB_STORE_PATH) -> JobStore:
+    """Open the worker-owned persistent job store and recover expired leases."""
+    job_store = JobStore(path)
+    job_store.recover_stale()
+    return job_store
+
+
 def main() -> None:
     print("[tc_temp_worker] Starting scheduled content automation")
     init_db(SQLITE_PATH)
     store = AutomationStore(AuthStore(SQLITE_PATH))
-    runner = AutomationRunner(store)
+    runner = AutomationRunner(store, job_store=create_job_store())
     owner = str(uuid.uuid4())
     def health_loop():
         while True:

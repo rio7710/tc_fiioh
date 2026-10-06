@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 from urllib.parse import quote
 
 from automation_store import STAGES
+from worker_core import JobConflict
 
 
 class AdapterFailure(RuntimeError):
@@ -51,9 +52,11 @@ class InternalAPI:
 
 
 class AutomationRunner:
-    def __init__(self, store, api_factory=InternalAPI, base_keywords=None):
+    def __init__(self, store, api_factory=InternalAPI, base_keywords=None, job_store=None, worker_id=None):
         self.store, self.auth, self.api_factory = store, store.auth, api_factory
         self.base_keywords = base_keywords
+        self.job_store = job_store
+        self.worker_id = worker_id or ('automation-runner-' + str(os.getpid()))
 
     def execute(self, run):
         stop = threading.Event()
@@ -87,8 +90,26 @@ class AutomationRunner:
         config, project, user = run['config'],run['project_id'],run['user_id']
         level = STAGES.index(config['endpoint'])
         source_revision = None
-        def step(key,operation,stage=None):
-            return self.store.step(run,key,stage or key,operation)
+        def step(key,operation,stage=None,job_input=None):
+            resolved_stage = stage or key
+            if self.job_store and resolved_stage in ('scene_image','final_composite'):
+                def dispatch():
+                    try:
+                        job = self.job_store.dispatch(
+                            project,
+                            resolved_stage,
+                            job_input or {'step_key': key},
+                            _OperationAdapter(operation),
+                            worker_id=self.worker_id,
+                            trace_id=run['run_id'],
+                        )
+                    except JobConflict:
+                        raise AdapterFailure('같은 제작 작업이 이미 실행 중이거나 취소되었습니다.') from None
+                    if job['status'] != 'succeeded':
+                        raise AdapterFailure('제작 작업을 완료하지 못했습니다. 결과를 확인한 뒤 다시 시도해 주세요.')
+                    return (job.get('result') or {}).get('value', {})
+                return self.store.step(run,key,resolved_stage,dispatch)
+            return self.store.step(run,key,resolved_stage,operation)
         def call(path,extra=None):
             if not self.store.check_active(run):
                 raise InterruptedError('자동화가 중지되었습니다.')
@@ -142,8 +163,10 @@ class AutomationRunner:
             raise AdapterFailure('자동화 중 대본이 변경되어 실행을 멈췄습니다.')
         scenes=latest['data']['document']['production']['timeline']['scenes']
         for scene in scenes:
+            image_model = os.environ.get('AUTOMATION_IMAGE_MODEL','gpt-image-2.5-sunburst')
             step('image_'+scene['id'],lambda s=scene:call('/api/storyboard/image-generate',{
-                'scene_id':s['id'],'provider':'openai','model':os.environ.get('AUTOMATION_IMAGE_MODEL','gpt-image-2.5-sunburst'),'force':False}),stage='scene_image')
+                'scene_id':s['id'],'provider':'openai','model':image_model,'force':False}),stage='scene_image',
+                 job_input={'scene_id':scene['id'],'source_revision':source_revision,'provider':'openai','model':image_model,'force':False})
         if config['video']['scene_count']:
             decision=step('video_scene_selection',lambda:call('/api/storyboard/auto-select',{'count':config['video']['scene_count']}))
             current_images={item['scene_id']:item['artifact_id'] for item in self.auth.list_scene_images(user,project,source_revision)}
@@ -197,4 +220,18 @@ class AutomationRunner:
             return call('/render',{'job_id':job_id,'platforms':config['channels'],'preview_platform':config['channels'][0],
                                    'type':'editorial','music':'satie','volume':0.5,'narration':True,'video_pan_x':0.5,
                                    'scene_crop_positions':self.auth.scene_crop_positions(user,project)})
-        step('final_export_calendar',export,stage='final_composite')
+        export_input={'render_job_id':'automation-'+run['run_id'],'platforms':config['channels'],
+                      'preview_platform':config['channels'][0],'type':'editorial','music':'satie',
+                      'volume':0.5,'narration':True,'video_pan_x':0.5,
+                      'scene_crop_positions':self.auth.scene_crop_positions(user,project)}
+        step('final_export_calendar',export,stage='final_composite',job_input=export_input)
+
+
+class _OperationAdapter:
+    """Adapter boundary for existing internal API operations."""
+
+    def __init__(self, operation):
+        self.operation = operation
+
+    def run(self, job):
+        return {'value': self.operation()}

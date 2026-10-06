@@ -1,0 +1,152 @@
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "01_app"))
+
+from auth_store import AuthStore
+from automation_runner import AutomationRunner
+from automation_store import AutomationStore
+from worker_core import JobStore
+from worker import create_job_store
+
+
+NOW = "2026-10-06T00:00:00+00:00"
+
+
+def config():
+    return {
+        "schema_version": "1.0.0",
+        "endpoint": "5",
+        "repeat": {"unit": "month", "interval": 1},
+        "keywords": {"count": 2, "ai": False, "month": ""},
+        "video": {"scene_count": 0, "crop": "default"},
+        "brand": {"intro": False, "outro": False, "watermark": False},
+        "channels": ["youtube", "instagram"],
+    }
+
+
+class FixtureAPI:
+    calls = []
+
+    def __init__(self, auth, user):
+        self.auth, self.user = auth, user
+
+    def close(self):
+        pass
+
+    def call(self, path, payload):
+        self.calls.append((path, payload))
+        project = payload.get("project_id") if payload else None
+        if path == "/api/script/generate":
+            self.auth.save_stage_draft(
+                self.user,
+                project,
+                3,
+                {
+                    "document": {
+                        "production": {
+                            "narration_cues": [{"id": "cue-a"}, {"id": "cue-b"}],
+                            "timeline": {
+                                "scenes": [
+                                    {"id": "scene-a", "narration_cue_ids": ["cue-a"]},
+                                    {"id": "scene-b", "narration_cue_ids": ["cue-b"]},
+                                ]
+                            },
+                        }
+                    }
+                },
+            )
+        if path == "/api/season-keywords/preview":
+            return {"ok": True, "keywords": [{"id": "1", "label": "첫 키워드"}, {"id": "2", "label": "둘째 키워드"}]}
+        if path == "/render":
+            return {"ok": True, "job_id": payload["job_id"], "outputs": [{"url": "memory://final.mp4"}]}
+        return {"ok": True}
+
+
+class WorkerJobIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.auth = AuthStore(self.root / "test.sqlite")
+        self.user = self.auth.create_user("worker_integration", "strong-test-password")["user_id"]
+        self.store = AutomationStore(self.auth)
+        self.store.configure(
+            self.user,
+            "start",
+            {"action": "start", "request_id": "integration-request", "version": 0, "config": config()},
+            NOW,
+        )
+        self.store.enqueue_due(NOW)
+        self.run = self.store.claim("integration-worker", NOW)
+        FixtureAPI.calls = []
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def test_scene_and_final_export_dispatch_through_job_store_without_provider_calls(self):
+        job_store = JobStore(self.root / "worker_jobs.json")
+        runner = AutomationRunner(self.store, FixtureAPI, job_store=job_store, worker_id="fixture-worker")
+
+        runner.execute(self.run)
+
+        self.assertEqual(self.store.snapshot(self.user)["runs"][0]["status"], "succeeded")
+        scene_jobs = job_store.list(status="succeeded")
+        self.assertEqual(sorted(job["stage"] for job in scene_jobs), ["final_composite", "scene_image", "scene_image"])
+        render_calls = [payload for path, payload in FixtureAPI.calls if path == "/render"]
+        self.assertEqual(len(render_calls), 1)
+        self.assertEqual(render_calls[0]["platforms"], ["youtube", "instagram"])
+        self.assertEqual(render_calls[0]["job_id"], "automation-" + self.run["run_id"])
+        self.assertFalse(any(path.startswith("ffmpeg") for path, _ in FixtureAPI.calls))
+
+    def test_same_scene_dispatch_reuses_succeeded_job_and_does_not_call_adapter_again(self):
+        job_store = JobStore(self.root / "worker_jobs.json")
+        calls = []
+
+        class FixtureAdapter:
+            def run(self, job):
+                calls.append(job["idempotency_key"])
+                return {"artifact_uri": "memory://scene-a"}
+
+        first = job_store.dispatch("project-1", "scene_image", {"scene_id": "scene-a"}, FixtureAdapter(), worker_id="w1")
+        second = job_store.dispatch("project-1", "scene_image", {"scene_id": "scene-a"}, FixtureAdapter(), worker_id="w2")
+
+        self.assertEqual(first["job_id"], second["job_id"])
+        self.assertEqual(first["input_hash"], second["input_hash"])
+        self.assertEqual(calls, [first["idempotency_key"]])
+
+    def test_worker_startup_recovers_expired_job_to_stale(self):
+        path = self.root / "worker_jobs.json"
+        jobs = JobStore(path)
+        job = jobs.create("project-1", "final_composite", {"render_job_id": "render-1"}, now=NOW)
+        jobs.claim(job["job_id"], "dead-worker", now=NOW, lease_seconds=10)
+
+        recovered_store = create_job_store(path)
+
+        recovered = recovered_store.get(job["job_id"])
+        self.assertEqual(recovered["status"], "stale")
+        self.assertEqual(recovered["error"]["code"], "lease_expired")
+
+    def test_provider_failure_is_safe_and_persisted_as_failed_job(self):
+        job_store = JobStore(self.root / "worker_jobs.json")
+
+        class FailingAPI(FixtureAPI):
+            def call(self, path, payload):
+                if path == "/api/storyboard/image-generate":
+                    raise RuntimeError("local secret path /private/provider-token")
+                return super().call(path, payload)
+
+        runner = AutomationRunner(self.store, FailingAPI, job_store=job_store, worker_id="fixture-worker")
+        runner.execute(self.run)
+
+        failed = job_store.list(status="failed")
+        self.assertTrue(failed)
+        self.assertEqual(failed[0]["error"]["message"], "작업 실행을 완료하지 못했습니다. 결과를 확인한 뒤 다시 시도해 주세요.")
+        run = self.store.snapshot(self.user)["runs"][0]
+        self.assertNotIn("private/provider-token", run["error_message"] or "")
+
+
+if __name__ == "__main__":
+    unittest.main()

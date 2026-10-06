@@ -304,6 +304,32 @@ class JobStore:
                 self._write(document)
         return recovered
 
+    def dispatch(
+        self,
+        project_id: str,
+        stage: str,
+        input: Mapping[str, Any],
+        adapter: Any,
+        *,
+        worker_id: str,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Create or resume one logical job, then execute it at most once per claim.
+
+        A failed or recovered-stale job is retried with the same idempotency key.
+        An already-running job is never claimed by a second dispatcher.
+        """
+        job = self.create(project_id, stage, input, trace_id=trace_id)
+        if job["status"] in RETRYABLE_STATUSES:
+            job = self.retry(job["job_id"])
+        if job["status"] == "succeeded":
+            return job
+        if job["status"] == "cancelled":
+            raise JobConflict(f"job {job['job_id']} was cancelled")
+        if job["status"] == "running":
+            raise JobConflict(f"job {job['job_id']} is already running")
+        return self.execute(job["job_id"], worker_id, adapter)
+
     def execute(self, job_id: str, worker_id: str, adapter: Any, *, lease_seconds: int = 300) -> dict[str, Any]:
         """Claim, execute through an adapter, and persist the terminal state."""
         job = self.claim(job_id, worker_id, lease_seconds=lease_seconds)
@@ -311,10 +337,21 @@ class JobStore:
             result = adapter.run(self._copy_job(job))
             if not isinstance(result, Mapping):
                 raise JobValidationError("adapter result must be an object")
+        except InterruptedError:
+            return self.transition(
+                job_id,
+                "cancelled",
+                error={"code": "cancelled", "message": "작업이 취소되었습니다."},
+            )
         except Exception as exc:
+            safe_message = (
+                str(exc)
+                if isinstance(exc, JobValidationError)
+                else "작업 실행을 완료하지 못했습니다. 결과를 확인한 뒤 다시 시도해 주세요."
+            )
             return self.transition(
                 job_id,
                 "failed",
-                error={"code": type(exc).__name__, "message": str(exc)},
+                error={"code": type(exc).__name__, "message": safe_message},
             )
         return self.transition(job_id, "succeeded", result=result)

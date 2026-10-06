@@ -1,8 +1,12 @@
 import json
+import sys
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "01_app"))
 
 from worker_core import JobConflict, JobStore, JobValidationError, compute_input_hash
 
