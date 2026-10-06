@@ -1238,7 +1238,23 @@ def save_project_kling_job(task_id, values):
             jobs = json.loads(PROJECT_KLING_JOBS_FILE.read_text(encoding="utf-8")) if PROJECT_KLING_JOBS_FILE.is_file() else {}
         except (OSError, json.JSONDecodeError):
             jobs = {}
-        jobs[task_id] = {**jobs.get(task_id, {}), **values}
+        if not isinstance(jobs, dict):
+            jobs = {}
+        existing = jobs.get(task_id) if isinstance(jobs.get(task_id), dict) else None
+        merged = {**(existing or {}), **values}
+        project_id = str(merged.get("project_id") or "").strip()
+        user_id = str(merged.get("user_id") or "").strip()
+        if not existing and not project_id and not user_id:
+            return
+        if not project_id or not user_id:
+            return
+        if not get_auth_store().get_project(user_id, project_id):
+            if existing:
+                jobs.pop(task_id, None)
+            else:
+                return
+        else:
+            jobs[task_id] = merged
         PROJECT_KLING_JOBS_FILE.parent.mkdir(parents=True, exist_ok=True)
         temporary = PROJECT_KLING_JOBS_FILE.with_suffix(".tmp")
         temporary.write_text(json.dumps(jobs, ensure_ascii=False, sort_keys=True), encoding="utf-8")
@@ -1736,6 +1752,103 @@ def save_demo_data(data):
         temporary = DATA_FILE.with_suffix(".json.tmp")
         temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         temporary.replace(DATA_FILE)
+
+
+def project_deletion_file_paths(user_id, project_id):
+    """Return only local, project-owned artifact files safe to quarantine."""
+    snapshot = get_auth_store().project_deletion_snapshot(user_id, project_id)
+    if snapshot is None:
+        return None
+    paths = []
+    for artifact in snapshot["artifacts"]:
+        uri = str(artifact.get("uri") or "")
+        parsed = urlparse(uri)
+        if parsed.scheme or parsed.netloc:
+            continue
+        query = parse_qs(parsed.query)
+        candidate = None
+        if parsed.path == "/api/storyboard/image" and query.get("project_id", [""])[0] == project_id:
+            values = [query.get(key, [""])[0] for key in ("revision_id", "scene_id", "file")]
+            if all(value and Path(value).name == value for value in values):
+                candidate = STORYBOARD_IMAGE_DIR.joinpath(project_id, *values)
+        elif parsed.path == "/api/voice/audio" and query.get("project_id", [""])[0] == project_id:
+            values = [query.get(key, [""])[0] for key in ("revision_id", "profile", "file")]
+            if all(value and Path(value).name == value for value in values):
+                candidate = VOICE_ARTIFACT_DIR.joinpath(project_id, *values)
+        elif parsed.path == "/api/storyboard/video" and query.get("project_id", [""])[0] == project_id:
+            filename = query.get("file", [""])[0]
+            if filename and Path(filename).name == filename:
+                candidate = KLING_ARTIFACT_DIR / filename
+        elif parsed.path.startswith("/04_exports/") or parsed.path.startswith("/exports/"):
+            filename = Path(parsed.path).name
+            if filename and parsed.path.rsplit("/", 1)[-1] == filename:
+                candidate = EXPORTS / filename
+        elif parsed.path.startswith("/02_media/generated/kling/"):
+            filename = Path(parsed.path).name
+            if filename and parsed.path.rsplit("/", 1)[-1] == filename:
+                candidate = KLING_ARTIFACT_DIR / filename
+        if candidate is None or snapshot["uri_counts"].get(uri, 0) != 1:
+            continue
+        resolved = candidate.resolve()
+        allowed = (STORYBOARD_IMAGE_DIR, VOICE_ARTIFACT_DIR, KLING_ARTIFACT_DIR, EXPORTS)
+        if any(root.resolve() == resolved or root.resolve() in resolved.parents for root in allowed):
+            paths.append(resolved)
+    return sorted(set(paths))
+
+
+def quarantine_project_files(paths):
+    """Move files out of serving paths; callers restore on transaction failure."""
+    quarantine_root = EXPORTS / ".project-delete-quarantine" / uuid.uuid4().hex
+    moved = []
+    try:
+        for index, path in enumerate(paths):
+            if not path.is_file():
+                continue
+            target = quarantine_root / str(index)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(path, target)
+            moved.append((path, target))
+    except Exception:
+        restore_project_files(quarantine_root, moved)
+        raise
+    return quarantine_root, moved
+
+
+def restore_project_files(quarantine_root, moved):
+    for original, target in reversed(moved):
+        if target.exists():
+            original.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(target, original)
+    shutil.rmtree(quarantine_root, ignore_errors=True)
+
+
+def discard_project_quarantine(quarantine_root):
+    shutil.rmtree(quarantine_root, ignore_errors=True)
+
+
+def stage_project_kling_jobs(project_id):
+    if not PROJECT_KLING_JOBS_FILE.is_file():
+        return None
+    original = PROJECT_KLING_JOBS_FILE.read_bytes()
+    jobs = json.loads(original.decode("utf-8"))
+    if not isinstance(jobs, dict):
+        return original
+    filtered = {
+        task_id: job for task_id, job in jobs.items()
+        if not isinstance(job, dict) or job.get("project_id") != project_id
+    }
+    temporary = PROJECT_KLING_JOBS_FILE.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(filtered, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+    temporary.replace(PROJECT_KLING_JOBS_FILE)
+    return original
+
+
+def restore_project_kling_jobs(original):
+    if original is None:
+        return
+    temporary = PROJECT_KLING_JOBS_FILE.with_suffix(".json.tmp")
+    temporary.write_bytes(original)
+    temporary.replace(PROJECT_KLING_JOBS_FILE)
 
 
 def update_caption_artifact(scene, index, style_name, text, width, height, caption_size, png_path, status):
@@ -3131,11 +3244,28 @@ class Handler(SimpleHTTPRequestHandler):
                 project_id = str(payload.get("project_id", "")).strip()
                 if not project_id:
                     raise ValueError("삭제할 콘텐츠 ID가 없습니다.")
-                if not get_auth_store().delete_project(user["user_id"], project_id):
+                paths = project_deletion_file_paths(user["user_id"], project_id)
+                if paths is None:
                     self.send_json(404, {"error": "콘텐츠를 찾을 수 없습니다."})
                     return
+                quarantine_root, moved = quarantine_project_files(paths)
+                original_kling_jobs = None
+                with project_kling_job_lock:
+                    try:
+                        original_kling_jobs = stage_project_kling_jobs(project_id)
+                        if not get_auth_store().delete_project(user["user_id"], project_id):
+                            raise ValueError("콘텐츠를 찾을 수 없습니다.")
+                    except Exception:
+                        restore_project_kling_jobs(original_kling_jobs)
+                        restore_project_files(quarantine_root, moved)
+                        raise
+                discard_project_quarantine(quarantine_root)
+                with render_progress_lock:
+                    for job_id in list(render_jobs):
+                        if render_jobs[job_id].get("project_id") == project_id:
+                            render_jobs.pop(job_id, None)
                 self.send_json(200, {"ok": True, "project_id": project_id})
-            except ValueError as exc:
+            except (OSError, ValueError) as exc:
                 self.send_json(400, {"error": str(exc)})
             return
         if self.path == "/api/project/crop-position":

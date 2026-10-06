@@ -1561,6 +1561,25 @@ class AuthStore:
             connection.commit()
         return {"project_id": project_id, "name": name, "updated_at": now}
 
+    def project_deletion_snapshot(self, user_id: str, project_id: str) -> dict | None:
+        with closing(self._connect()) as connection:
+            owned = connection.execute(
+                "SELECT 1 FROM projects WHERE project_id = ? AND owner_user_id = ?",
+                (project_id, user_id),
+            ).fetchone()
+            if not owned:
+                return None
+            artifacts = [dict(row) for row in connection.execute(
+                "SELECT artifact_id, uri FROM artifacts WHERE project_id = ?",
+                (project_id,),
+            )]
+            counts = {
+                row["uri"]: row["count"] for row in connection.execute(
+                    "SELECT uri, COUNT(*) AS count FROM artifacts GROUP BY uri"
+                )
+            }
+        return {"artifacts": artifacts, "uri_counts": counts}
+
     def delete_project(self, user_id: str, project_id: str) -> bool:
         """Delete one owned project and its database-owned dependent records."""
         with closing(self._connect()) as connection:
@@ -1570,6 +1589,13 @@ class AuthStore:
             ).fetchone()
             if not row:
                 return False
+            if connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'automation_runs'"
+            ).fetchone():
+                connection.execute(
+                    "DELETE FROM automation_runs WHERE user_id = ? AND project_id = ?",
+                    (user_id, project_id),
+                )
             connection.execute(
                 """DELETE FROM stage_dependencies
                      WHERE downstream_revision_id IN (
