@@ -141,6 +141,23 @@ class WorkerJobCoreTests(unittest.TestCase):
         self.assertEqual(result["status"], "cancelled")
         self.assertIsNone(result["result"])
 
+    def test_late_success_without_cancellation_callback_is_cancelled(self):
+        job = self.create({"scene_id": "late-without-callback"})
+
+        class LateAdapter:
+            def run(self, snapshot):
+                self.store.tombstone_project(snapshot["project_id"], now=NOW)
+                return {"artifact_uri": "memory://must-not-persist"}
+
+            def __init__(self, store):
+                self.store = store
+
+        result = self.store.execute(job["job_id"], "worker-a", LateAdapter(self.store))
+
+        self.assertEqual(result["status"], "cancelled")
+        self.assertIsNone(result["result"])
+        self.assertEqual(self.store.get(job["job_id"])["status"], "cancelled")
+
     def test_tombstone_then_adapter_interrupted_error_keeps_cancelled_state(self):
         job = self.create({"scene_id": "interrupted-after-delete"})
 

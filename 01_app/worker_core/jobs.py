@@ -393,7 +393,7 @@ class JobStore:
             result = adapter.run(self._copy_job(job))
             if not isinstance(result, Mapping):
                 raise JobValidationError("adapter result must be an object")
-            if cancellation_check and cancellation_check():
+            if self.is_project_tombstoned(job["project_id"]) or (cancellation_check and cancellation_check()):
                 current = self.get(job_id)
                 if current["status"] == "cancelled":
                     return current
