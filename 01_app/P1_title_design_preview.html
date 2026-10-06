@@ -3467,34 +3467,56 @@ loadLatestExport();
 renderCalendar();
 refreshApiConnections().catch(()=>{});
 
+async function loadRenderSettingsOnce() {
+  if (!window.Step04VideoEditor) return;
+  if (typeof window.Step04VideoEditor.isConfigured === 'function' && window.Step04VideoEditor.isConfigured()) {
+    window.Step04VideoEditor.initStep4UI();
+    return;
+  }
+  let settings = null;
+  let catalog = null;
+  try {
+    const apiRes = (typeof window.api === 'function') ? await window.api('/api/render-settings') : null;
+    if (apiRes) {
+      settings = apiRes.effective || null;
+      catalog = apiRes.catalog || null;
+    }
+  } catch (e) {}
+  window.Step04VideoEditor.configure(settings, catalog);
+  window.Step04VideoEditor.initStep4UI();
+}
+
 async function ensureStep4Loaded() {
   if (document.querySelector('#step4')) {
-    if (window.Step04VideoEditor) window.Step04VideoEditor.initStep4UI();
+    await loadRenderSettingsOnce();
     return true;
   }
   const container = document.querySelector('#step4Container') || document.body;
   if (!container) return false;
+  let loaded = false;
   try {
     if (typeof fetch === 'function') {
       const res = await fetch('/01_app/pages/steps/step04-video.html');
       if (res.ok) {
         container.innerHTML = await res.text();
-        if (window.Step04VideoEditor) window.Step04VideoEditor.initStep4UI();
-        return true;
+        loaded = true;
       }
     }
   } catch (e) {}
-  if (typeof require === 'function' && typeof process !== 'undefined') {
+  if (!loaded && typeof require === 'function' && typeof process !== 'undefined') {
     try {
       const fs = require('fs');
       const path = require('path');
       const fp = path.resolve('01_app/pages/steps/step04-video.html');
       if (fs.existsSync(fp)) {
         container.innerHTML = fs.readFileSync(fp, 'utf8');
-        if (window.Step04VideoEditor) window.Step04VideoEditor.initStep4UI();
-        return true;
+        loaded = true;
       }
     } catch (e) {}
+  }
+  if (loaded) {
+    await loadRenderSettingsOnce();
+    return true;
   }
   return false;
 }

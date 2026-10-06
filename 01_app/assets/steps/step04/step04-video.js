@@ -26,8 +26,9 @@
   let activeNarration = -1;
   let pendingDissolveOverlay = null;
   let isStep4Initialized = false;
-
-  const sceneDissolveSeconds = 0.5;
+  let configuredSettings = null;
+  let configuredCatalog = null;
+  let sceneDissolveSeconds = 0.5;
 
   function fmt(seconds) {
     return MobileSync ? MobileSync.formatTime(seconds) : '00:00';
@@ -71,6 +72,69 @@
     if (typeof document === 'undefined') return;
     const stage = document.querySelector('#stage');
     if (stage) stage.style.setProperty('--video-pan-x', `${videoPanX}%`);
+  }
+
+  function setSceneDissolveSeconds(seconds) {
+    const val = Number.isFinite(Number(seconds)) ? Math.max(0, Math.min(3, Number(seconds))) : 0.5;
+    sceneDissolveSeconds = val;
+    if (typeof document !== 'undefined') {
+      const stage = document.querySelector('#stage');
+      if (stage) stage.style.setProperty('--scene-dissolve-seconds', `${sceneDissolveSeconds}s`);
+    }
+  }
+
+  function configure(settings, catalog) {
+    if (catalog) {
+      configuredCatalog = catalog;
+      if (RatioProfiles && typeof RatioProfiles.configureCatalog === 'function') {
+        RatioProfiles.configureCatalog(catalog);
+      }
+    }
+    if (settings && typeof settings === 'object') {
+      configuredSettings = settings;
+      restoreEditorSettings(settings);
+    }
+    return { settings: configuredSettings, catalog: configuredCatalog };
+  }
+
+  function getEffectiveSettingsPayload() {
+    const musicVolume = typeof document !== 'undefined' ? document.querySelector('#musicVolume') : null;
+    const volumeNum = musicVolume ? Number(musicVolume.value) : 0.5;
+    return {
+      type: currentType,
+      music: selectedMusic,
+      volume: Number.isFinite(volumeNum) ? Math.max(0, Math.min(1, volumeNum)) : 0.5,
+      narration: narrationEnabled,
+      preview_platform: currentPreviewPlatform,
+      platforms: Array.from(selectedPlatforms),
+      video_pan_x: videoPanX / 100,
+      scene_dissolve_seconds: sceneDissolveSeconds,
+      caption_size: captionSizeLevel
+    };
+  }
+
+  async function persistRenderSettings() {
+    saveEditorSettings();
+    if (typeof window === 'undefined' || typeof window.api !== 'function') return;
+    const overridesPayload = getEffectiveSettingsPayload();
+    const body = {
+      schema_version: 'render-settings.v1',
+      overrides: overridesPayload
+    };
+    try {
+      const res = await window.api('/api/render-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      return res;
+    } catch (error) {
+      console.error('Render settings save failed:', error);
+      if (typeof document !== 'undefined') {
+        const rs = document.querySelector('#renderStatus');
+        if (rs) rs.textContent = '설정 저장 실패 (오프라인/오류)';
+      }
+    }
   }
 
   function applyStoredSceneCrop() {
@@ -127,31 +191,62 @@
     }
   }
 
-  function restoreEditorSettings() {
-    if (typeof document === 'undefined') return;
-    const saved = loadEditorSettings() || {};
-    const typeButtons = Array.from(document.querySelectorAll('.type-btn'));
-    const musicButtons = Array.from(document.querySelectorAll('.music-btn[data-music]'));
-    const platformButtons = Array.from(document.querySelectorAll('.distribution-btn'));
+  function restoreEditorSettings(settingsOverride) {
+    const apiSettings = settingsOverride || configuredSettings;
+    const localCache = loadEditorSettings() || {};
+    const source = apiSettings || localCache;
+    if (!source) return;
+
+    const hasDoc = typeof document !== 'undefined';
+    const typeButtons = hasDoc ? Array.from(document.querySelectorAll('.type-btn')) : [];
+    const musicButtons = hasDoc ? Array.from(document.querySelectorAll('.music-btn[data-music]')) : [];
+    const platformButtons = hasDoc ? Array.from(document.querySelectorAll('.distribution-btn')) : [];
     const validTypes = new Set(typeButtons.map(btn => btn.dataset.type));
     const validMusic = new Set(musicButtons.map(btn => btn.dataset.music));
     const validPlatforms = new Set(platformButtons.map(btn => btn.dataset.platform));
-    const restoredPlatforms = Array.isArray(saved.platforms) ? saved.platforms.filter(item => validPlatforms.has(item)) : null;
+    const preferredPlatforms = source.platforms;
+    const restoredPlatforms = Array.isArray(preferredPlatforms) ? preferredPlatforms.filter(item => validPlatforms.size === 0 || validPlatforms.has(item)) : null;
 
     sceneCropPositions = {};
     if (restoredPlatforms) {
       selectedPlatforms.clear();
       restoredPlatforms.forEach(item => selectedPlatforms.add(item));
     }
-    platformButtons.forEach(btn => btn.setAttribute('aria-pressed', String(selectedPlatforms.has(btn.dataset.platform))));
-    const musicVolume = document.querySelector('#musicVolume');
-    if (musicVolume) musicVolume.value = String(Math.max(0, Math.min(1, Number.isFinite(Number(saved.volume)) ? Number(saved.volume) : 0.5)));
-    setVideoPan(Number.isFinite(Number(saved.videoPanX)) ? Number(saved.videoPanX) : 50);
-    setCaptionSize(Number.isFinite(Number(saved.captionSize)) ? Number(saved.captionSize) : 0);
-    setNarration(saved.narration !== false);
-    setType(validTypes.has(saved.type) ? saved.type : 'editorial');
-    setMusic(validMusic.has(saved.music) ? saved.music : 'satie');
-    setPlatformPreview(validPlatforms.has(saved.previewPlatform) ? saved.previewPlatform : 'youtube');
+    if (hasDoc) {
+      platformButtons.forEach(btn => btn.setAttribute('aria-pressed', String(selectedPlatforms.has(btn.dataset.platform))));
+    }
+
+    const musicVolume = hasDoc ? document.querySelector('#musicVolume') : null;
+    const rawVolume = source.volume;
+    const volumeNum = Number.isFinite(Number(rawVolume)) ? Math.max(0, Math.min(1, Number(rawVolume))) : 0.5;
+    if (musicVolume) musicVolume.value = String(volumeNum);
+
+    const rawPan = source.video_pan_x !== undefined ? source.video_pan_x : source.videoPanX;
+    let panPercent = 50;
+    if (Number.isFinite(Number(rawPan))) {
+      const numPan = Number(rawPan);
+      panPercent = numPan <= 1.0 ? numPan * 100 : numPan;
+    }
+    setVideoPan(panPercent);
+
+    const rawCaptionSize = source.caption_size !== undefined ? source.caption_size : source.captionSize;
+    setCaptionSize(Number.isFinite(Number(rawCaptionSize)) ? Number(rawCaptionSize) : 0);
+
+    const rawNarration = source.narration;
+    setNarration(rawNarration !== false);
+
+    const rawType = source.type;
+    setType((validTypes.size === 0 || validTypes.has(rawType)) ? rawType : 'editorial');
+
+    const rawMusic = source.music;
+    setMusic((validMusic.size === 0 || validMusic.has(rawMusic)) ? rawMusic : 'satie');
+
+    const rawPlatform = source.preview_platform || source.previewPlatform;
+    setPlatformPreview((validPlatforms.size === 0 || validPlatforms.has(rawPlatform)) ? rawPlatform : 'youtube');
+
+    const rawDissolve = source.scene_dissolve_seconds !== undefined ? source.scene_dissolve_seconds : source.sceneDissolveSeconds;
+    setSceneDissolveSeconds(Number.isFinite(Number(rawDissolve)) ? Number(rawDissolve) : 0.5);
+
     saveEditorSettings();
   }
 
@@ -226,7 +321,7 @@
 
   function setPlatformPreview(platform) {
     if (typeof document === 'undefined') return;
-    const config = RatioProfiles ? RatioProfiles.PLATFORM_PREVIEW_FORMATS[platform] : null;
+    const config = RatioProfiles ? (RatioProfiles.getPlatformFormat ? RatioProfiles.getPlatformFormat(platform) : RatioProfiles.PLATFORM_PREVIEW_FORMATS[platform]) : null;
     const format = config || { className: 'preview-landscape', label: 'YouTube · 16:9', safe: '' };
     currentPreviewPlatform = platform;
     const stageCard = document.querySelector('#stageCard') || document.querySelector('.stage-card');
@@ -335,6 +430,7 @@
     const clock = document.querySelector('#clock');
 
     if (!video || !stage) return;
+    stage.style.setProperty('--scene-dissolve-seconds', `${sceneDissolveSeconds}s`);
     const t = video.currentTime || 0;
     const idx = sceneAt(t);
 
@@ -563,20 +659,84 @@
     });
 
     document.querySelectorAll('.type-btn').forEach(btn => {
-      btn.addEventListener('click', () => setType(btn.dataset.type));
+      btn.addEventListener('click', () => {
+        setType(btn.dataset.type);
+        persistRenderSettings();
+      });
     });
     document.querySelectorAll('.music-btn[data-music]').forEach(btn => {
-      btn.addEventListener('click', () => setMusic(btn.dataset.music));
+      btn.addEventListener('click', () => {
+        setMusic(btn.dataset.music);
+        persistRenderSettings();
+      });
     });
     document.querySelectorAll('.platform-preview-btn').forEach(btn => {
-      btn.addEventListener('click', () => setPlatformPreview(btn.dataset.platform));
+      btn.addEventListener('click', () => {
+        setPlatformPreview(btn.dataset.platform);
+        persistRenderSettings();
+      });
     });
 
+    const captionSizeDown = document.querySelector('#captionSizeDown');
+    const captionSizeUp = document.querySelector('#captionSizeUp');
+    if (captionSizeDown) {
+      captionSizeDown.addEventListener('click', () => {
+        setCaptionSize(captionSizeLevel - 1);
+        persistRenderSettings();
+      });
+    }
+    if (captionSizeUp) {
+      captionSizeUp.addEventListener('click', () => {
+        setCaptionSize(captionSizeLevel + 1);
+        persistRenderSettings();
+      });
+    }
+
+    const narrationBtn = document.querySelector('#narrationBtn');
+    if (narrationBtn) {
+      narrationBtn.addEventListener('click', () => {
+        setNarration(!narrationEnabled);
+        persistRenderSettings();
+      });
+    }
+
+    const musicVolume = document.querySelector('#musicVolume');
+    if (musicVolume) {
+      musicVolume.addEventListener('input', () => {
+        saveEditorSettings();
+        persistRenderSettings();
+      });
+    }
+
+    document.querySelectorAll('.distribution-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const platform = btn.dataset.platform;
+        if (!platform) return;
+        if (selectedPlatforms.has(platform)) {
+          selectedPlatforms.delete(platform);
+        } else {
+          selectedPlatforms.add(platform);
+        }
+        btn.setAttribute('aria-pressed', String(selectedPlatforms.has(platform)));
+        saveEditorSettings();
+        persistRenderSettings();
+      });
+    });
+
+    restoreEditorSettings();
     isStep4Initialized = true;
     return true;
   }
 
   return {
+    configure: configure,
+    getConfiguredSettings: () => configuredSettings,
+    getConfiguredCatalog: () => configuredCatalog,
+    isConfigured: () => Boolean(configuredSettings),
+    persistRenderSettings: persistRenderSettings,
+    setSceneDissolveSeconds: setSceneDissolveSeconds,
+    getSceneDissolveSeconds: () => sceneDissolveSeconds,
+    getEffectiveSettingsPayload: getEffectiveSettingsPayload,
     initStep4UI: initStep4UI,
     isInitialized: () => isStep4Initialized,
     applyTimeline: applyTimeline,

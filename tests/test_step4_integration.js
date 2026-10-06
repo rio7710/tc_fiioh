@@ -224,4 +224,40 @@ assert.equal(mSync.displayLabel, 'SCENE 02 / 02');
   assert.equal(profile.key, fmt);
 });
 
+// Phase 3: Configure, Payload Wrapping & Unit Conversion Tests
+assert.equal(typeof Step04VideoEditor.configure, 'function', 'configure must be a function');
+assert.equal(typeof Step04VideoEditor.persistRenderSettings, 'function', 'persistRenderSettings must be a function');
+
+const testCatalog = {
+  ratio_profiles: {
+    custom_ratio: { key: '16x9', className: 'preview-landscape', label: 'Custom 16:9', safe: '' }
+  },
+  platform_preview_formats: {
+    threads: { formatKey: '9x16', className: 'preview-portrait', label: 'Threads Custom', safe: 'SAFE' }
+  }
+};
+
+const testEffective = {
+  type: 'minimal',
+  music: 'debussy',
+  volume: 0.7,
+  narration: true,
+  preview_platform: 'threads',
+  platforms: ['youtube', 'threads'],
+  video_pan_x: 0.6, // 0..1 API unit => should map to 60 UI percent
+  scene_dissolve_seconds: 1.0,
+  caption_size: 2
+};
+
+Step04VideoEditor.configure(testEffective, testCatalog);
+assert.equal(Step04VideoEditor.isConfigured(), true, 'isConfigured should return true after configure call');
+assert.equal(Step04VideoEditor.getConfiguredSettings().type, 'minimal');
+
+// Verify unit conversion in getEffectiveSettingsPayload (60% UI pan -> 0.6 API pan, numeric volume)
+const payload = Step04VideoEditor.getEffectiveSettingsPayload();
+assert.equal(typeof payload.volume, 'number', 'volume must be numeric');
+assert.equal(payload.video_pan_x, 0.6, 'video_pan_x should convert back to 0..1 decimal unit');
+assert.equal(payload.scene_dissolve_seconds, 1.0, 'scene_dissolve_seconds preserved');
+
+console.log('✓ Phase 3 settings configuration, unit conversion, and payload wrapping tests passed');
 console.log('✓ Strict lifecycle, pre-partial safety, and post-partial init tests passed');

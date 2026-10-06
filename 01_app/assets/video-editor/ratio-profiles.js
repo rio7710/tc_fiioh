@@ -73,22 +73,35 @@
     square: { formatKey: '1x1', className: 'preview-square', label: 'Square Feed · 1:1 · 1080×1080', safe: 'SQUARE SAFE AREA' }
   };
 
+  let activeRatioProfiles = { ...RATIO_PROFILES };
+  let activePlatformFormats = { ...PLATFORM_PREVIEW_FORMATS };
+
+  function configureCatalog(catalog) {
+    if (!catalog) return;
+    if (catalog.ratio_profiles && typeof catalog.ratio_profiles === 'object') {
+      Object.assign(activeRatioProfiles, catalog.ratio_profiles);
+    }
+    if (catalog.platform_preview_formats && typeof catalog.platform_preview_formats === 'object') {
+      Object.assign(activePlatformFormats, catalog.platform_preview_formats);
+    }
+  }
+
   function getProfileByKey(key) {
-    if (!key) return RATIO_PROFILES['16x9'];
+    if (!key) return activeRatioProfiles['16x9'] || RATIO_PROFILES['16x9'];
     const normalized = String(key).toLowerCase().trim();
-    if (normalized === 'portrait' || normalized === 'preview-portrait') return RATIO_PROFILES['9x16'];
-    if (normalized === 'feed' || normalized === 'preview-feed') return RATIO_PROFILES['4x5'];
-    if (normalized === 'square' || normalized === 'preview-square') return RATIO_PROFILES['1x1'];
-    return RATIO_PROFILES[normalized] || RATIO_PROFILES['16x9'];
+    if (normalized === 'portrait' || normalized === 'preview-portrait') return activeRatioProfiles['9x16'] || RATIO_PROFILES['9x16'];
+    if (normalized === 'feed' || normalized === 'preview-feed') return activeRatioProfiles['4x5'] || RATIO_PROFILES['4x5'];
+    if (normalized === 'square' || normalized === 'preview-square') return activeRatioProfiles['1x1'] || RATIO_PROFILES['1x1'];
+    return activeRatioProfiles[normalized] || RATIO_PROFILES[normalized] || RATIO_PROFILES['16x9'];
   }
 
   function getProfileByPlatform(platform) {
     const p = String(platform || '').toLowerCase().trim();
-    const config = PLATFORM_PREVIEW_FORMATS[p];
+    const config = activePlatformFormats[p] || PLATFORM_PREVIEW_FORMATS[p];
     if (config) {
       return getProfileByKey(config.formatKey);
     }
-    return RATIO_PROFILES['16x9'];
+    return activeRatioProfiles['16x9'] || RATIO_PROFILES['16x9'];
   }
 
   function calculateCropFormat(keyOrClassName) {
@@ -142,9 +155,16 @@
     return { updatedPositions: updatedPositions, payload: payload };
   }
 
+  function getPlatformFormat(platform) {
+    const p = String(platform || '').toLowerCase().trim();
+    return activePlatformFormats[p] || PLATFORM_PREVIEW_FORMATS[p] || null;
+  }
+
   return {
     RATIO_PROFILES: RATIO_PROFILES,
     PLATFORM_PREVIEW_FORMATS: PLATFORM_PREVIEW_FORMATS,
+    configureCatalog: configureCatalog,
+    getPlatformFormat: getPlatformFormat,
     getProfileByKey: getProfileByKey,
     getProfileByPlatform: getProfileByPlatform,
     calculateCropFormat: calculateCropFormat,
