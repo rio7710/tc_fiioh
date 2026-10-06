@@ -137,6 +137,10 @@
     }
   }
 
+  function getSceneCropPositions() {
+    return JSON.parse(JSON.stringify(sceneCropPositions || {}));
+  }
+
   function applyStoredSceneCrop() {
     const scene = scenes[currentScene];
     const format = currentCropFormat();
@@ -737,6 +741,7 @@
     setSceneDissolveSeconds: setSceneDissolveSeconds,
     getSceneDissolveSeconds: () => sceneDissolveSeconds,
     getEffectiveSettingsPayload: getEffectiveSettingsPayload,
+    getSceneCropPositions: getSceneCropPositions,
     initStep4UI: initStep4UI,
     isInitialized: () => isStep4Initialized,
     applyTimeline: applyTimeline,

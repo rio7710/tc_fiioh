@@ -2977,10 +2977,23 @@ window.startRenderWorkflow=async function(){
     const renderPoll=setInterval(pollRenderProgress,500);
     let response;
     try{
+      const effectiveSettings=(window.Step04VideoEditor&&typeof window.Step04VideoEditor.getEffectiveSettingsPayload==='function')
+        ?window.Step04VideoEditor.getEffectiveSettingsPayload()
+        :{type:currentType,music:selectedMusic,volume:Number(musicVolume?musicVolume.value:0.5),narration:narrationEnabled,caption_size:captionSizeLevel,video_pan_x:videoPanX/100,platforms:[...selectedPlatforms],preview_platform:currentPreviewPlatform};
+      const activeCropPositions=(window.Step04VideoEditor&&typeof window.Step04VideoEditor.getSceneCropPositions==='function')
+        ?window.Step04VideoEditor.getSceneCropPositions()
+        :sceneCropPositions;
+      const renderPayload={
+        ...effectiveSettings,
+        job_id:renderJobId,
+        project_id:activeProjectId,
+        scene_crop_positions:activeCropPositions,
+        scene_videos:[...storedStoryboardVideos.values()]
+      };
       response=await fetch('/render',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({job_id:renderJobId,project_id:activeProjectId,type:currentType,music:selectedMusic,volume:Number(musicVolume.value),narration:narrationEnabled,caption_size:captionSizeLevel,video_pan_x:videoPanX/100,scene_crop_positions:sceneCropPositions,scene_videos:[...storedStoryboardVideos.values()],platforms:[...selectedPlatforms],preview_platform:currentPreviewPlatform})
+        body:JSON.stringify(renderPayload)
       });
     }catch(requestError){
       let recoveredResult=null;

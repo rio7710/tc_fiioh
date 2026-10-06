@@ -255,9 +255,18 @@ assert.equal(Step04VideoEditor.getConfiguredSettings().type, 'minimal');
 
 // Verify unit conversion in getEffectiveSettingsPayload (60% UI pan -> 0.6 API pan, numeric volume)
 const payload = Step04VideoEditor.getEffectiveSettingsPayload();
+assert.equal(payload.type, 'minimal', 'type should be minimal from configured settings');
+assert.equal(payload.music, 'debussy', 'music should be debussy from configured settings');
 assert.equal(typeof payload.volume, 'number', 'volume must be numeric');
+assert.equal(payload.volume, 0.7, 'volume should be 0.7');
 assert.equal(payload.video_pan_x, 0.6, 'video_pan_x should convert back to 0..1 decimal unit');
 assert.equal(payload.scene_dissolve_seconds, 1.0, 'scene_dissolve_seconds preserved');
+assert.deepEqual(payload.platforms, ['youtube', 'threads'], 'platforms list should match configured effective settings');
+
+// Verify getSceneCropPositions deep copy export
+assert.equal(typeof Step04VideoEditor.getSceneCropPositions, 'function', 'getSceneCropPositions must be exported');
+const cropPositions = Step04VideoEditor.getSceneCropPositions();
+assert.equal(typeof cropPositions, 'object', 'getSceneCropPositions should return an object');
 
 console.log('✓ Phase 3 settings configuration, unit conversion, and payload wrapping tests passed');
 console.log('✓ Strict lifecycle, pre-partial safety, and post-partial init tests passed');
