@@ -1,0 +1,102 @@
+/* Step 4 Video Editor Isolated Styles */
+
+.ve-stage-container {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  background: #0b1513;
+  isolation: isolate;
+}
+
+/* Ratio Profile Aspect Ratios */
+.ve-stage-container.preview-landscape {
+  aspect-ratio: 16 / 9;
+}
+
+.ve-stage-container.preview-portrait {
+  aspect-ratio: 9 / 16;
+}
+
+.ve-stage-container.preview-feed {
+  aspect-ratio: 4 / 5;
+}
+
+.ve-stage-container.preview-square {
+  aspect-ratio: 1 / 1;
+}
+
+/* Pan availability cursor and controls */
+.ve-stage-container.can-pan {
+  cursor: grab;
+}
+
+.ve-stage-container.is-panning {
+  cursor: grabbing;
+}
+
+.ve-media-element {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--video-pan-x, 50%) 50%;
+}
+
+/* Safe zone indicators */
+.ve-safe-zone {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+.ve-safe-zone::before {
+  content: attr(data-label);
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.05em;
+}
+
+/* Mobile navigation sync bar */
+.ve-mobile-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: #f7efdf;
+  border-radius: 8px;
+}
+
+.ve-mobile-select {
+  flex: 1;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid #d8d0c1;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.ve-mobile-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #a99b84;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ve-mobile-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
