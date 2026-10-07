@@ -15,6 +15,7 @@ import threading
 import time
 import uuid
 import unicodedata
+import re
 import webbrowser
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1405,19 +1406,19 @@ MUSIC = {
 }
 
 NARRATION_TRACKS = [
-    (1.00, "audio_0_좋은_돌봄은___.mp3"),
-    (1.10, "audio_1__한_사람의_하루를_바라보는_일에서_시작합니다__.mp3"),
-    (1.00, "audio_2__햇살을_맞는_작은_순간부터__.mp3"),
-    (1.00, "audio_3__반가운_인사를_건네고__.mp3"),
-    (1.00, "audio_4___눈높이를_맞춰_마음의_이야기를_듣습니다__.mp3"),
-    (1.00, "audio_5___그리고_함께___.mp3"),
-    (1.00, "audio_6__오늘의_몸과_마음을_세심히_살핍니다__.mp3"),
-    (1.02, "audio_7__돌봄의_마음은_자연스럽게_이어지고__.mp3"),
-    (1.02, "audio_8__편안한_발걸음은_새로운_하루로_향합니다__.mp3"),
-    (1.00, "audio_9__익숙한_미소가_기다리는_곳에서__.mp3"),
-    (1.00, "audio_10___오늘_하고_싶은_일을_스스로_고르고__.mp3"),
-    (1.10, "audio_11___함께하는_즐거움_속으로_천천히_들어갑니다__.mp3"),
-    (1.16, "audio_13__행복한_하루를_함께_만드는_곳__그린힐_재활실버케어_요양원입니다___.mp3"),
+    (1.00, "audio_0.mp3"),
+    (1.10, "audio_1.mp3"),
+    (1.00, "audio_2.mp3"),
+    (1.00, "audio_3.mp3"),
+    (1.00, "audio_4.mp3"),
+    (1.00, "audio_5.mp3"),
+    (1.00, "audio_6.mp3"),
+    (1.02, "audio_7.mp3"),
+    (1.02, "audio_8.mp3"),
+    (1.00, "audio_9.mp3"),
+    (1.00, "audio_10.mp3"),
+    (1.10, "audio_11.mp3"),
+    (1.16, "audio_13.mp3"),
 ]
 
 ASS_STYLES = {key: tuple(value) for key, value in RENDER_CATALOG["styles"].items()}
@@ -2429,6 +2430,12 @@ class Handler(SimpleHTTPRequestHandler):
                 path = normalized_nfc
             elif normalized_nfd.is_file():
                 path = normalized_nfd
+            elif path.name.startswith("audio_"):
+                m = re.match(r"^audio_(\d+)", path.name)
+                if m:
+                    alt_path = path.with_name(f"audio_{m.group(1)}.mp3")
+                    if alt_path.is_file():
+                        path = alt_path
         try:
             source = path.open("rb")
         except OSError:
