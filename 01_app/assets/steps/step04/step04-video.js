@@ -1,21 +1,19 @@
 /* Step 04 Video Editor Isolated JS Controller */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
-    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js'], factory);
+    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js'], factory);
   } else if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'));
+    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'));
   } else {
-    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController);
+    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController);
   }
-}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController) {
+}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController) {
   'use strict';
 
   const { SceneNav, RatioProfiles, BrandSelection, MobileSync } = VideoEditor || {};
 
   // Step 4 State (Single Source of Truth)
   let scenes = [];
-  let narrations = [];
-  let narrationAudios = [];
   const editorState = Step04Store.create();
   let pendingDissolveOverlay = null;
   let isStep4Initialized = false;
@@ -30,6 +28,12 @@
     setCurrentTime: value => { const video = typeof document !== 'undefined' ? document.querySelector('#video') : null; if (video) video.currentTime = value; },
     syncPreview: () => sync(),
     formatTime: fmt
+  });
+  const narrationController = NarrationController.create({
+    isNarrationEnabled: () => editorState.get('narrationEnabled'),
+    getActiveNarration: () => editorState.get('activeNarration'),
+    setActiveNarration: value => editorState.set('activeNarration', value),
+    getPreviewVideo: () => typeof document !== 'undefined' ? document.querySelector('#video') : null
   });
 
   function callShellFeature(name, ...args) {
@@ -416,48 +420,15 @@
   }
 
   function stopNarration() {
-    const activeNarration = editorState.get('activeNarration');
-    if (activeNarration >= 0 && narrationAudios[activeNarration]) {
-      narrationAudios[activeNarration].pause();
-    }
-    editorState.set('activeNarration', -1);
+    return narrationController.stop();
   }
 
   function startNarration(index, t) {
-    if (!editorState.get('narrationEnabled') || index < 0 || !narrations[index] || !narrationAudios[index]) {
-      stopNarration();
-      return;
-    }
-    const target = narrations[index];
-    const audio = narrationAudios[index];
-    const duration = Math.max(0.001, target.end - target.start);
-    const audioDuration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : duration;
-    const targetTime = Math.min(Math.max(0, audioDuration - 0.03), Math.max(0, t - target.start) / duration * audioDuration);
-
-    if (editorState.get('activeNarration') !== index) {
-      stopNarration();
-      editorState.set('activeNarration', index);
-      audio.currentTime = targetTime;
-      audio.play().catch(() => {});
-    } else if (Math.abs(audio.currentTime - targetTime) > 0.25) {
-      audio.currentTime = targetTime;
-      if (audio.paused) audio.play().catch(() => {});
-    }
+    return narrationController.start(index, t);
   }
 
   function syncNarration(t, force = false) {
-    if (typeof document === 'undefined') return;
-    const video = document.querySelector('#video');
-    if (!editorState.get('narrationEnabled') || !video || video.paused) {
-      stopNarration();
-      return;
-    }
-    const idx = narrations.findIndex(item => t >= item.start && t < item.end);
-    if (idx >= 0) {
-      startNarration(idx, t);
-    } else {
-      stopNarration();
-    }
+    return narrationController.sync(t, force);
   }
 
   function alignMusic() {
@@ -566,9 +537,7 @@
   }
 
   function setNarrationTracks(payload) {
-    stopNarration();
-    narrations = Array.isArray(payload?.narrations) ? payload.narrations.slice() : [];
-    narrationAudios = Array.isArray(payload?.narrationAudios) ? payload.narrationAudios.slice() : [];
+    return narrationController.setTracks(payload);
   }
 
   function openImageRegeneration() {
