@@ -1115,6 +1115,60 @@ document.querySelectorAll('.page-date').forEach(item=>{
 });
 let scenes=[];
 let titleSceneIndexes=[];
+let narrationTracks=[
+  {rate:1,src:'/02_media/narration/audio_0.mp3'},
+  {rate:1.1,src:'/02_media/narration/audio_1.mp3'},
+  {rate:1,src:'/02_media/narration/audio_2.mp3'},
+  {rate:1,src:'/02_media/narration/audio_3.mp3'},
+  {rate:1,src:'/02_media/narration/audio_4.mp3'},
+  {rate:1,src:'/02_media/narration/audio_5.mp3'},
+  {rate:1,src:'/02_media/narration/audio_6.mp3'},
+  {rate:1.02,src:'/02_media/narration/audio_7.mp3'},
+  {rate:1.02,src:'/02_media/narration/audio_8.mp3'},
+  {rate:1,src:'/02_media/narration/audio_9.mp3'},
+  {rate:1,src:'/02_media/narration/audio_10.mp3'},
+  {rate:1.1,src:'/02_media/narration/audio_11.mp3'},
+  {rate:1,src:'/02_media/narration/audio_12.mp3'},
+  {rate:1.16,src:'/02_media/narration/audio_13.mp3'}
+];
+let narrations=[];
+let narrationAudios=narrationTracks.map(item=>{
+  if(!item.src)return null;
+  const audio=new Audio(item.src);
+  audio.preload='auto';
+  audio.volume=.95;
+  audio.playbackRate=item.rate;
+  return audio;
+});
+
+function setNarrationTracks(tracks){
+  if(Array.isArray(narrationAudios)){
+    narrationAudios.forEach(audio=>{if(audio&&typeof audio.pause==='function')audio.pause()});
+  }
+  activeNarration=-1;
+  const list=(Array.isArray(tracks)&&tracks.length)?tracks:narrationTracks;
+  narrationTracks=list.map(item=>({rate:Number(item?.rate)||1,src:String(item?.src||'')}));
+  narrationAudios=narrationTracks.map(item=>{
+    if(!item.src)return null;
+    const audio=new Audio(item.src);
+    audio.preload=item.src?'auto':'none';
+    audio.volume=.95;
+    audio.playbackRate=item.rate;
+    return audio;
+  });
+  if(typeof window!=='undefined'){
+    window.narrationTracks=narrationTracks;
+    window.narrations=narrations;
+    window.narrationAudios=narrationAudios;
+  }
+}
+
+if(typeof window!=='undefined'){
+  window.narrationTracks=narrationTracks;
+  window.narrations=narrations;
+  window.narrationAudios=narrationAudios;
+  window.setNarrationTracks=setNarrationTracks;
+}
 
 function applyTimeline(timeline){
   const source=Array.isArray(timeline?.scenes)?timeline.scenes:[];
@@ -1133,8 +1187,15 @@ function applyTimeline(timeline){
     text:''
   }));
   titleSceneIndexes=scenes.map((scene,index)=>scene.scriptLineIndex==null?null:index).filter(index=>index!=null);
-  if(titleSceneIndexes.length!==narrationTracks.length)throw new Error('음성과 대본 타임라인의 개수가 일치하지 않습니다.');
+  if(titleSceneIndexes.length!==narrationTracks.length&&titleSceneIndexes.length>0){
+    const adjustedTracks=titleSceneIndexes.map((_,index)=>narrationTracks[index]||{rate:1,src:''});
+    setNarrationTracks(adjustedTracks);
+  }
   narrations=titleSceneIndexes.map((sceneIndex,index)=>({start:scenes[sceneIndex].cueStart,end:scenes[sceneIndex].cueEnd,...narrationTracks[index]}));
+  if(typeof window!=='undefined'){
+    window.narrations=narrations;
+    window.narrationAudios=narrationAudios;
+  }
   const duration=scenes[scenes.length-1].end;
   sceneTimelineSummary.textContent=`타임라인 기준 · 총 ${scenes.length}장면 · ${duration}초`;
   scenes.forEach(scene=>{if(scene.image){const preload=new Image();preload.src=scene.image}});
@@ -1245,6 +1306,10 @@ function connectStoryboardAssetsToEditor(){
     end:scenes[sceneIndex].cueEnd,
     ...narrationTracks[index]
   }));
+  if(typeof window!=='undefined'){
+    window.narrations=narrations;
+    window.narrationAudios=narrationAudios;
+  }
   scenes.forEach(scene=>{if(scene.image){const preload=new Image();preload.src=scene.image}});
   if(window.Step04VideoEditor?.applyTimeline){
     window.Step04VideoEditor.applyTimeline({ scenes });
@@ -1252,8 +1317,13 @@ function connectStoryboardAssetsToEditor(){
     renderSceneList();
   }
   currentScene=-1;
-  video.currentTime=0;
-  sync();
+  const targetVideo=document.querySelector('#video');
+  if(targetVideo)targetVideo.currentTime=0;
+  if(window.Step04VideoEditor?.sync){
+    window.Step04VideoEditor.sync();
+  }else if(typeof sync==='function'){
+    sync();
+  }
 }
 let selectedKeywords=new Set();
 function resetProjectScopedState(){
