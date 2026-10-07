@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+assert.match(html, /let demoData=\{state:\{\},timeline:\{scenes:\[\]\},keywords:\[\]\};/, 'project restore starts from a safe non-null demo state');
 const resetStart = html.indexOf('function resetProjectScopedState()');
 const resetEnd = html.indexOf('\nconst keywordTilts=', resetStart);
 assert.ok(resetStart >= 0 && resetEnd > resetStart, 'project reset helper must exist');
