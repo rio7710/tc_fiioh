@@ -1,13 +1,13 @@
 /* Step 04 Video Editor Isolated JS Controller */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
-    define(['/01_app/assets/video-editor/index.js'], factory);
+    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js'], factory);
   } else if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('../../video-editor/index.js'));
+    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'));
   } else {
-    root.Step04VideoEditor = factory(root.VideoEditor);
+    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings);
   }
-}(typeof self !== 'undefined' ? self : this, function (VideoEditor) {
+}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings) {
   'use strict';
 
   const { SceneNav, RatioProfiles, BrandSelection, MobileSync } = VideoEditor || {};
@@ -30,6 +30,16 @@
   let configuredCatalog = null;
   let sceneDissolveSeconds = 0.5;
   let currentVolume = 0.5;
+
+  function callShellFeature(name, ...args) {
+    if (typeof window === 'undefined' || typeof window[name] !== 'function') return undefined;
+    try {
+      return window[name](...args);
+    } catch (error) {
+      console.error(`[Step04:${name}]`, error);
+      return undefined;
+    }
+  }
 
   function fmt(seconds) {
     return MobileSync ? MobileSync.formatTime(seconds) : '00:00';
@@ -397,8 +407,8 @@
 
     applyStoredSceneCrop();
     updatePanAvailability();
-    if (typeof window.updateWatermarkPreview === 'function') window.updateWatermarkPreview();
-    if (typeof window.updateCommonOutroPreview === 'function') window.updateCommonOutroPreview();
+    callShellFeature('updateWatermarkPreview');
+    callShellFeature('updateCommonOutroPreview');
     saveEditorSettings();
   }
 
@@ -656,219 +666,63 @@
     const step4 = document.querySelector('#step4');
     if (!step4) return false;
     if (isStep4Initialized) return true;
-
-    const video = document.querySelector('#video');
-    const playBtn = document.querySelector('#playBtn');
-    const prevBtn = document.querySelector('#prevBtn');
-    const nextBtn = document.querySelector('#nextBtn');
-    const mobileSceneSelect = document.querySelector('#mobileSceneSelect');
-    const mobilePrevScene = document.querySelector('#mobilePrevScene');
-    const mobileNextScene = document.querySelector('#mobileNextScene');
-    const sceneList = document.querySelector('#sceneList');
-    const renderBtn = document.querySelector('#renderBtn');
-    const imageRegenerateBtn = document.querySelector('#imageRegenerateBtn');
-    const imageRegenerationCancel = document.querySelector('#imageRegenerationCancel');
-    const imageRegenerationCreate = document.querySelector('#imageRegenerationCreate');
-    const imageRegenerationModal = document.querySelector('#imageRegenerationModal');
-
-    if (playBtn) playBtn.addEventListener('click', togglePlay);
-    if (prevBtn) prevBtn.addEventListener('click', () => navigatePreview('PREV_SCENE'));
-    if (nextBtn) nextBtn.addEventListener('click', () => navigatePreview('NEXT_SCENE'));
-
-    if (mobileSceneSelect) {
-      mobileSceneSelect.addEventListener('change', () => {
-        const action = MobileSync
-          ? MobileSync.resolveMobileSelectChange(mobileSceneSelect.value, scenes, true)
-          : (mobileSceneSelect.value === 'outro'
-              ? { type: 'SEEK_OUTRO' }
-              : { type: 'SEEK_SCENE', index: Number(mobileSceneSelect.value) });
-        navigatePreview(action);
-      });
-    }
-    if (mobilePrevScene) mobilePrevScene.addEventListener('click', () => navigatePreview('PREV_SCENE'));
-    if (mobileNextScene) mobileNextScene.addEventListener('click', () => navigatePreview('NEXT_SCENE'));
-
-    if (sceneList) {
-      sceneList.addEventListener('click', e => {
-        const btn = e.target.closest('.scene-btn');
-        if (!btn) return;
-        if (btn.dataset.outro === 'true') seekOutroPreview();
-        else seekScene(Number(btn.dataset.index));
-      });
-    }
-
-    if (video) {
-      video.addEventListener('play', () => {
-        if (playBtn) { playBtn.textContent = '일시정지'; playBtn.setAttribute('aria-label', '일시정지'); }
-        const bgm = document.querySelector('#bgm');
-        if (selectedMusic !== 'none' && bgm) { alignMusic(); bgm.play().catch(() => {}); }
-        sync();
-      });
-      video.addEventListener('pause', () => {
-        if (playBtn) { playBtn.textContent = '재생'; playBtn.setAttribute('aria-label', '재생'); }
-        const sceneVideoEl = document.querySelector('#sceneVideo');
-        const bgmEl = document.querySelector('#bgm');
-        if (sceneVideoEl) sceneVideoEl.pause();
-        if (bgmEl) bgmEl.pause();
-        stopNarration();
-        sync();
-      });
-      video.addEventListener('seeked', () => {
-        alignMusic();
-        syncNarration(video.currentTime, true);
-        sync();
-      });
-      video.addEventListener('loadedmetadata', () => {
-        updatePanAvailability();
-        sync();
-      });
-      video.addEventListener('ended', () => {
-        const bgmEl = document.querySelector('#bgm');
-        if (bgmEl) bgmEl.pause();
-        sync();
-      });
-    }
-
-    if (renderBtn) {
-      renderBtn.addEventListener('click', async () => {
-        if (typeof window.startRenderWorkflow === 'function') {
-          await window.startRenderWorkflow();
+    const result = UIBindings?.bind({
+      document,
+      root: step4,
+      navigatePreview,
+      seekScene,
+      seekOutroPreview,
+      togglePlay,
+      alignMusic,
+      sync,
+      stopNarration,
+      syncNarration,
+      updatePanAvailability,
+      openImageRegeneration,
+      closeImageRegeneration,
+      requestImageRegeneration,
+      setType,
+      setMusic,
+      setPlatformPreview,
+      setCaptionSize,
+      setNarration,
+      persistRenderSettings,
+      getSelectedMusic: () => selectedMusic,
+      getCaptionSize: () => captionSizeLevel,
+      getNarrationEnabled: () => narrationEnabled,
+      setCurrentVolume: value => { currentVolume = value; saveEditorSettings(); },
+      platformForRatio: ratio => ratio === '9x16' ? 'instagram' : ratio === '4x5' ? 'facebook' : ratio === '1x1' ? 'square' : 'youtube',
+      resolveMobileSelection: value => MobileSync
+        ? MobileSync.resolveMobileSelectChange(value, scenes, true)
+        : (value === 'outro' ? { type: 'SEEK_OUTRO' } : { type: 'SEEK_SCENE', index: Number(value) }),
+      startRender: () => typeof window.startRenderWorkflow === 'function' ? window.startRenderWorkflow() : undefined,
+      openDistributionHelp: () => {
+        const modal = document.querySelector('#platformGuideModal');
+        if (modal) { modal.hidden = false; document.body.classList.add('modal-open'); }
+      },
+      brandChanged: async event => {
+        if (event.target.id === 'brandOutroVersion') {
+          const assets = window.brandAssets || [];
+          callShellFeature('ensureOutroRatioAssets', assets.find(item => item.version_id === event.target.value));
         }
-      });
-    }
-
-    if (imageRegenerateBtn) imageRegenerateBtn.addEventListener('click', openImageRegeneration);
-    if (imageRegenerationCancel) imageRegenerationCancel.addEventListener('click', closeImageRegeneration);
-    if (imageRegenerationCreate) imageRegenerationCreate.addEventListener('click', requestImageRegeneration);
-
-    if (imageRegenerationModal) {
-      imageRegenerationModal.addEventListener('pointerdown', event => {
-        if (event.target === imageRegenerationModal) closeImageRegeneration();
-      });
-    }
-
-    const distributionHelp = document.querySelector('#distributionHelp');
-    if (distributionHelp) {
-      distributionHelp.addEventListener('click', () => {
-        const platformGuideModal = document.querySelector('#platformGuideModal');
-        if (platformGuideModal) {
-          platformGuideModal.hidden = false;
-          document.body.classList.add('modal-open');
-        }
-      });
-    }
-
-    document.querySelectorAll('#brandIntroEnabled,#brandIntroVersion,#brandOutroEnabled,#brandOutroVersion,#brandWatermarkEnabled,#brandWatermarkVersion,#brandWatermarkOpacity').forEach(control => {
-      control.addEventListener('change', event => {
-        if (typeof window.ensureOutroRatioAssets === 'function' && event.target.id === 'brandOutroVersion') {
-          const brandAssets = window.brandAssets || [];
-          window.ensureOutroRatioAssets(brandAssets.find(item => item.version_id === event.target.value));
-        }
-        if (typeof window.updateWatermarkPreview === 'function') window.updateWatermarkPreview();
-        if (typeof window.updateCommonOutroPreview === 'function') window.updateCommonOutroPreview();
-        if (typeof window.saveBrandSelections === 'function') {
-          window.saveBrandSelections().catch(error => {
-            const rs = document.querySelector('#renderStatus');
-            if (rs) rs.textContent = error.message;
-          });
-        }
-      });
-    });
-
-    document.querySelectorAll('.type-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        setType(btn.dataset.type);
-        persistRenderSettings();
-      });
-    });
-    document.querySelectorAll('.music-btn[data-music]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        setMusic(btn.dataset.music);
-        persistRenderSettings();
-      });
-    });
-    document.querySelectorAll('.platform-preview-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        setPlatformPreview(btn.dataset.platform);
-        persistRenderSettings();
-      });
-    });
-    document.querySelectorAll('.ratio-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const platform = btn.dataset.platform || (btn.dataset.ratio === '9x16' ? 'instagram' : btn.dataset.ratio === '4x5' ? 'facebook' : btn.dataset.ratio === '1x1' ? 'square' : 'youtube');
-        setPlatformPreview(platform);
-        persistRenderSettings();
-      });
-    });
-
-    const captionSizeDown = document.querySelector('#captionSizeDown');
-    const captionSizeUp = document.querySelector('#captionSizeUp');
-    if (captionSizeDown) {
-      captionSizeDown.addEventListener('click', () => {
-        setCaptionSize(captionSizeLevel - 1);
-        persistRenderSettings();
-      });
-    }
-    if (captionSizeUp) {
-      captionSizeUp.addEventListener('click', () => {
-        setCaptionSize(captionSizeLevel + 1);
-        persistRenderSettings();
-      });
-    }
-
-    const narrationBtn = document.querySelector('#narrationBtn');
-    if (narrationBtn) {
-      narrationBtn.addEventListener('click', () => {
-        setNarration(!narrationEnabled);
-        persistRenderSettings();
-      });
-    }
-
-    const musicVolume = document.querySelector('#musicVolume');
-    if (musicVolume) {
-      musicVolume.addEventListener('input', () => {
-        currentVolume = Number(musicVolume.value);
-        saveEditorSettings();
-        persistRenderSettings();
-      });
-    }
-
-    document.querySelectorAll('.distribution-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const platform = btn.dataset.platform;
+        callShellFeature('updateWatermarkPreview');
+        callShellFeature('updateCommonOutroPreview');
+        const saved = callShellFeature('saveBrandSelections');
+        if (saved && typeof saved.then === 'function') await saved;
+      },
+      toggleDistribution: (platform, button) => {
         if (!platform) return;
-        if (selectedPlatforms.has(platform)) {
-          selectedPlatforms.delete(platform);
-        } else {
-          selectedPlatforms.add(platform);
-        }
-        btn.setAttribute('aria-pressed', String(selectedPlatforms.has(platform)));
+        selectedPlatforms.has(platform) ? selectedPlatforms.delete(platform) : selectedPlatforms.add(platform);
+        button.setAttribute('aria-pressed', String(selectedPlatforms.has(platform)));
         saveEditorSettings();
-        persistRenderSettings();
-      });
+      }
     });
+    if (!result?.bound) return false;
 
-    restoreEditorSettings();
+    try { restoreEditorSettings(); }
+    catch (error) { console.error('[Step04:settings-restore]', error); }
     isStep4Initialized = true;
     return true;
-  }
-
-  if (typeof document !== 'undefined') {
-    document.addEventListener('click', event => {
-      const ratioBtn = event.target.closest('.ratio-btn');
-      if (ratioBtn) {
-        const platform = ratioBtn.dataset.platform || (ratioBtn.dataset.ratio === '9x16' ? 'instagram' : ratioBtn.dataset.ratio === '4x5' ? 'facebook' : ratioBtn.dataset.ratio === '1x1' ? 'square' : 'youtube');
-        setPlatformPreview(platform);
-        persistRenderSettings();
-        return;
-      }
-      const platformBtn = event.target.closest('.platform-preview-btn');
-      if (platformBtn) {
-        setPlatformPreview(platformBtn.dataset.platform);
-        persistRenderSettings();
-        return;
-      }
-    });
   }
 
   return {

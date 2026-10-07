@@ -9,16 +9,20 @@ console.log('--- Step 4 Partial Lifecycle & Strict Browser Runtime Safety Tests 
 const partialPath = '01_app/pages/steps/step04-video.html';
 const cssPath = '01_app/assets/steps/step04/step04-video.css';
 const jsPath = '01_app/assets/steps/step04/step04-video.js';
+const bindingsPath = '01_app/assets/steps/step04/step04-ui-bindings.js';
 const videoEditorPath = '01_app/assets/video-editor/index.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
 assert.ok(fs.existsSync(jsPath), 'step04-video.js must exist');
+assert.ok(fs.existsSync(bindingsPath), 'step04-ui-bindings.js must exist');
 assert.ok(fs.existsSync(videoEditorPath), 'video-editor/index.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
+const step04Source = fs.readFileSync(jsPath, 'utf8');
 assert.match(partialHtml, /id="step4"/, 'Partial HTML contains #step4');
 assert.match(partialHtml, /id="imageRegenerationModal"/, 'Partial HTML contains #imageRegenerationModal');
+assert.doesNotMatch(step04Source, /document\.addEventListener\('click',[\s\S]*\.ratio-btn/, 'ratio controls must not have a duplicate global click listener');
 
 console.log('✓ File integrity checks passed');
 
@@ -32,11 +36,14 @@ const ratioProfilesScript = html.indexOf('/01_app/assets/video-editor/ratio-prof
 const brandSelectionScript = html.indexOf('/01_app/assets/video-editor/brand-selection.js');
 const mobileSyncScript = html.indexOf('/01_app/assets/video-editor/mobile-sync.js');
 const videoEditorIndexScript = html.indexOf('/01_app/assets/video-editor/index.js');
+const step04BindingsScript = html.indexOf('/01_app/assets/steps/step04/step04-ui-bindings.js');
 assert.ok(sceneNavigationScript >= 0, 'HTML loads browser scene navigation dependency');
 assert.ok(ratioProfilesScript >= 0, 'HTML loads browser ratio profiles dependency');
 assert.ok(brandSelectionScript >= 0, 'HTML loads browser brand selection dependency');
 assert.ok(mobileSyncScript >= 0, 'HTML loads browser mobile sync dependency');
 assert.ok(Math.max(sceneNavigationScript, ratioProfilesScript, brandSelectionScript, mobileSyncScript) < videoEditorIndexScript, 'browser dependencies load before video-editor index.js');
+assert.ok(videoEditorIndexScript < step04BindingsScript, 'Step 4 UI bindings load after video editor dependencies');
+assert.ok(step04BindingsScript < html.indexOf('/01_app/assets/steps/step04/step04-video.js'), 'Step 4 UI bindings load before the controller');
 assert.match(html, /src="\/01_app\/assets\/video-editor\/index\.js(?:\?v=[^"]+)?"/, 'HTML loads video-editor index.js');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js(?:\?v=[^"]+)?"/, 'HTML loads step04-video.js');
 assert.match(html, /Object\.assign\(window,\{[\s\S]*updateCommonOutroPreview[\s\S]*updateWatermarkPreview[\s\S]*\}\)/, 'shell exposes Step 4 preview callbacks after async isolation');

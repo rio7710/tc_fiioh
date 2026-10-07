@@ -12,6 +12,7 @@ browserContext.globalThis = browserContext;
   '01_app/assets/video-editor/brand-selection.js',
   '01_app/assets/video-editor/mobile-sync.js',
   '01_app/assets/video-editor/index.js',
+  '01_app/assets/steps/step04/step04-ui-bindings.js',
   '01_app/assets/steps/step04/step04-video.js'
 ].forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), browserContext, { filename: file }));
 assert.ok(browserContext.VideoEditor.SceneNav, 'browser bundle exposes scene navigation');
@@ -83,6 +84,10 @@ try {
   assert.match(stageCard.className, /preview-portrait/, 'ratio selection updates the preview frame');
   assert.equal(outroRefreshes, 1, 'ratio selection refreshes the ratio-specific outro');
   assert.equal(watermarkRefreshes, 1, 'ratio selection refreshes the ratio-specific watermark');
+
+  global.window.updateWatermarkPreview = () => { throw new Error('isolated watermark failure'); };
+  assert.doesNotThrow(() => Step04.setPlatformPreview('youtube'), 'watermark failure must not stop ratio navigation');
+  assert.equal(outroRefreshes, 2, 'outro refresh continues when watermark refresh fails');
 } finally {
   global.document = originalDocument;
   global.window = originalWindow;
