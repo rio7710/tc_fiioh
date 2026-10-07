@@ -8,11 +8,14 @@ RUN groupadd -g 10001 appuser \
 WORKDIR /app
 
 COPY --chown=appuser:appuser 01_app /app/01_app
+COPY --chown=appuser:appuser config /app/config
+COPY --chown=appuser:appuser migrations /app/migrations
 COPY --chown=appuser:appuser 02_media/video/P1_merged.mp4 /app/02_media/video/P1_merged.mp4
 COPY --chown=appuser:appuser 02_media/images/scenes/scene_*.webp /app/02_media/images/scenes/
 COPY --chown=appuser:appuser 02_media/music /app/02_media/music
 COPY --chown=appuser:appuser 02_media/narration /app/02_media/narration
 
+ENV PYTHONPATH=/app:/app/01_app
 ENV PORT=3000
 ENV API_URL=http://tc_temp_api:10000
 

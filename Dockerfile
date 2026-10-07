@@ -11,6 +11,8 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY 01_app /app/01_app
+COPY config /app/config
+COPY migrations /app/migrations
 COPY contracts /app/contracts
 COPY prompts /app/prompts
 COPY tools/unified_content_prompt_harness.py /app/tools/unified_content_prompt_harness.py
@@ -24,6 +26,7 @@ COPY 02_media/narration /app/02_media/narration
 
 RUN chown -R appuser:appuser /data /app
 
+ENV PYTHONPATH=/app:/app/01_app
 ENV PORT=10000
 ENV P1_NO_BROWSER=1
 ENV RENDER_PRESET=ultrafast
