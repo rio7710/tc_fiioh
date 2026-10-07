@@ -397,6 +397,8 @@
 
     applyStoredSceneCrop();
     updatePanAvailability();
+    if (typeof window.updateWatermarkPreview === 'function') window.updateWatermarkPreview();
+    if (typeof window.updateCommonOutroPreview === 'function') window.updateCommonOutroPreview();
     saveEditorSettings();
   }
 
@@ -842,6 +844,24 @@
     restoreEditorSettings();
     isStep4Initialized = true;
     return true;
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('click', event => {
+      const ratioBtn = event.target.closest('.ratio-btn');
+      if (ratioBtn) {
+        const platform = ratioBtn.dataset.platform || (ratioBtn.dataset.ratio === '9x16' ? 'instagram' : ratioBtn.dataset.ratio === '4x5' ? 'facebook' : ratioBtn.dataset.ratio === '1x1' ? 'square' : 'youtube');
+        setPlatformPreview(platform);
+        persistRenderSettings();
+        return;
+      }
+      const platformBtn = event.target.closest('.platform-preview-btn');
+      if (platformBtn) {
+        setPlatformPreview(platformBtn.dataset.platform);
+        persistRenderSettings();
+        return;
+      }
+    });
   }
 
   return {

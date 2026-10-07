@@ -225,6 +225,7 @@
   display: flex;
   gap: 6px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .ratio-btn {
@@ -254,6 +255,24 @@
 .ratio-btn:focus-visible {
   outline: 3px solid #d4af37;
   outline-offset: 2px;
+}
+
+.stage-card.preview-square {
+  width: min(480px, 100%);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.stage-card.preview-square .stage {
+  aspect-ratio: 1/1;
+}
+
+.stage-card.preview-square video {
+  object-fit: cover;
+}
+
+.stage-card.preview-square .format-safe-zone {
+  display: block;
 }
 
 .preview-format-badge {
