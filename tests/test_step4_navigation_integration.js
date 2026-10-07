@@ -15,6 +15,7 @@ browserContext.globalThis = browserContext;
   '01_app/assets/steps/step04/step04-brand-state.js',
   '01_app/assets/steps/step04/step04-brand-overlay.js',
   '01_app/assets/steps/step04/step04-store.js',
+  '01_app/assets/steps/step04/step04-navigation-controller.js',
   '01_app/assets/steps/step04/step04-ui-bindings.js',
   '01_app/assets/steps/step04/step04-video.js'
 ].forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), browserContext, { filename: file }));
@@ -22,6 +23,7 @@ assert.ok(browserContext.VideoEditor.SceneNav, 'browser bundle exposes scene nav
 assert.ok(browserContext.VideoEditor.MobileSync, 'browser bundle exposes mobile synchronization');
 assert.ok(browserContext.Step04BrandState, 'browser bundle exposes Step 4 brand state');
 assert.ok(browserContext.BrandOverlayController, 'browser bundle exposes Step 4 brand overlay controller');
+assert.ok(browserContext.Step04NavigationController, 'browser bundle exposes Step 4 navigation controller');
 assert.ok(browserContext.Step04VideoEditor, 'browser bundle initializes Step 4 after its dependencies');
 
 const scenes = [

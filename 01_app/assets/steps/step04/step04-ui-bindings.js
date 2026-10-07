@@ -37,24 +37,6 @@
       } catch (error) { report(name, error); }
     };
 
-    feature('navigation', () => {
-      one('#prevBtn')?.addEventListener('click', () => options.navigatePreview('PREV_SCENE'));
-      one('#nextBtn')?.addEventListener('click', () => options.navigatePreview('NEXT_SCENE'));
-      one('#mobilePrevScene')?.addEventListener('click', () => options.navigatePreview('PREV_SCENE'));
-      one('#mobileNextScene')?.addEventListener('click', () => options.navigatePreview('NEXT_SCENE'));
-      one('#mobileSceneSelect')?.addEventListener('change', event => {
-        const value = event.currentTarget.value;
-        const action = options.resolveMobileSelection(value);
-        options.navigatePreview(action);
-      });
-      one('#sceneList')?.addEventListener('click', event => {
-        const button = event.target.closest('.scene-btn');
-        if (!button) return;
-        if (button.dataset.outro === 'true') options.seekOutroPreview();
-        else options.seekScene(Number(button.dataset.index));
-      });
-    });
-
     feature('playback', () => {
       const video = one('#video');
       const playButton = one('#playBtn');

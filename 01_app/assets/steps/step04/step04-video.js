@@ -1,13 +1,13 @@
 /* Step 04 Video Editor Isolated JS Controller */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
-    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js'], factory);
+    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js'], factory);
   } else if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'));
+    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'));
   } else {
-    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store);
+    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController);
   }
-}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store) {
+}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController) {
   'use strict';
 
   const { SceneNav, RatioProfiles, BrandSelection, MobileSync } = VideoEditor || {};
@@ -19,6 +19,16 @@
   let isStep4Initialized = false;
   let configuredSettings = null;
   let configuredCatalog = null;
+  const navigationController = NavigationController.create({
+    SceneNav,
+    MobileSync,
+    getScenes: () => scenes,
+    getCurrentScene: () => editorState.get('currentScene'),
+    getCurrentTime: () => typeof document !== 'undefined' ? (document.querySelector('#video')?.currentTime || 0) : 0,
+    setCurrentTime: value => { const video = typeof document !== 'undefined' ? document.querySelector('#video') : null; if (video) video.currentTime = value; },
+    syncPreview: () => sync(),
+    formatTime: fmt
+  });
 
   function callShellFeature(name, ...args) {
     if (typeof window === 'undefined' || typeof window[name] !== 'function') return undefined;
@@ -464,57 +474,16 @@
   }
 
   function renderSceneList() {
-    if (typeof document === 'undefined') return;
-    const sceneList = document.querySelector('#sceneList');
-    if (!sceneList) return;
-    sceneList.innerHTML = scenes.map((scene, i) => `
-      <button class="scene-btn ${i === editorState.get('currentScene') ? 'active' : ''}" type="button" data-index="${i}">
-        <span class="scene-no">${String(i + 1).padStart(2, '0')}</span>
-        <span class="scene-name">${scene.name || `장면 ${i + 1}`}</span>
-        <span class="scene-time">${fmt(scene.start)}~${fmt(scene.end)}</span>
-      </button>
-    `).join('') + `
-      <button class="scene-btn scene-outro-btn" type="button" data-outro="true">
-        <span class="scene-no">OUT</span>
-        <span class="scene-name">엔딩 카피 &amp; 브랜딩</span>
-        <span class="scene-time">END · ${fmt(timelineDuration())}</span>
-      </button>
-    `;
-
-    const mobileSceneSelect = document.querySelector('#mobileSceneSelect');
-    if (mobileSceneSelect && MobileSync) {
-      const mobileState = MobileSync.computeMobileSyncState(
-        scenes,
-        editorState.get('currentScene'),
-        false,
-        0,
-        timelineDuration()
-      );
-      mobileSceneSelect.innerHTML = mobileState.options.map(option =>
-        `<option value="${option.value}">${option.label}</option>`
-      ).join('');
-    }
+    if (typeof document !== 'undefined') navigationController.mount(document);
+    return navigationController.render();
   }
 
   function currentNavigationState() {
-    const video = typeof document !== 'undefined' ? document.querySelector('#video') : null;
-    const time = video ? video.currentTime || 0 : 0;
-    return SceneNav
-      ? SceneNav.createInitialNavigationState(scenes, { initialTime: time, outroEnabled: true })
-      : null;
+    return navigationController.currentState();
   }
 
   function navigatePreview(action) {
-    if (!scenes.length || !SceneNav) return null;
-    const nextState = SceneNav.navigateScene(scenes, currentNavigationState(), action, { outroEnabled: true });
-    if (typeof document !== 'undefined') {
-      const video = document.querySelector('#video');
-      if (video) {
-        video.currentTime = nextState.currentTime;
-        sync();
-      }
-    }
-    return nextState;
+    return navigationController.navigate(action);
   }
 
   function sync() {
@@ -522,11 +491,6 @@
     const video = document.querySelector('#video');
     const stage = document.querySelector('#stage');
     const sceneImage = document.querySelector('#sceneImage');
-    const mobileSceneSelect = document.querySelector('#mobileSceneSelect');
-    const mobilePrevScene = document.querySelector('#mobilePrevScene');
-    const mobileNextScene = document.querySelector('#mobileNextScene');
-    const prevBtn = document.querySelector('#prevBtn');
-    const nextBtn = document.querySelector('#nextBtn');
     const progressFill = document.querySelector('#progressFill');
     const clock = document.querySelector('#clock');
 
@@ -541,9 +505,6 @@
         sceneImage.src = scenes[idx]?.image || '';
         sceneImage.alt = `${scenes[idx]?.name || ''} 장면 이미지`;
       }
-      document.querySelectorAll('.scene-btn').forEach((el, i) => el.classList.toggle('active', i === idx));
-      document.querySelector('.scene-btn.active')?.scrollIntoView({ block: 'nearest' });
-
       applyStoredSceneCrop();
     }
 
@@ -561,20 +522,7 @@
     if (titleText) titleText.textContent = captionText;
     stage.classList.toggle('has-title', Boolean(captionText) && !showOutro);
 
-    if (MobileSync) {
-      const mState = MobileSync.computeMobileSyncState(scenes, currentScene, showOutro, t, duration);
-      if (mobileSceneSelect) mobileSceneSelect.value = mState.selectedValue;
-      if (mobilePrevScene) mobilePrevScene.disabled = mState.prevDisabled;
-      if (mobileNextScene) mobileNextScene.disabled = mState.nextDisabled;
-      if (prevBtn) prevBtn.disabled = mState.prevDisabled;
-      if (nextBtn) nextBtn.disabled = mState.nextDisabled;
-    }
-    document.querySelectorAll('.scene-btn').forEach((el, i) => {
-      const selected = el.dataset.outro === 'true' ? showOutro : (!showOutro && i === currentScene);
-      el.classList.toggle('active', selected);
-      el.setAttribute('aria-current', selected ? 'true' : 'false');
-    });
-    document.querySelector('.scene-btn.active')?.scrollIntoView({ block: 'nearest' });
+    navigationController.sync({currentScene, showOutro, time: t, duration});
 
     if (progressFill) progressFill.style.width = `${duration ? Math.min(100, t / duration * 100) : 0}%`;
     if (clock) clock.textContent = `${fmt(t)} / ${fmt(duration)}`;
@@ -584,29 +532,11 @@
   }
 
   function seekScene(index) {
-    if (!scenes.length) return;
-    const safe = Math.max(0, Math.min(scenes.length - 1, index));
-    const scene = scenes[safe];
-    const targetTime = SceneNav ? SceneNav.calculateSceneSeekTime(scene) : (scene.text ? scene.cueStart + 0.05 : scene.start + 0.05);
-    if (typeof document !== 'undefined') {
-      const video = document.querySelector('#video');
-      if (video) {
-        video.currentTime = targetTime;
-        sync();
-      }
-    }
+    return navigationController.seekScene(index);
   }
 
   function seekOutroPreview() {
-    const duration = timelineDuration();
-    const targetTime = SceneNav ? SceneNav.calculateOutroSeekTime(duration) : Math.max(0, duration - 0.05);
-    if (typeof document !== 'undefined') {
-      const video = document.querySelector('#video');
-      if (video) {
-        video.currentTime = targetTime;
-        sync();
-      }
-    }
+    return navigationController.seekOutro();
   }
 
   function togglePlay() {
@@ -659,12 +589,10 @@
     const step4 = document.querySelector('#step4');
     if (!step4) return false;
     if (isStep4Initialized) return true;
+    navigationController.mount(document);
     const result = UIBindings?.bind({
       document,
       root: step4,
-      navigatePreview,
-      seekScene,
-      seekOutroPreview,
       togglePlay,
       alignMusic,
       sync,
@@ -685,9 +613,6 @@
       getNarrationEnabled: () => editorState.get('narrationEnabled'),
       setCurrentVolume: value => { editorState.set('currentVolume', value); saveEditorSettings(); },
       platformForRatio: ratio => ratio === '9x16' ? 'instagram' : ratio === '4x5' ? 'facebook' : ratio === '1x1' ? 'square' : 'youtube',
-      resolveMobileSelection: value => MobileSync
-        ? MobileSync.resolveMobileSelectChange(value, scenes, true)
-        : (value === 'outro' ? { type: 'SEEK_OUTRO' } : { type: 'SEEK_SCENE', index: Number(value) }),
       startRender: () => typeof window.startRenderWorkflow === 'function' ? window.startRenderWorkflow() : undefined,
       openDistributionHelp: () => {
         const modal = document.querySelector('#platformGuideModal');
@@ -761,6 +686,7 @@
     persistCurrentSceneCrop: persistCurrentSceneCrop,
     openImageRegeneration: openImageRegeneration,
     closeImageRegeneration: closeImageRegeneration,
-    requestImageRegeneration: requestImageRegeneration
+    requestImageRegeneration: requestImageRegeneration,
+    unmountNavigation: () => navigationController.unmount()
   };
 }));

@@ -12,6 +12,7 @@ const jsPath = '01_app/assets/steps/step04/step04-video.js';
 const brandStatePath = '01_app/assets/steps/step04/step04-brand-state.js';
 const brandOverlayPath = '01_app/assets/steps/step04/step04-brand-overlay.js';
 const storePath = '01_app/assets/steps/step04/step04-store.js';
+const navigationControllerPath = '01_app/assets/steps/step04/step04-navigation-controller.js';
 const bindingsPath = '01_app/assets/steps/step04/step04-ui-bindings.js';
 const videoEditorPath = '01_app/assets/video-editor/index.js';
 
@@ -21,6 +22,7 @@ assert.ok(fs.existsSync(jsPath), 'step04-video.js must exist');
 assert.ok(fs.existsSync(brandStatePath), 'step04-brand-state.js must exist');
 assert.ok(fs.existsSync(brandOverlayPath), 'step04-brand-overlay.js must exist');
 assert.ok(fs.existsSync(storePath), 'step04-store.js must exist');
+assert.ok(fs.existsSync(navigationControllerPath), 'step04-navigation-controller.js must exist');
 assert.ok(fs.existsSync(bindingsPath), 'step04-ui-bindings.js must exist');
 assert.ok(fs.existsSync(videoEditorPath), 'video-editor/index.js must exist');
 
@@ -45,6 +47,7 @@ const videoEditorIndexScript = html.indexOf('/01_app/assets/video-editor/index.j
 const step04BrandStateScript = html.indexOf('/01_app/assets/steps/step04/step04-brand-state.js');
 const step04BrandOverlayScript = html.indexOf('/01_app/assets/steps/step04/step04-brand-overlay.js');
 const step04StoreScript = html.indexOf('/01_app/assets/steps/step04/step04-store.js');
+const step04NavigationScript = html.indexOf('/01_app/assets/steps/step04/step04-navigation-controller.js');
 const step04BindingsScript = html.indexOf('/01_app/assets/steps/step04/step04-ui-bindings.js');
 assert.ok(sceneNavigationScript >= 0, 'HTML loads browser scene navigation dependency');
 assert.ok(ratioProfilesScript >= 0, 'HTML loads browser ratio profiles dependency');
@@ -55,6 +58,8 @@ assert.ok(videoEditorIndexScript < step04BindingsScript, 'Step 4 UI bindings loa
 assert.ok(videoEditorIndexScript < step04BrandStateScript, 'Step 4 brand state loads after video editor dependencies');
 assert.ok(step04BrandStateScript < step04BrandOverlayScript, 'Step 4 brand state loads before overlay controller');
 assert.ok(step04BrandOverlayScript < step04StoreScript, 'Step 4 overlay controller loads before related Step 4 scripts');
+assert.ok(step04StoreScript < step04NavigationScript, 'Step 4 navigation controller loads after state dependencies');
+assert.ok(step04NavigationScript < step04BindingsScript, 'Step 4 navigation controller loads before UI bindings');
 assert.ok(videoEditorIndexScript < step04StoreScript, 'Step 4 store loads after video editor dependencies');
 assert.ok(step04StoreScript < html.indexOf('/01_app/assets/steps/step04/step04-video.js'), 'Step 4 store loads before the controller');
 assert.ok(step04BindingsScript < html.indexOf('/01_app/assets/steps/step04/step04-video.js'), 'Step 4 UI bindings load before the controller');
@@ -62,9 +67,12 @@ assert.match(html, /src="\/01_app\/assets\/video-editor\/index\.js(?:\?v=[^"]+)?
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js(?:\?v=[^"]+)?"/, 'HTML loads step04-video.js');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-brand-state\.js\?v=20261007_v5"/, 'HTML cache-busts step04-brand-state.js');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-brand-overlay\.js\?v=20261007_v6"/, 'HTML cache-busts step04-brand-overlay.js');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-navigation-controller\.js\?v=20261007_v7"/, 'HTML cache-busts navigation controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-bindings\.js\?v=20261007_v7"/, 'HTML cache-busts UI bindings');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261007_v7"/, 'HTML cache-busts Step 4 controller');
+assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /#prevBtn|#nextBtn|#mobileSceneSelect|#sceneList/, 'UI bindings do not duplicate navigation listeners');
 assert.doesNotMatch(html, /const watermarkPreviewRatios=|let watermarkPreviewItem=|let outroPreviewItem=|function activateWatermarkRatio\(|function renderOutroPreviewSlide\(/, 'P1 does not retain overlay controller state or implementation');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-store\.js\?v=20261007_v4"/, 'HTML cache-busts step04-store.js');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261007_v4"/, 'HTML cache-busts the Step 4 controller');
 assert.match(html, /Object\.assign\(window,\{[\s\S]*updateCommonOutroPreview[\s\S]*updateWatermarkPreview[\s\S]*\}\)/, 'shell exposes Step 4 preview callbacks after async isolation');
 assert.match(html, /Object\.defineProperty\(window,'brandAssets',[\s\S]*get:\(\)=>brandAssets/, 'shell exposes current brand assets through a live getter');
 for (const declaration of [
@@ -186,6 +194,7 @@ function createPrePartialContext() {
     URL,
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),
     BrandOverlayController: require('../01_app/assets/steps/step04/step04-brand-overlay.js'),
+    Step04NavigationController: require('../01_app/assets/steps/step04/step04-navigation-controller.js'),
     setInterval: () => 1,
     clearInterval: () => {},
     setTimeout: (fn) => {
