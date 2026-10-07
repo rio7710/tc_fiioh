@@ -7,6 +7,7 @@ const jsPath = '01_app/assets/steps/step05/step05-calendar.js';
 [partialPath, cssPath, jsPath].forEach(file => assert.ok(fs.existsSync(file), `${file} must exist`));
 
 const html = fs.readFileSync(partialPath, 'utf8');
+const shell = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 [
   'step5', 'latestExport', 'latestExportList', 'calendarPrev', 'calendarMonthTitle',
   'calendarNext', 'calendarExport', 'calendarGrid', 'calendarHelp', 'calendarSettingsModal',
@@ -18,6 +19,15 @@ const html = fs.readFileSync(partialPath, 'utf8');
   'calendarPreviewClose'
 ].forEach(id => assert.match(html, new RegExp(`id="${id}"`), `fragment preserves #${id}`));
 assert.doesNotMatch(html, /<script\b|onclick=/i, 'injectable fragment does not execute scripts');
+assert.match(shell, /<div id="step05Container"><\/div>/, 'shell provides the Step 5 mount point');
+assert.match(shell, /container:'#step05Container',path:'\/01_app\/pages\/steps\/step05-calendar\.html'/, 'Step 5 loads with the other partials before binding');
+assert.match(shell, /assets\/steps\/step05\/step05-calendar\.css/, 'shell loads isolated Step 5 styles');
+assert.match(shell, /assets\/steps\/step05\/step05-calendar\.js/, 'shell loads isolated Step 5 helpers');
+assert.equal((shell.match(/id="step5"/g) || []).length, 0, 'Step 5 markup is not duplicated inline');
+assert.equal((shell.match(/id="calendarSettingsModal"/g) || []).length, 0, 'Step 5 modals are not duplicated inline');
+assert.match(shell, /ThinkCastApiClient\.createApiClient\(\)/, 'shell delegates JSON requests to the shared API client');
+assert.match(shell, /path==='\/api\/brand-assets'.*brandSelections=result\.selections/, 'brand selection compatibility side effect remains in the shell adapter');
+assert.match(shell, /assets\/core\/project-store\.js/, 'project store is available for staged migration without duplicate writes');
 
 const Calendar = require('../01_app/assets/steps/step05/step05-calendar.js');
 const entry = (id, projectId, start, platform, updatedAt, extra = {}) => ({

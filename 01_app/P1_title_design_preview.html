@@ -9,16 +9,21 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Serif+KR:wght@700;900&family=Song+Myung&display=swap" rel="stylesheet">
 <script src="/01_app/assets/components/thinkcast-top-nav.js?v=3"></script>
+<script src="/01_app/assets/core/api-client.js"></script>
+<script src="/01_app/assets/core/content-route.js"></script>
+<script src="/01_app/assets/core/project-store.js"></script>
 <script src="/01_app/assets/steps/step-partial-loader.js"></script>
 <script src="/01_app/assets/steps/step02/step02-keyword.js"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js"></script>
 <script src="/01_app/assets/video-editor/index.js"></script>
 <script src="/01_app/assets/steps/step04/step04-video.js"></script>
+<script src="/01_app/assets/steps/step05/step05-calendar.js"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css">
 <link rel="stylesheet" href="/01_app/assets/video-editor/video-editor.css">
 <link rel="stylesheet" href="/01_app/assets/steps/step04/step04-video.css">
+<link rel="stylesheet" href="/01_app/assets/steps/step05/step05-calendar.css">
 <style>
 :root{
   --green:#174f48;
@@ -928,28 +933,7 @@ body::before{content:"";position:fixed;z-index:-1;inset:-3px;background-image:li
   <div id="step03Container"></div>
   <div id="step031Container"></div>
   <div id="step4Container"></div>
-
- <section class="step-view flow-page" id="step5" hidden>
-    <div class="flow-card calendar-card">
-      <time class="page-date"></time>
-      <div class="calendar-heading">
-        <div><p class="flow-kicker">STEP 05 · CONTENT CALENDAR</p><h1 class="flow-title">제작과 배포 일정을<br>한눈에 기록해요.</h1></div>
-        <p class="flow-desc">스티커를 드래그해 날짜를 옮기거나, 우클릭·길게 눌러 배포 설정을 수정하세요.</p>
-      </div>
-      <section class="latest-export" id="latestExport" aria-label="최근 변환 영상" hidden>
-        <div class="latest-export-list" id="latestExportList"></div>
-        <div class="latest-export-actions"><button type="button" data-go="4">영상 디자인으로 돌아가기</button></div>
-      </section>
-      <div class="calendar-toolbar">
-        <div class="calendar-month-nav"><button id="calendarPrev" type="button" aria-label="이전 기간">←</button><strong class="calendar-month-title" id="calendarMonthTitle"></strong><button id="calendarNext" type="button" aria-label="다음 기간">→</button></div>
-        <div class="calendar-toolbar-actions"><div class="calendar-view-tabs" role="group" aria-label="캘린더 보기"><button class="calendar-view-btn" type="button" data-calendar-view="month" aria-pressed="true">월</button><button class="calendar-view-btn" type="button" data-calendar-view="week" aria-pressed="false">주</button><button class="calendar-view-btn" type="button" data-calendar-view="day" aria-pressed="false">오늘</button></div><button class="calendar-export" id="calendarExport" type="button">다른 캘린더로 내보내기 · .ics</button></div>
-      </div>
-      <div class="calendar-legend" aria-label="배포 상태 범례"><span><i class="legend-dot"></i>배포 완료</span><span><i class="legend-dot scheduled"></i>배포 예약</span><span><i class="legend-dot draft"></i>미배포</span><span><i class="legend-dot deleted"></i>삭제·제거</span></div>
-      <div class="calendar-scroll"><div class="calendar-grid" id="calendarGrid"></div></div>
-      <p class="calendar-help" id="calendarHelp" aria-live="polite">스티커를 다른 날짜로 드래그해 이동할 수 있습니다. 모바일에서는 길게 눌러 날짜를 수정하세요.</p>
-      <div class="flow-actions"><button class="flow-btn" type="button" data-go="4">이전 · 영상 디자인</button></div>
-    </div>
-  </section>
+  <div id="step05Container"></div>
 </main>
 
 <div class="api-settings-modal" id="platformGuideModal" role="dialog" aria-modal="true" aria-labelledby="platformGuideTitle" hidden>
@@ -1078,35 +1062,6 @@ body::before{content:"";position:fixed;z-index:-1;inset:-3px;background-image:li
   </form>
 </div>
 
-<div class="calendar-settings-modal" id="calendarSettingsModal" role="dialog" aria-modal="true" aria-labelledby="calendarSettingsTitle" hidden>
-  <div class="calendar-settings-dialog">
-    <div class="calendar-settings-head"><small>STICKER PIPELINE SETTINGS</small><h2 id="calendarSettingsTitle">콘텐츠 스티커 설정</h2></div>
-    <div class="calendar-settings-body">
-      <label class="calendar-settings-date">콘텐츠 날짜<input id="calendarSettingsDate" type="date"></label>
-      <div class="calendar-settings-platforms" id="calendarSettingsPlatforms"></div>
-    </div>
-    <div class="calendar-settings-actions"><button class="view" id="calendarContentView" type="button">콘텐츠 보기</button><button id="calendarSettingsCancel" type="button">취소</button><button class="save" id="calendarSettingsSave" type="button">설정 저장</button></div>
-  </div>
-</div>
-
-<div class="calendar-settings-modal" id="contentUnavailableModal" role="dialog" aria-modal="true" aria-labelledby="contentUnavailableTitle" hidden>
-  <div class="calendar-settings-dialog">
-    <div class="calendar-settings-head"><small>CONTENT PREVIEW</small><h2 id="contentUnavailableTitle">콘텐츠 보기</h2></div>
-    <p class="content-unavailable-copy">연결된 콘텐츠가 없습니다.</p>
-    <div class="calendar-settings-actions"><button class="save" id="contentUnavailableClose" type="button">확인</button></div>
-  </div>
-</div>
-
-<div class="calendar-settings-modal" id="calendarPreviewModal" role="dialog" aria-modal="true" aria-labelledby="calendarPreviewTitle" hidden>
-  <div class="calendar-settings-dialog calendar-preview-dialog">
-    <div class="calendar-settings-head"><small>FINAL CONTENT PREVIEW</small><h2 id="calendarPreviewTitle">최종 영상 미리보기</h2></div>
-    <div class="calendar-preview-stage"><video class="calendar-preview-video" id="calendarPreviewVideo" controls playsinline preload="metadata"></video><button class="calendar-preview-version-nav prev" id="calendarPreviewVersionPrev" type="button" aria-label="이전 최종 영상 버전">‹</button><button class="calendar-preview-version-nav next" id="calendarPreviewVersionNext" type="button" aria-label="다음 최종 영상 버전">›</button><span class="calendar-preview-version-count" id="calendarPreviewVersionCount" hidden></span></div>
-    <div class="calendar-preview-meta" id="calendarPreviewMeta"></div>
-    <div class="calendar-settings-actions"><a class="view" id="calendarPreviewDownload" download>MP4 다운로드</a><button class="save" id="calendarPreviewClose" type="button">닫기</button></div>
-  </div>
-</div>
-
-
 <div class="ai-modal" id="aiWorkflowModal" role="dialog" aria-modal="true" aria-labelledby="aiWorkflowTitle" hidden>
   <div class="ai-dialog">
     <div class="ai-dialog-head">
@@ -1139,7 +1094,8 @@ const stepPartialDefinitions=[
   {container:'#step01ProjectContainer',path:'/01_app/pages/steps/step01-project.html'},
   {container:'#step02Container',path:'/01_app/pages/steps/step02-keyword.html'},
   {container:'#step03Container',path:'/01_app/pages/steps/step03-script.html'},
-  {container:'#step031Container',path:'/01_app/pages/steps/step03-storyboard.html'}
+  {container:'#step031Container',path:'/01_app/pages/steps/step03-storyboard.html'},
+  {container:'#step05Container',path:'/01_app/pages/steps/step05-calendar.html'}
 ];
 let stepPartialsPromise=null;
 function ensureStepPartialsLoaded(){
@@ -1407,21 +1363,10 @@ function renderSceneList(){
   sceneList.innerHTML=scenes.map((s,i)=>`<button class="scene-btn" type="button" data-index="${i}"><span class="scene-no">${String(i+1).padStart(2,'0')}</span><span class="scene-name">${escapeHtml(s.name)}</span><span class="scene-time">${Math.max(0,s.end-s.start).toFixed(2)}초</span></button>`).join('')+outroButton;
   mobileSceneSelect.innerHTML=scenes.map((s,i)=>`<option value="${i}">${String(i+1).padStart(2,'0')} · ${escapeHtml(s.name)} · ${Math.max(0,s.end-s.start).toFixed(2)}초</option>`).join('')+(hasOutro?'<option value="outro">OUT · 아웃트로 · 미리보기</option>':'');
 }
+let frontendApi=null;
 async function api(path,options={}){
-  let response;
-  try{response=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}})}
-  catch(error){error.transient=true;throw error}
-  const responseText=await response.text();
-  let result={};
-  if(responseText.trim()){
-    try{result=JSON.parse(responseText)}
-    catch(parseError){
-      const error=new Error(response.ok?'서버 응답을 읽지 못했습니다. 잠시 후 다시 시도해 주세요.':'서버가 준비 중입니다. 잠시 후 다시 시도해 주세요.');
-      error.status=response.status;error.transient=response.status>=500;throw error;
-    }
-  }
-  if(!responseText.trim()&&response.ok){const error=new Error('서버 응답이 비어 있습니다. 잠시 후 다시 시도해 주세요.');error.status=response.status;error.transient=true;throw error}
-  if(!response.ok){const error=new Error(result.error||'요청을 처리하지 못했습니다.');error.status=response.status;error.transient=response.status===408||response.status===429||response.status>=500;throw error}
+  if(!frontendApi)frontendApi=window.ThinkCastApiClient.createApiClient();
+  const result=await frontendApi(path,options);
   if(path==='/api/brand-assets'&&Array.isArray(result.selections))brandSelections=result.selections;
   return result;
 }

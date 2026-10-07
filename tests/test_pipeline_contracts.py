@@ -28,7 +28,9 @@ class PipelineContractTests(unittest.TestCase):
     def setUpClass(cls):
         step4_html = (ROOT / "01_app" / "pages" / "steps" / "step04-video.html").read_text(encoding="utf-8")
         step4_js = (ROOT / "01_app" / "assets" / "steps" / "step04" / "step04-video.js").read_text(encoding="utf-8")
-        cls.html = HTML_PATH.read_text(encoding="utf-8") + "\n" + step4_html + "\n" + step4_js
+        step5_html = (ROOT / "01_app" / "pages" / "steps" / "step05-calendar.html").read_text(encoding="utf-8")
+        step5_css = (ROOT / "01_app" / "assets" / "steps" / "step05" / "step05-calendar.css").read_text(encoding="utf-8")
+        cls.html = "\n".join((HTML_PATH.read_text(encoding="utf-8"), step4_html, step4_js, step5_html, step5_css))
         cls.manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
         cls.demo_data = json.loads(DEMO_DATA_PATH.read_text(encoding="utf-8"))
         cls.server = load_render_server()
