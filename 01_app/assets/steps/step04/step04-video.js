@@ -1,13 +1,13 @@
 /* Step 04 Video Editor Isolated JS Controller */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
-    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js'], factory);
+    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js'], factory);
   } else if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'));
+    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'));
   } else {
-    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController);
+    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController);
   }
-}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController) {
+}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController) {
   'use strict';
 
   const { SceneNav, RatioProfiles, BrandSelection, MobileSync } = VideoEditor || {};
@@ -35,6 +35,17 @@
     setActiveNarration: value => editorState.set('activeNarration', value),
     getPreviewVideo: () => typeof document !== 'undefined' ? document.querySelector('#video') : null
   });
+  const previewController = TimelinePreviewController.create({
+    root: typeof document !== 'undefined' ? document : null,
+    SceneNav,
+    formatTime: fmt,
+    getScenes: () => scenes,
+    getCurrentScene: () => editorState.get('currentScene'),
+    setCurrentScene: value => editorState.set('currentScene', value),
+    getDissolveSeconds: () => editorState.get('sceneDissolveSeconds'),
+    applyStoredSceneCrop: () => applyStoredSceneCrop(),
+    syncNavigation: view => navigationController.sync(view)
+  });
 
   function callShellFeature(name, ...args) {
     if (typeof window === 'undefined' || typeof window[name] !== 'function') return undefined;
@@ -48,14 +59,6 @@
 
   function fmt(seconds) {
     return MobileSync ? MobileSync.formatTime(seconds) : '00:00';
-  }
-
-  function timelineDuration() {
-    return SceneNav ? SceneNav.calculateTimelineDuration(scenes) : (scenes.length ? scenes[scenes.length - 1].end : 0);
-  }
-
-  function sceneAt(t) {
-    return SceneNav ? SceneNav.findSceneAtTime(scenes, t) : 0;
   }
 
   function currentCropFormat() {
@@ -458,45 +461,10 @@
   function sync() {
     if (!scenes.length || typeof document === 'undefined') return;
     const video = document.querySelector('#video');
-    const stage = document.querySelector('#stage');
-    const sceneImage = document.querySelector('#sceneImage');
-    const progressFill = document.querySelector('#progressFill');
-    const clock = document.querySelector('#clock');
-
-    if (!video || !stage) return;
-    stage.style.setProperty('--scene-dissolve-seconds', `${editorState.get('sceneDissolveSeconds')}s`);
+    if (!video) return;
     const t = video.currentTime || 0;
-    const idx = sceneAt(t);
-
-    if (idx !== editorState.get('currentScene')) {
-      editorState.set('currentScene', idx);
-      if (sceneImage) {
-        sceneImage.src = scenes[idx]?.image || '';
-        sceneImage.alt = `${scenes[idx]?.name || ''} 장면 이미지`;
-      }
-      applyStoredSceneCrop();
-    }
-
-    const duration = timelineDuration();
-    const outroHolder = document.querySelector('#brandOutroPreview');
-    const showOutro = SceneNav ? SceneNav.isOutroActive(t, duration, true) : (t >= Math.max(0, duration - 2));
-
-    if (outroHolder) outroHolder.hidden = !showOutro;
-    stage.classList.toggle('has-outro-preview', showOutro);
-
-    const titleText = document.querySelector('#titleText');
-    const currentScene = editorState.get('currentScene');
-    const currentSceneItem = scenes[currentScene];
-    const captionText = currentSceneItem ? (currentSceneItem.text || currentSceneItem.script || currentSceneItem.narration || currentSceneItem.line || currentSceneItem.name || '') : '';
-    if (titleText) titleText.textContent = captionText;
-    stage.classList.toggle('has-title', Boolean(captionText) && !showOutro);
-
-    navigationController.sync({currentScene, showOutro, time: t, duration});
-
-    if (progressFill) progressFill.style.width = `${duration ? Math.min(100, t / duration * 100) : 0}%`;
-    if (clock) clock.textContent = `${fmt(t)} / ${fmt(duration)}`;
-
-    syncNarration(t);
+    const view = previewController.sync(t);
+    syncNarration(view.time);
     if (!video.paused) requestAnimationFrame(sync);
   }
 
@@ -526,12 +494,8 @@
     }));
     editorState.set('currentScene', -1);
     renderSceneList();
-    const duration = timelineDuration();
     if (typeof document !== 'undefined') {
-      const sceneTimelineSummary = document.querySelector('#sceneTimelineSummary');
-      if (sceneTimelineSummary) {
-        sceneTimelineSummary.textContent = `타임라인 기준 · 총 ${scenes.length}장면 · ${duration}초`;
-      }
+      previewController.updateSummary();
       sync();
     }
   }

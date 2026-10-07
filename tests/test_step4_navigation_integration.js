@@ -16,6 +16,7 @@ browserContext.globalThis = browserContext;
   '01_app/assets/steps/step04/step04-brand-overlay.js',
   '01_app/assets/steps/step04/step04-store.js',
   '01_app/assets/steps/step04/step04-narration-controller.js',
+  '01_app/assets/steps/step04/step04-timeline-preview-controller.js',
   '01_app/assets/steps/step04/step04-navigation-controller.js',
   '01_app/assets/steps/step04/step04-ui-bindings.js',
   '01_app/assets/steps/step04/step04-video.js'
@@ -26,6 +27,7 @@ assert.ok(browserContext.Step04BrandState, 'browser bundle exposes Step 4 brand 
 assert.ok(browserContext.BrandOverlayController, 'browser bundle exposes Step 4 brand overlay controller');
 assert.ok(browserContext.Step04NavigationController, 'browser bundle exposes Step 4 navigation controller');
 assert.ok(browserContext.Step04NarrationController, 'browser bundle exposes Step 4 narration controller');
+assert.ok(browserContext.Step04TimelinePreviewController, 'browser bundle exposes Step 4 timeline preview controller');
 assert.ok(browserContext.Step04VideoEditor, 'browser bundle initializes Step 4 after its dependencies');
 
 const scenes = [

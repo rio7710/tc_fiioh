@@ -14,6 +14,7 @@ const brandOverlayPath = '01_app/assets/steps/step04/step04-brand-overlay.js';
 const storePath = '01_app/assets/steps/step04/step04-store.js';
 const timelineBridgePath = '01_app/assets/steps/step04/step04-timeline-bridge.js';
 const narrationControllerPath = '01_app/assets/steps/step04/step04-narration-controller.js';
+const timelinePreviewControllerPath = '01_app/assets/steps/step04/step04-timeline-preview-controller.js';
 const navigationControllerPath = '01_app/assets/steps/step04/step04-navigation-controller.js';
 const bindingsPath = '01_app/assets/steps/step04/step04-ui-bindings.js';
 const videoEditorPath = '01_app/assets/video-editor/index.js';
@@ -26,6 +27,7 @@ assert.ok(fs.existsSync(brandOverlayPath), 'step04-brand-overlay.js must exist')
 assert.ok(fs.existsSync(storePath), 'step04-store.js must exist');
 assert.ok(fs.existsSync(timelineBridgePath), 'step04-timeline-bridge.js must exist');
 assert.ok(fs.existsSync(narrationControllerPath), 'step04-narration-controller.js must exist');
+assert.ok(fs.existsSync(timelinePreviewControllerPath), 'step04-timeline-preview-controller.js must exist');
 assert.ok(fs.existsSync(navigationControllerPath), 'step04-navigation-controller.js must exist');
 assert.ok(fs.existsSync(bindingsPath), 'step04-ui-bindings.js must exist');
 assert.ok(fs.existsSync(videoEditorPath), 'video-editor/index.js must exist');
@@ -53,6 +55,7 @@ const step04BrandOverlayScript = html.indexOf('/01_app/assets/steps/step04/step0
 const step04StoreScript = html.indexOf('/01_app/assets/steps/step04/step04-store.js');
 const step04TimelineBridgeScript = html.indexOf('/01_app/assets/steps/step04/step04-timeline-bridge.js');
 const step04NarrationControllerScript = html.indexOf('/01_app/assets/steps/step04/step04-narration-controller.js');
+const step04TimelinePreviewScript = html.indexOf('/01_app/assets/steps/step04/step04-timeline-preview-controller.js');
 const step04NavigationScript = html.indexOf('/01_app/assets/steps/step04/step04-navigation-controller.js');
 const step04BindingsScript = html.indexOf('/01_app/assets/steps/step04/step04-ui-bindings.js');
 assert.ok(sceneNavigationScript >= 0, 'HTML loads browser scene navigation dependency');
@@ -67,6 +70,7 @@ assert.ok(step04BrandOverlayScript < step04StoreScript, 'Step 4 overlay controll
 assert.ok(step04StoreScript < step04NavigationScript, 'Step 4 navigation controller loads after state dependencies');
 assert.ok(step04StoreScript < step04TimelineBridgeScript && step04TimelineBridgeScript < step04NavigationScript, 'timeline bridge loads between Step 4 state and controllers');
 assert.ok(step04TimelineBridgeScript < step04NarrationControllerScript && step04NarrationControllerScript < step04NavigationScript, 'narration controller loads before Step 4 controllers');
+assert.ok(step04NarrationControllerScript < step04TimelinePreviewScript && step04TimelinePreviewScript < step04NavigationScript, 'timeline preview controller loads before Step 4 controllers');
 assert.ok(step04NavigationScript < step04BindingsScript, 'Step 4 navigation controller loads before UI bindings');
 assert.ok(videoEditorIndexScript < step04StoreScript, 'Step 4 store loads after video editor dependencies');
 assert.ok(step04StoreScript < html.indexOf('/01_app/assets/steps/step04/step04-video.js'), 'Step 4 store loads before the controller');
@@ -79,7 +83,8 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-navigation-cont
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-bindings\.js\?v=20261007_v7"/, 'HTML cache-busts UI bindings');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-bridge\.js\?v=20261007_v8"/, 'HTML cache-busts timeline bridge');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-narration-controller\.js\?v=20261007_v9"/, 'HTML cache-busts narration controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261007_v9"/, 'HTML cache-busts Step 4 controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-preview-controller\.js\?v=20261007_v10"/, 'HTML cache-busts timeline preview controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261007_v10"/, 'HTML cache-busts Step 4 controller');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /#prevBtn|#nextBtn|#mobileSceneSelect|#sceneList/, 'UI bindings do not duplicate navigation listeners');
 assert.doesNotMatch(html, /const watermarkPreviewRatios=|let watermarkPreviewItem=|let outroPreviewItem=|function activateWatermarkRatio\(|function renderOutroPreviewSlide\(/, 'P1 does not retain overlay controller state or implementation');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-store\.js\?v=20261007_v4"/, 'HTML cache-busts step04-store.js');
