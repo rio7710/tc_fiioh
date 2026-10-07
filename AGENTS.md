@@ -39,16 +39,18 @@ These instructions apply to the entire repository. Keep this file concise: durab
 
 ## Quality and safety
 
+- **Regression Prevention Protocol**: Read and enforce `.agents/rules/regression_prevention.md` before and after every modification.
+- **Cross-Scope Inspection**: Inspect side effects across all aspect ratios (16:9, 1:1, 9:16, 4:5), preview modes, and subtitle/outro profiles when modifying UI or state handlers (`P1_title_design_preview.html`, `step04-video.js`).
+- **No Superficial Patches**: Never swallow errors with empty `try/except`, comment out failing tests, or return dummy fallbacks.
+- **Mandatory Empirical Verification**: A change is never complete until the full test suite passes with exit code 0.
 - Do not silently shorten or shift the data-driven project timeline.
 - Do not overwrite source clips or user exports unless the task explicitly requires it and the target is verified.
 - Do not commit generated exports, caches, secrets, or provider responses containing sensitive data.
 - Keep the demo dependency-light. New production dependencies need a clear operational reason.
-- A change is complete only when lint passes, relevant behavior is exercised, and deployment status is reported when deployment was requested.
 
 ## Commands
 
-```powershell
-python tools/lint_project.py
-python -m unittest discover -s tests -v
-python -m py_compile 01_app/render_server.py
+```bash
+# Complete regression prevention verification suite (Must pass 100% before completion):
+for f in tests/*.js; do node "$f"; done && python3 -m unittest discover tests && PYTHONPATH=.:01_app python3 tests/test_random_api_e2e.py && PYTHONPATH=.:01_app python3 tests/test_worker_random_e2e.py && node tests/test_randomized_user_lifecycle.js && python3 tools/lint_project.py
 ```
