@@ -1,0 +1,83 @@
+/* Step 02 keyword selection. Shell typography and shared flow controls stay global. */
+#step2 .flow-card {
+  height: auto;
+  min-height: max(680px, var(--page-height));
+  padding-bottom: 48px;
+  justify-content: flex-start;
+}
+
+#step2 .keyword-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(112px, 1fr));
+  min-height: 250px;
+  flex: 1;
+  gap: 12px;
+  align-content: stretch;
+}
+
+#step2 .keyword-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  padding: 18px;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: visible;
+  border: 6px solid #fbf8f0;
+  border-bottom-width: 23px;
+  border-radius: 2px;
+  background-image: linear-gradient(180deg, rgba(6, 25, 22, .05) 10%, rgba(6, 25, 22, .82) 100%), var(--keyword-bg);
+  background-position: center;
+  background-size: cover;
+  background-clip: padding-box;
+  box-shadow: 2px 5px 12px rgba(55, 43, 28, .18);
+  filter: grayscale(1) saturate(0) contrast(.92);
+  cursor: pointer;
+  transform: rotate(-.45deg);
+  transition: .2s;
+}
+
+#step2 .keyword-card:nth-child(even) { transform: rotate(.55deg); }
+#step2 .keyword-card:nth-child(3n) { transform: rotate(-.2deg); }
+#step2 .keyword-card:hover { transform: rotate(0) translateY(-2px); }
+#step2 .keyword-card.selected {
+  border-color: #fbf8f0;
+  box-shadow: 3px 7px 14px rgba(55, 43, 28, .22);
+  filter: none;
+  transform: rotate(var(--selected-tilt, .4deg)) translateY(-2px);
+}
+#step2 .keyword-card.selected::after {
+  content: "✓ 선택";
+  position: absolute;
+  z-index: 4;
+  top: 10px;
+  right: 10px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 900;
+}
+#step2 .keyword-card.locked { cursor: not-allowed; filter: saturate(.72); opacity: .72; }
+#step2 .keyword-card.locked.selected { opacity: 1; }
+#step2 .keyword-card input { position: absolute; opacity: 0; pointer-events: none; }
+#step2 .keyword-label { position: relative; z-index: 1; color: #fff; font-family: "Song Myung", "Gungsuh", sans-serif; font-size: 21px; font-weight: 900; line-height: 1; text-shadow: 0 1px 8px rgba(0, 0, 0, .35); }
+#step2 .keyword-description { position: relative; z-index: 1; margin-top: 5px; color: rgba(255, 255, 255, .78); font-size: 10px; text-shadow: 0 1px 6px rgba(0, 0, 0, .4); }
+#step2 .keyword-ai-badge { position: absolute; z-index: 4; top: 10px; left: 10px; padding: 5px 8px; border-radius: 999px; background: #e9bc58; color: #253f37; font-size: 9px; font-weight: 900; }
+#step2 .keyword-tools { display: flex; width: min(620px, 92%); margin: 18px 0 4px 8px; padding: 12px 14px; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-radius: 1px; background: #f1dfa4; box-shadow: 3px 5px 10px rgba(75, 56, 27, .15); transform: rotate(.3deg); }
+#step2 .keyword-tools button:disabled { cursor: not-allowed; opacity: .45; }
+
+@media (max-width: 900px) {
+  #step2 .keyword-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(112px, 1fr)); }
+}
+
+@media (max-width: 620px) {
+  #step2 .flow-card { height: auto; padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
+  #step2 .keyword-grid { grid-template-columns: 1fr; grid-template-rows: none; min-height: 0; flex: none; gap: 9px; }
+  #step2 .keyword-card { height: auto; min-height: 106px; padding: 14px 15px; }
+  #step2 .keyword-label { font-size: 14px; }
+}
