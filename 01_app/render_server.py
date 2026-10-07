@@ -14,6 +14,7 @@ import sys
 import threading
 import time
 import uuid
+import unicodedata
 import webbrowser
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -2421,6 +2422,13 @@ class Handler(SimpleHTTPRequestHandler):
         path = Path(self.translate_path(self.path))
         if path.is_dir() or path.suffix == ".html":
             return super().send_head()
+        if not path.is_file():
+            normalized_nfc = Path(unicodedata.normalize("NFC", str(path)))
+            normalized_nfd = Path(unicodedata.normalize("NFD", str(path)))
+            if normalized_nfc.is_file():
+                path = normalized_nfc
+            elif normalized_nfd.is_file():
+                path = normalized_nfd
         try:
             source = path.open("rb")
         except OSError:
