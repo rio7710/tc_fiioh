@@ -14,7 +14,7 @@
 
   // Step 4 State (Single Source of Truth)
   let scenes = [];
-  let currentScene = 0;
+  let currentScene = -1;
   let currentType = 'editorial';
   let selectedMusic = 'satie';
   let currentPreviewPlatform = 'youtube';
@@ -606,6 +606,7 @@
       cueStart: scene.cueStart != null ? Number(scene.cueStart) : (scene.cue_start != null ? Number(scene.cue_start) : Number(scene.start || 0)),
       cueEnd: scene.cueEnd != null ? Number(scene.cueEnd) : (scene.cue_end != null ? Number(scene.cue_end) : Number(scene.end || 0))
     }));
+    currentScene = -1;
     renderSceneList();
     const duration = timelineDuration();
     if (typeof document !== 'undefined') {
