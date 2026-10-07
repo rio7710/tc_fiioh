@@ -16,13 +16,17 @@ const shellHtml = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8')
 
 ['step3', 'scriptHeadline', 'scriptConcept', 'scriptLines', 'scriptSaveBar', 'scriptSaveBtn', 'voiceSampleAudio', 'scriptMessage', 'scriptNext'].forEach(id => {
   assert.match(scriptHtml, new RegExp(`id="${id}"`), `script fragment preserves #${id}`);
-  assert.match(shellHtml, new RegExp(`id="${id}"`), `shell contract still contains #${id}`);
 });
 
 ['step31', 'storyboardModel', 'storyboardBulkGenerate', 'storyboardVoiceBulkGenerate', 'storyboardVideoBulkGenerate', 'storyboardLookToolbar', 'storyboardGrid', 'storyboardVoiceAudio', 'storyboardMessage', 'storyboardNext'].forEach(id => {
   assert.match(storyboardHtml, new RegExp(`id="${id}"`), `storyboard fragment preserves #${id}`);
-  assert.match(shellHtml, new RegExp(`id="${id}"`), `shell contract still contains #${id}`);
 });
+
+assert.match(shellHtml, /id="step03Container"/, 'shell mounts the script fragment');
+assert.match(shellHtml, /id="step031Container"/, 'shell mounts the storyboard fragment');
+assert.match(shellHtml, /step03-script\.html/, 'shell loads the script fragment');
+assert.match(shellHtml, /step03-storyboard\.html/, 'shell loads the storyboard fragment');
+assert.doesNotMatch(shellHtml, /id="step3"|id="step31"/, 'step 3 markup is not duplicated inline');
 
 assert.doesNotMatch(scriptHtml + storyboardHtml, /<script\b|onclick=/i, 'fragments are safe to inject and do not duplicate script execution');
 

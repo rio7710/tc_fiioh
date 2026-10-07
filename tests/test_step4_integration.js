@@ -150,7 +150,7 @@ function createPrePartialContext() {
     },
     clearTimeout: () => {},
     document: documentStub,
-    window: { scrollTo() {}, addEventListener() {} },
+    window: { scrollTo() {}, addEventListener() {}, StepPartialLoader: { load: async () => 0 } },
     localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
     location: { href: 'https://tc.test/app.html' },
     fetch: async () => ({ ok: true, text: async () => partialHtml }),
@@ -165,7 +165,7 @@ function createPrePartialContext() {
 const prePartialEnv = createPrePartialContext();
 const scriptStart = html.indexOf('<script>') + '<script>'.length;
 const scriptEnd = html.indexOf('async function boot()');
-const scriptMatch = html.slice(scriptStart, scriptEnd > 0 ? scriptEnd : html.lastIndexOf('</script>'));
+const scriptMatch = `${html.slice(scriptStart, scriptEnd > 0 ? scriptEnd : html.lastIndexOf('</script>'))}\n})();`;
 
 assert.doesNotThrow(() => {
   vm.runInContext(scriptMatch, prePartialEnv.context);
