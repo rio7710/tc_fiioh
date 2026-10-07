@@ -1418,6 +1418,7 @@ NARRATION_TRACKS = [
     (1.00, "audio_9.mp3"),
     (1.00, "audio_10.mp3"),
     (1.10, "audio_11.mp3"),
+    (1.00, "audio_12.mp3"),
     (1.16, "audio_13.mp3"),
 ]
 
