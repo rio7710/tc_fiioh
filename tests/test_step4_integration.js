@@ -41,6 +41,12 @@ assert.match(html, /src="\/01_app\/assets\/video-editor\/index\.js(?:\?v=[^"]+)?
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js(?:\?v=[^"]+)?"/, 'HTML loads step04-video.js');
 assert.match(html, /Object\.assign\(window,\{[\s\S]*updateCommonOutroPreview[\s\S]*updateWatermarkPreview[\s\S]*\}\)/, 'shell exposes Step 4 preview callbacks after async isolation');
 assert.match(html, /Object\.defineProperty\(window,'brandAssets',[\s\S]*get:\(\)=>brandAssets/, 'shell exposes current brand assets through a live getter');
+for (const declaration of [
+  "let brandAssets=[];",
+  "let brandSelections=[];",
+  "let watermarkProfiles={};",
+  "let outroProfiles={};"
+]) assert.ok(html.indexOf(declaration) > 0 && html.indexOf(declaration) < html.indexOf('function activeWatermarkProfile'), `${declaration} is initialized before Step 4 settings restore`);
 
 // Verify top-level script contains no direct querySelector('#video') causing null binding at startup
 assert.doesNotMatch(html, /const video=document\.querySelector\('#video'\);/, 'HTML must not query #video at top-level script parse time');

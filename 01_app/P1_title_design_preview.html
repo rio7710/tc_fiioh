@@ -1123,6 +1123,16 @@ document.querySelectorAll('.page-date').forEach(item=>{
 });
 let scenes=[];
 let titleSceneIndexes=[];
+let brandAssets=[];
+let brandSelections=[];
+let watermarkPosition='top-right';
+let watermarkWidthRatio=.15;
+let watermarkProfiles={};
+let outroPosition='center-center';
+let outroWidthRatio=1;
+let outroBackground='none';
+let outroBackgroundOpacity=.8;
+let outroProfiles={};
 function normalizeNarrationSrc(src){
   if(!src)return '';
   const str=String(src);
