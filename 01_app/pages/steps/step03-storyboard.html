@@ -1,0 +1,21 @@
+<!-- Step 03.1 Storyboard Partial Markup -->
+<section class="step-view flow-page" id="step31" hidden>
+  <div class="flow-card wide script-paper">
+    <time class="page-date"></time>
+    <p class="flow-kicker">STEP 03-1 · STORYBOARD</p>
+    <h1 class="flow-title">씬별 콘티를<br>확인해 주세요.</h1>
+    <p class="flow-desc">저장된 최종대본에서 씬과 이미지 생성 프롬프트를 펼쳐 보여드립니다. 아직 이미지·음성 API는 실행되지 않았습니다.</p>
+    <div class="storyboard-toolbar">
+      <label for="storyboardModel">레퍼런스 유지 모델</label>
+      <select class="storyboard-model-select" id="storyboardModel"><optgroup label="OpenAI · 다중 이미지 참조"><option value="openai:gpt-image-2.5-sunburst">GPT‑Image 2.5 Sunburst · 최고 품질</option><option value="openai:gpt-image-2.5-flare">GPT‑Image 2.5 Flare · 빠른 생성</option><option value="openai:gpt-image-2">GPT‑Image 2 · 균형형</option></optgroup></select>
+      <button class="storyboard-bulk-generate" id="storyboardBulkGenerate" type="button">미생성 씬 일괄 생성</button>
+      <button class="storyboard-bulk-generate" id="storyboardVoiceBulkGenerate" type="button">미생성 음성 일괄 생성</button>
+      <button class="storyboard-bulk-generate" id="storyboardVideoBulkGenerate" type="button">미생성 Kling 영상 일괄 생성</button>
+    </div>
+    <div class="storyboard-look-toolbar" id="storyboardLookToolbar" role="group" aria-label="이미지 화면 후처리"><span>화면 후처리</span><button class="storyboard-look-btn" type="button" data-look="original" aria-pressed="true">원본</button><button class="storyboard-look-btn" type="button" data-look="warm" aria-pressed="false">따뜻하게</button><button class="storyboard-look-btn" type="button" data-look="cool" aria-pressed="false">차갑게</button><button class="storyboard-look-btn" type="button" data-look="realistic" aria-pressed="false">사실적</button></div>
+    <div class="storyboard-grid" id="storyboardGrid" data-look="original"></div>
+    <audio id="storyboardVoiceAudio" preload="none"></audio>
+    <p class="form-message" id="storyboardMessage"></p>
+    <div class="flow-actions"><button class="flow-btn" type="button" data-go="3">이전 · 대본</button><button class="flow-btn primary" id="storyboardNext" type="button">다음 · 영상 디자인</button></div>
+  </div>
+</section>
