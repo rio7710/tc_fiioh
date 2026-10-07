@@ -13,6 +13,7 @@ browserContext.globalThis = browserContext;
   '01_app/assets/video-editor/mobile-sync.js',
   '01_app/assets/video-editor/index.js',
   '01_app/assets/steps/step04/step04-brand-state.js',
+  '01_app/assets/steps/step04/step04-brand-overlay.js',
   '01_app/assets/steps/step04/step04-store.js',
   '01_app/assets/steps/step04/step04-ui-bindings.js',
   '01_app/assets/steps/step04/step04-video.js'
@@ -20,6 +21,7 @@ browserContext.globalThis = browserContext;
 assert.ok(browserContext.VideoEditor.SceneNav, 'browser bundle exposes scene navigation');
 assert.ok(browserContext.VideoEditor.MobileSync, 'browser bundle exposes mobile synchronization');
 assert.ok(browserContext.Step04BrandState, 'browser bundle exposes Step 4 brand state');
+assert.ok(browserContext.BrandOverlayController, 'browser bundle exposes Step 4 brand overlay controller');
 assert.ok(browserContext.Step04VideoEditor, 'browser bundle initializes Step 4 after its dependencies');
 
 const scenes = [
