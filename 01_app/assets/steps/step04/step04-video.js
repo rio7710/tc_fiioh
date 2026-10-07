@@ -456,7 +456,48 @@
         <span class="scene-name">${scene.name || `장면 ${i + 1}`}</span>
         <span class="scene-time">${fmt(scene.start)}~${fmt(scene.end)}</span>
       </button>
-    `).join('');
+    `).join('') + `
+      <button class="scene-btn scene-outro-btn" type="button" data-outro="true">
+        <span class="scene-no">OUT</span>
+        <span class="scene-name">엔딩 카피 &amp; 브랜딩</span>
+        <span class="scene-time">END · ${fmt(timelineDuration())}</span>
+      </button>
+    `;
+
+    const mobileSceneSelect = document.querySelector('#mobileSceneSelect');
+    if (mobileSceneSelect && MobileSync) {
+      const mobileState = MobileSync.computeMobileSyncState(
+        scenes,
+        currentScene,
+        false,
+        0,
+        timelineDuration()
+      );
+      mobileSceneSelect.innerHTML = mobileState.options.map(option =>
+        `<option value="${option.value}">${option.label}</option>`
+      ).join('');
+    }
+  }
+
+  function currentNavigationState() {
+    const video = typeof document !== 'undefined' ? document.querySelector('#video') : null;
+    const time = video ? video.currentTime || 0 : 0;
+    return SceneNav
+      ? SceneNav.createInitialNavigationState(scenes, { initialTime: time, outroEnabled: true })
+      : null;
+  }
+
+  function navigatePreview(action) {
+    if (!scenes.length || !SceneNav) return null;
+    const nextState = SceneNav.navigateScene(scenes, currentNavigationState(), action, { outroEnabled: true });
+    if (typeof document !== 'undefined') {
+      const video = document.querySelector('#video');
+      if (video) {
+        video.currentTime = nextState.currentTime;
+        sync();
+      }
+    }
+    return nextState;
   }
 
   function sync() {
@@ -486,15 +527,6 @@
       document.querySelectorAll('.scene-btn').forEach((el, i) => el.classList.toggle('active', i === idx));
       document.querySelector('.scene-btn.active')?.scrollIntoView({ block: 'nearest' });
 
-      if (MobileSync) {
-        const mState = MobileSync.computeMobileSyncState(scenes, idx, false, t, timelineDuration());
-        if (mobileSceneSelect) mobileSceneSelect.value = mState.selectedValue;
-        if (mobilePrevScene) mobilePrevScene.disabled = mState.prevDisabled;
-        if (mobileNextScene) mobileNextScene.disabled = mState.nextDisabled;
-      }
-      if (prevBtn) prevBtn.disabled = idx === 0;
-      if (nextBtn) nextBtn.disabled = idx === scenes.length - 1;
-
       applyStoredSceneCrop();
     }
 
@@ -508,7 +540,17 @@
     if (MobileSync) {
       const mState = MobileSync.computeMobileSyncState(scenes, currentScene, showOutro, t, duration);
       if (mobileSceneSelect) mobileSceneSelect.value = mState.selectedValue;
+      if (mobilePrevScene) mobilePrevScene.disabled = mState.prevDisabled;
+      if (mobileNextScene) mobileNextScene.disabled = mState.nextDisabled;
+      if (prevBtn) prevBtn.disabled = mState.prevDisabled;
+      if (nextBtn) nextBtn.disabled = mState.nextDisabled;
     }
+    document.querySelectorAll('.scene-btn').forEach((el, i) => {
+      const selected = el.dataset.outro === 'true' ? showOutro : (!showOutro && i === currentScene);
+      el.classList.toggle('active', selected);
+      el.setAttribute('aria-current', selected ? 'true' : 'false');
+    });
+    document.querySelector('.scene-btn.active')?.scrollIntoView({ block: 'nearest' });
 
     if (progressFill) progressFill.style.width = `${duration ? Math.min(100, t / duration * 100) : 0}%`;
     if (clock) clock.textContent = `${fmt(t)} / ${fmt(duration)}`;
@@ -602,17 +644,21 @@
     const imageRegenerationModal = document.querySelector('#imageRegenerationModal');
 
     if (playBtn) playBtn.addEventListener('click', togglePlay);
-    if (prevBtn) prevBtn.addEventListener('click', () => seekScene(currentScene - 1));
-    if (nextBtn) nextBtn.addEventListener('click', () => seekScene(currentScene + 1));
+    if (prevBtn) prevBtn.addEventListener('click', () => navigatePreview('PREV_SCENE'));
+    if (nextBtn) nextBtn.addEventListener('click', () => navigatePreview('NEXT_SCENE'));
 
     if (mobileSceneSelect) {
       mobileSceneSelect.addEventListener('change', () => {
-        if (mobileSceneSelect.value === 'outro') seekOutroPreview();
-        else seekScene(Number(mobileSceneSelect.value));
+        const action = MobileSync
+          ? MobileSync.resolveMobileSelectChange(mobileSceneSelect.value, scenes, true)
+          : (mobileSceneSelect.value === 'outro'
+              ? { type: 'SEEK_OUTRO' }
+              : { type: 'SEEK_SCENE', index: Number(mobileSceneSelect.value) });
+        navigatePreview(action);
       });
     }
-    if (mobilePrevScene) mobilePrevScene.addEventListener('click', () => seekScene(currentScene - 1));
-    if (mobileNextScene) mobileNextScene.addEventListener('click', () => seekScene(currentScene + 1));
+    if (mobilePrevScene) mobilePrevScene.addEventListener('click', () => navigatePreview('PREV_SCENE'));
+    if (mobileNextScene) mobileNextScene.addEventListener('click', () => navigatePreview('NEXT_SCENE'));
 
     if (sceneList) {
       sceneList.addEventListener('click', e => {
@@ -789,6 +835,8 @@
     sync: sync,
     seekScene: seekScene,
     seekOutroPreview: seekOutroPreview,
+    navigatePreview: navigatePreview,
+    currentNavigationState: currentNavigationState,
     togglePlay: togglePlay,
     stopNarration: stopNarration,
     startNarration: startNarration,

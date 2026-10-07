@@ -1,0 +1,23 @@
+<!-- Step 01 content-index partial. Dynamic project rows are rendered into #contentIndex. -->
+<section class="step-view flow-page" id="stepIndex" hidden>
+  <div class="flow-card wide script-paper">
+    <time class="page-date"></time>
+    <p class="flow-kicker">STEP 01-1 · CONTENT INDEX</p>
+    <h1 class="flow-title">내 콘텐츠<br>제작 인덱스</h1>
+    <p class="flow-desc">다이어리의 목차처럼 제작물과 진행 상태를 한눈에 확인하는 사용자 대시보드입니다.</p>
+    <p class="form-message" id="contentIndexMessage" hidden></p>
+    <div class="user-settings-launch"><button class="user-settings-icon" id="userSettingsOpen" type="button" aria-label="사용자 설정" aria-haspopup="dialog" aria-controls="userSettingsDialog" title="사용자 설정">
+      <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>
+    </button></div>
+    <div class="index-summary" aria-label="콘텐츠 제작 요약"><button class="index-summary-item active" type="button" data-index-filter="all"><small>ALL CONTENTS</small><strong data-index-count="all">00</strong><span>전체 제작물</span></button><button class="index-summary-item" type="button" data-index-filter="progress"><small>IN PROGRESS</small><strong data-index-count="progress">00</strong><span>현재 제작 중</span></button><button class="index-summary-item" type="button" data-index-filter="completed"><small>COMPLETED</small><strong data-index-count="completed">00</strong><span>영상 제작 완료</span></button><button class="index-summary-item" type="button" data-index-filter="scheduled"><small>SCHEDULED</small><strong data-index-count="scheduled">00</strong><span>배포 예약</span></button><button class="index-summary-item brand-index-card" id="brandLibraryOpen" type="button"><small>BRAND RESOURCES</small><strong id="brandVersionCount">00</strong><span>리소스 버전</span></button></div>
+    <div class="content-index" id="contentIndex" aria-label="제작 콘텐츠 목록">
+      <div class="content-index-row head" aria-hidden="true"><span>NO.</span><span>콘텐츠</span><span>현재 단계</span><span>최근 수정</span><span>열기</span></div>
+    </div>
+    <section class="brand-library-panel" id="brandLibraryPanel" aria-labelledby="brandLibraryTitle" hidden>
+      <header class="brand-library-head"><div><small>PERSONAL BRAND LIBRARY</small><h2 id="brandLibraryTitle">개인 브랜드 리소스</h2><p>여기서만 새 버전을 등록합니다. 콘텐츠 화면에서는 기존 버전만 선택할 수 있습니다.</p></div><button class="flow-btn" id="brandLibraryClose" type="button">콘텐츠 목록으로</button></header>
+      <div class="brand-library-form"><label>종류<select id="brandUploadRole"><option value="intro">인트로</option><option value="outro">아웃트로</option><option value="watermark">워터마크 PNG</option></select></label><label>리소스 이름<input id="brandUploadName" maxlength="80" placeholder="예: 기본 시설 인트로"></label><label>새 버전 파일<input id="brandUploadFile" type="file" accept="image/png,image/jpeg,image/webp,video/mp4"></label><button class="flow-btn primary" id="brandUploadButton" type="button">새 버전 등록</button></div>
+      <p class="form-message" id="brandLibraryMessage"></p><div class="brand-library-list" id="brandLibraryList"></div>
+    </section>
+    <div class="flow-actions"><button class="flow-btn" type="button" data-go="1">계정 정보</button><button class="flow-btn primary" id="createProjectButton" type="button">새 콘텐츠 만들기<span class="btn-next-icon" aria-hidden="true"></span></button></div>
+  </div>
+</section>

@@ -1,0 +1,27 @@
+<!-- Step 01 login partial. The legacy shell owns event binding until this partial is mounted. -->
+<section class="step-view flow-page" id="step1">
+  <div class="flow-card binder-cover">
+    <time class="page-date"></time>
+    <p class="flow-kicker">STEP 01 · LOGIN</p>
+    <div class="cover-brand">
+      <img class="cover-logo-image" src="/01_app/assets/brand/thinkcast-user-logo-inverse.png" alt="생각담 ThinkCast">
+      <span class="cover-brand-category">AI SOCIAL CONTENT STUDIO</span>
+    </div>
+    <p class="cover-brand-tagline">당신의 생각을, 고객이 원하는 콘텐츠로.</p>
+    <form id="loginForm" class="form-grid">
+      <label class="field"><span>아이디</span><input id="loginUsername" name="username" autocomplete="username" placeholder="아이디를 입력하세요" required></label>
+      <label class="field"><span>비밀번호</span><input id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="비밀번호를 입력하세요" required></label>
+      <p class="form-message" id="loginMessage"></p>
+    </form>
+    <form id="registerForm" class="form-grid" hidden>
+      <label class="field"><span>아이디</span><input id="registerUsername" name="username" autocomplete="username" minlength="3" maxlength="40" placeholder="영문·숫자 3자 이상" required></label>
+      <label class="field"><span>비밀번호</span><input id="registerPassword" name="password" type="password" autocomplete="new-password" minlength="8" placeholder="8자 이상 입력하세요" required></label>
+      <label class="field"><span>비밀번호 확인</span><input id="registerPasswordConfirm" name="password_confirm" type="password" autocomplete="new-password" minlength="8" placeholder="한 번 더 입력하세요" required></label>
+      <p class="form-message" id="registerMessage"></p>
+    </form>
+    <div id="loggedInPanel" class="form-grid" hidden><div class="account-summary"><span>현재 사용자</span><strong id="loggedInUsername"></strong><span id="loggedInProject"></span></div></div>
+    <div class="flow-actions login-actions" id="loginActions"><button class="flow-btn" id="registerOpen" type="button">회원가입</button><button class="flow-btn primary" type="submit" form="loginForm">로그인<span class="btn-next-icon" aria-hidden="true"></span></button></div>
+    <div class="flow-actions login-actions" id="registerActions" hidden><button class="flow-btn" id="registerBack" type="button">로그인으로</button><button class="flow-btn primary" type="submit" form="registerForm">가입하고 시작<span class="btn-next-icon" aria-hidden="true"></span></button></div>
+    <div class="flow-actions login-actions" id="loggedInActions" hidden><button class="flow-btn" id="logoutButton" type="button">로그아웃</button><button class="flow-btn primary" type="button" data-go="index">내 콘텐츠<span class="btn-next-icon" aria-hidden="true"></span></button></div>
+  </div>
+</section>
