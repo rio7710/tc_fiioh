@@ -1388,7 +1388,8 @@ function sceneBaseGuide(scene){
 function openImageRegeneration(){
   const sceneIndex=Math.max(0,currentScene);
   const scene=scenes[sceneIndex];
-  video.pause();
+  const mainVideo=typeof video!=='undefined'&&video?video:document.querySelector('#video');
+  if(mainVideo&&typeof mainVideo.pause==='function'){try{mainVideo.pause()}catch(e){}}
   imageRegenerationSceneNo.textContent=`SCENE ${String(sceneIndex+1).padStart(2,'0')} · IMAGE VARIATION`;
   document.querySelector('#imageRegenerationTitle').textContent=`${scene.name} · 후보 추가`;
   imageBaseGuide.textContent=sceneBaseGuide(scene);
@@ -1633,7 +1634,8 @@ const contentRouteSubscription=typeof ThinkCastContentRoute!=='undefined'&&Think
 function showStep(step,historyMode='push'){
   step=String(step);if(!isLoggedIn&&step!=='1')step='1';
   updateContentUuidLabels();
-  video.pause();
+  const mainVideo=typeof video!=='undefined'&&video?video:document.querySelector('#video');
+  if(mainVideo&&typeof mainVideo.pause==='function'){try{mainVideo.pause()}catch(e){}}
   const viewId=step==='index'?'stepIndex':step==='project'?'stepProject':step==='3-1'?'step31':`step${step}`;
   document.querySelectorAll('.step-view').forEach(view=>{view.hidden=view.id!==viewId});
   document.querySelector('thinkcast-top-nav')?.setActive(step==='project'?'index':step==='3-1'?'3':step);
@@ -2880,7 +2882,8 @@ window.startRenderWorkflow=async function(){
   }
   try{if(!await ensureStepApiReady(4))return}catch(error){renderStatus.textContent=`API 설정 확인 오류: ${error.message}`;return}
   try{await saveBrandSelections()}catch(error){renderStatus.textContent=`브랜드 설정 저장 오류: ${error.message}`;return}
-  video.pause();
+  const mainVideo=typeof video!=='undefined'&&video?video:document.querySelector('#video');
+  if(mainVideo&&typeof mainVideo.pause==='function'){try{mainVideo.pause()}catch(e){}}
   renderBtn.disabled=true;renderBtn.setAttribute('aria-busy','true');
   renderStatus.textContent='승인 이미지로 최종 영상을 제작하고 있습니다. 이 페이지를 닫지 마세요.';
   const modal=configureWorkflowModal('export');
@@ -3118,7 +3121,12 @@ async function restoreLoginSession(){
   }
 }
 
-document.querySelectorAll('[data-go]').forEach(button=>button.addEventListener('click',async()=>{try{await navigateProjectStep(button.dataset.go)}catch(error){document.querySelector('#projectDetailNote').textContent=error.message}}));
+document.addEventListener('click',async event=>{
+  const button=event.target.closest('[data-go]');
+  if(!button)return;
+  try{await navigateProjectStep(button.dataset.go)}
+  catch(error){const note=document.querySelector('#projectDetailNote')||document.querySelector('#contentIndexMessage');if(note)note.textContent=error.message}
+});
 const watermarkPreviewRatios=[['16x9','1920 × 1080 · 16:9'],['9x16','1080 × 1920 · 9:16'],['4x5','1080 × 1350 · 4:5'],['1x1','1080 × 1080 · 1:1']];let watermarkPreviewItem=null;let watermarkPreviewIndex=0;let watermarkPreviewSnapshot=null;let watermarkPreviewSaved=false;
 function activateWatermarkRatio(index){watermarkPreviewIndex=index;const ratio=watermarkPreviewRatios[index][0];const profile=watermarkProfiles[ratio]||{position:'top-right',width_ratio:.15};watermarkPosition=profile.position||'top-right';watermarkWidthRatio=Number(profile.width_ratio)||.15;syncWatermarkPositionControls()}
 function storeActiveWatermarkProfile(){const ratio=watermarkPreviewRatios[watermarkPreviewIndex][0];watermarkProfiles[ratio]={position:watermarkPosition,width_ratio:watermarkWidthRatio}}
