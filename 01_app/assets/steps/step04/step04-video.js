@@ -341,13 +341,19 @@
     saveEditorSettings();
   }
 
+  const musicTracks = {
+    satie: '/02_media/music/01_Satie_Gymnopedie_No1_CC-BY-3.0.mp3',
+    debussy: '/02_media/music/02_Debussy_Clair_de_lune_CC-BY-3.0.mp3',
+    bach: '/02_media/music/03_Bach_Air_BWV1068_Public_Domain.mp3'
+  };
+
   function setMusic(track) {
     selectedMusic = track;
     if (typeof document === 'undefined') return;
     const bgm = document.querySelector('#bgm');
     const video = document.querySelector('#video');
     if (bgm && track !== 'none') {
-      bgm.src = `/02_media/music/${track}.mp3`;
+      bgm.src = musicTracks[track] || `/02_media/music/${track}.mp3`;
       bgm.addEventListener('loadedmetadata', () => {
         alignMusic();
         if (video && !video.paused) bgm.play().catch(() => {});
