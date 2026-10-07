@@ -1258,6 +1258,7 @@ function resetProjectScopedState(){
   storedStoryboardVideoCandidates=new Map();
   selectedKeywords.clear();
   if(window.Step04VideoEditor?.setSceneCropPositions)window.Step04VideoEditor.setSceneCropPositions({});
+  if(typeof projectStore!=='undefined'&&projectStore)projectStore.resetProjectState();
 }
 const keywordTilts=new Map();
 let visibleKeywordIds=[];
@@ -1493,22 +1494,36 @@ document.querySelector('#apiSettingsForm').addEventListener('submit',async event
   }catch(error){message.textContent=error.message}finally{save.disabled=false}
 });
 function readContentRoute(){
+  if(typeof ThinkCastContentRoute!=='undefined'&&ThinkCastContentRoute.readContentRoute){
+    return ThinkCastContentRoute.readContentRoute(location);
+  }
   const url=new URL(location.href);
   const hash=url.hash;
   const step=hash==='#index'?'index':hash==='#project'?'project':hash.match(/^#step(3-1|[1-5])$/)?.[1]||'index';
   return {step,projectId:url.searchParams.get('project_id'),explicitProject:url.searchParams.has('project_id')};
 }
 function writeContentRoute(step,mode='push'){
+  if(typeof ThinkCastContentRoute!=='undefined'&&ThinkCastContentRoute.writeContentRoute){
+    return ThinkCastContentRoute.writeContentRoute({location,history,mode,step,projectId:activeProjectId});
+  }
   const url=new URL(location.href);
   url.hash=step==='index'?'index':step==='project'?'project':`step${step}`;
   if(activeProjectId)url.searchParams.set('project_id',activeProjectId);else url.searchParams.delete('project_id');
   if(url.href!==location.href)history[mode==='replace'?'replaceState':'pushState'](null,'',url.href);
 }
+const ACTIVE_PROJECT_STORAGE_KEY='thinkcast-active-project-v1';
+let activeProjectId=null;
+const projectStore=typeof ThinkCastProjectStore!=='undefined'&&ThinkCastProjectStore.createProjectStore?ThinkCastProjectStore.createProjectStore({activeProjectId:null}):null;
+function setActiveProjectId(projectId){
+  activeProjectId=projectId;
+  if(projectId)localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY,projectId);
+  else localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
+  if(projectStore)projectStore.setActiveProject(projectId);
+}
 function selectRouteProject(route){
   if(!route.explicitProject)return true;
   const project=indexProjects[route.projectId];
-  activeProjectId=project?route.projectId:null;
-  if(project)localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY,activeProjectId);else localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
+  setActiveProjectId(project?route.projectId:null);
   if(!project)setContentIndexError('content','요청한 콘텐츠를 찾을 수 없습니다. 목록에서 다시 선택해 주세요.');
   return Boolean(project);
 }
@@ -1522,8 +1537,9 @@ async function restoreContentRoute(){
   try{await navigateProjectStep(valid?route.step:'index',{historyMode:'replace'})}
   catch(error){setContentIndexError('content','콘텐츠를 불러오지 못했습니다. 목록에서 다시 시도해 주세요.');showStep('index','replace')}
 }
-window.addEventListener('popstate',restoreContentRoute);
-window.addEventListener('hashchange',restoreContentRoute);
+const contentRouteSubscription=typeof ThinkCastContentRoute!=='undefined'&&ThinkCastContentRoute.listenContentRoutes?ThinkCastContentRoute.listenContentRoutes(function(){
+  return restoreContentRoute();
+},{window,location}):null;
 function showStep(step,historyMode='push'){
   step=String(step);if(!isLoggedIn&&step!=='1')step='1';
   updateContentUuidLabels();
@@ -1601,8 +1617,6 @@ async function navigateProjectStep(requestedTarget,{historyMode='push'}={}){
 }
 
 const indexProjects={};
-const ACTIVE_PROJECT_STORAGE_KEY='thinkcast-active-project-v1';
-let activeProjectId=null;
 let navToken=0;
 function beginNav(){return ++navToken}
 function isStaleNav(token){return token!==navToken}
@@ -1668,17 +1682,17 @@ function renderProjectIndex(projects){
     }
   });
   const remembered=localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY);
-  if(remembered&&indexProjects[remembered])activeProjectId=remembered;
-  else if(!remembered&&projects.length===1){activeProjectId=projects[0].project_id;localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY,activeProjectId)}
-  else if(remembered&&!indexProjects[remembered]){activeProjectId=null;localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY)}
-  else if(activeProjectId&&!indexProjects[activeProjectId]){activeProjectId=null;localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY)}
+  if(remembered&&indexProjects[remembered])setActiveProjectId(remembered);
+  else if(!remembered&&projects.length===1){setActiveProjectId(projects[0].project_id)}
+  else if(remembered&&!indexProjects[remembered]){setActiveProjectId(null)}
+  else if(activeProjectId&&!indexProjects[activeProjectId]){setActiveProjectId(null)}
 }
 async function refreshProjectIndex(){const [result]=await Promise.all([api('/api/projects'),refreshBrandLibrary()]);renderProjectIndex(result.projects||[])}
 let projectStatusPollBusy=false;setInterval(async()=>{const holder=document.querySelector('#contentIndex');if(!holder||holder.offsetParent===null||projectStatusPollBusy)return;projectStatusPollBusy=true;try{const result=await api('/api/projects');renderProjectIndex(result.projects||[])}catch(error){}finally{projectStatusPollBusy=false}},5000);
 function openIndexProject(projectId,historyMode='push'){
   const project=indexProjects[projectId];if(!project)return;
   beginNav();
-  activeProjectId=projectId;localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY,projectId);document.querySelector('#projectDetailKicker').textContent=`PROJECT · ${projectId}`;
+  setActiveProjectId(projectId);document.querySelector('#projectDetailKicker').textContent=`PROJECT · ${projectId}`;
   document.querySelector('#projectDetailTitle').textContent=project.title;
   document.querySelector('#projectDetailSummary').textContent=project.summary;
   const currentKey=project.currentStep||'2';
@@ -3058,12 +3072,12 @@ document.querySelector('#projectDeleteButton').addEventListener('click',async ev
   try{
     await api('/api/project/delete',{method:'POST',body:JSON.stringify({project_id:activeProjectId})});
     resetProjectScopedState();
-    localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);activeProjectId=null;setKeywordStageLocked(false);
+    setActiveProjectId(null);setKeywordStageLocked(false);
     await refreshProjectIndex();showStep('index');
   }catch(error){document.querySelector('#projectDetailNote').textContent=error.message}
   finally{button.disabled=false}
 });
-document.querySelector('#createProjectButton').addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{const result=await api('/api/projects',{method:'POST',body:JSON.stringify({name:'새 콘텐츠'})});resetProjectScopedState();activeProjectId=result.project.project_id;setKeywordStageLocked(false);localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY,activeProjectId);setVoiceProfile('warm_female');visibleKeywordIds=demoData.keywords.filter(item=>!item.seasonal).slice(0,8).map(item=>item.id);renderKeywords();await refreshProjectIndex();showStep(2)}catch(error){alert(error.message)}finally{button.disabled=false}});
+document.querySelector('#createProjectButton').addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{const result=await api('/api/projects',{method:'POST',body:JSON.stringify({name:'새 콘텐츠'})});resetProjectScopedState();setActiveProjectId(result.project.project_id);setKeywordStageLocked(false);setVoiceProfile('warm_female');visibleKeywordIds=demoData.keywords.filter(item=>!item.seasonal).slice(0,8).map(item=>item.id);renderKeywords();await refreshProjectIndex();showStep(2)}catch(error){alert(error.message)}finally{button.disabled=false}});
 let trendRequestVersion=0;
 function setTrendKeywordLoading(loading){
   document.querySelector('#trendKeywordLoading').hidden=!loading;
@@ -3136,7 +3150,7 @@ document.querySelector('#registerForm').addEventListener('submit',async event=>{
 });
 document.querySelector('#logoutButton').addEventListener('click',async()=>{
   await api('/api/logout',{method:'POST',body:'{}'});
-  activeProjectId=null;setKeywordStageLocked(false);localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);setLoginAccess(false);setAuthMode('login');showStep(1);
+  setActiveProjectId(null);setKeywordStageLocked(false);setLoginAccess(false);setAuthMode('login');showStep(1);
 });
 document.querySelector('#keywordGrid').addEventListener('click',event=>{
   const card=event.target.closest('.keyword-card');

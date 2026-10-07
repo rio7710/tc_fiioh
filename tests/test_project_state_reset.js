@@ -48,7 +48,7 @@ const createEnd = html.indexOf('\nlet trendRequestVersion=',createStart);
 const createHandler = html.slice(createStart,createEnd);
 const createApi = createHandler.indexOf("await api('/api/projects'");
 const createReset = createHandler.indexOf('resetProjectScopedState()');
-const assignNewProject = createHandler.indexOf('activeProjectId=result.project.project_id');
+const assignNewProject = createHandler.search(/(?:activeProjectId=|setActiveProjectId\()result\.project\.project_id/);
 assert.ok(createApi >= 0 && createReset > createApi,'create must preserve state when the API fails');
 assert.ok(assignNewProject > createReset,'create must reset old state before adopting the new project');
 assert.equal((createHandler.match(/resetProjectScopedState\(\)/g)||[]).length,1,'create reset must have one success-path call');

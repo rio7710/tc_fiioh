@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const ThinkCastContentRoute = require('../01_app/assets/core/content-route.js');
+const ThinkCastProjectStore = require('../01_app/assets/core/project-store.js');
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 const block = html.slice(html.indexOf('function readContentRoute()'), html.indexOf("let selectedVoiceProfile="));
 
@@ -12,6 +14,7 @@ function browser(url) {
   const views = ['stepIndex','stepProject','step1','step2','step3','step31','step4','step5'].map(id => ({id, hidden:true}));
   const messages = {};
   const context = vm.createContext({
+    ThinkCastContentRoute, ThinkCastProjectStore,
     URL, console, isLoggedIn:true, video:{pause(){}}, updateContentUuidLabels(){},
     document:{
       querySelectorAll(){return views;},
