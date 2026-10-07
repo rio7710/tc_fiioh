@@ -1,35 +1,24 @@
 /* Step 04 Video Editor Isolated JS Controller */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
-    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js'], factory);
+    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js'], factory);
   } else if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'));
+    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'));
   } else {
-    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings);
+    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store);
   }
-}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings) {
+}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store) {
   'use strict';
 
   const { SceneNav, RatioProfiles, BrandSelection, MobileSync } = VideoEditor || {};
 
   // Step 4 State (Single Source of Truth)
   let scenes = [];
-  let currentScene = -1;
-  let currentType = 'editorial';
-  let selectedMusic = 'satie';
-  let currentPreviewPlatform = 'youtube';
-  let selectedPlatforms = new Set(['youtube', 'instagram', 'naver']);
-  let sceneCropPositions = {};
-  let videoPanX = 50;
-  let captionSizeLevel = 0;
-  let narrationEnabled = true;
-  let activeNarration = -1;
+  const editorState = Step04Store.create();
   let pendingDissolveOverlay = null;
   let isStep4Initialized = false;
   let configuredSettings = null;
   let configuredCatalog = null;
-  let sceneDissolveSeconds = 0.5;
-  let currentVolume = 0.5;
 
   function callShellFeature(name, ...args) {
     if (typeof window === 'undefined' || typeof window[name] !== 'function') return undefined;
@@ -79,7 +68,8 @@
   }
 
   function setVideoPan(value) {
-    videoPanX = RatioProfiles ? RatioProfiles.clampVideoPan(value) : Math.max(0, Math.min(100, Number(value) || 50));
+    const videoPanX = RatioProfiles ? RatioProfiles.clampVideoPan(value) : Math.max(0, Math.min(100, Number(value) || 50));
+    editorState.set('videoPanX', videoPanX);
     if (typeof document === 'undefined') return;
     const stage = document.querySelector('#stage');
     if (stage) stage.style.setProperty('--video-pan-x', `${videoPanX}%`);
@@ -87,10 +77,10 @@
 
   function setSceneDissolveSeconds(seconds) {
     const val = Number.isFinite(Number(seconds)) ? Math.max(0, Math.min(3, Number(seconds))) : 0.5;
-    sceneDissolveSeconds = val;
+    editorState.set('sceneDissolveSeconds', val);
     if (typeof document !== 'undefined') {
       const stage = document.querySelector('#stage');
-      if (stage) stage.style.setProperty('--scene-dissolve-seconds', `${sceneDissolveSeconds}s`);
+      if (stage) stage.style.setProperty('--scene-dissolve-seconds', `${val}s`);
     }
   }
 
@@ -103,35 +93,34 @@
     }
     if (settings && typeof settings === 'object') {
       configuredSettings = settings;
-      if (settings.type !== undefined) currentType = settings.type;
-      if (settings.music !== undefined) selectedMusic = settings.music;
+      if (settings.type !== undefined) editorState.set('currentType', settings.type);
+      if (settings.music !== undefined) editorState.set('selectedMusic', settings.music);
       if (settings.preview_platform !== undefined || settings.previewPlatform !== undefined) {
-        currentPreviewPlatform = settings.preview_platform || settings.previewPlatform;
+        editorState.set('currentPreviewPlatform', settings.preview_platform || settings.previewPlatform);
       }
       if (Array.isArray(settings.platforms)) {
-        selectedPlatforms.clear();
-        settings.platforms.forEach(p => selectedPlatforms.add(p));
+        editorState.set('selectedPlatforms', new Set(settings.platforms));
       }
       const rawVolume = settings.volume;
       if (rawVolume !== undefined) {
-        currentVolume = Number.isFinite(Number(rawVolume)) ? Math.max(0, Math.min(1, Number(rawVolume))) : 0.5;
+        editorState.set('currentVolume', Number.isFinite(Number(rawVolume)) ? Math.max(0, Math.min(1, Number(rawVolume))) : 0.5);
       }
       const rawPan = settings.video_pan_x !== undefined ? settings.video_pan_x : settings.videoPanX;
       if (Number.isFinite(Number(rawPan))) {
         const numPan = Number(rawPan);
         const panPercent = numPan <= 1.0 ? numPan * 100 : numPan;
-        videoPanX = RatioProfiles ? RatioProfiles.clampVideoPan(panPercent) : Math.max(0, Math.min(100, panPercent));
+        editorState.set('videoPanX', RatioProfiles ? RatioProfiles.clampVideoPan(panPercent) : Math.max(0, Math.min(100, panPercent)));
       }
       const rawDissolve = settings.scene_dissolve_seconds !== undefined ? settings.scene_dissolve_seconds : settings.sceneDissolveSeconds;
       if (Number.isFinite(Number(rawDissolve))) {
-        sceneDissolveSeconds = Math.max(0, Math.min(3, Number(rawDissolve)));
+        editorState.set('sceneDissolveSeconds', Math.max(0, Math.min(3, Number(rawDissolve))));
       }
       const rawCaptionSize = settings.caption_size !== undefined ? settings.caption_size : settings.captionSize;
       if (Number.isFinite(Number(rawCaptionSize))) {
-        captionSizeLevel = Math.max(-5, Math.min(5, Number(rawCaptionSize)));
+        editorState.set('captionSizeLevel', Math.max(-5, Math.min(5, Number(rawCaptionSize))));
       }
       if (settings.narration !== undefined) {
-        narrationEnabled = Boolean(settings.narration);
+        editorState.set('narrationEnabled', Boolean(settings.narration));
       }
       restoreEditorSettings(settings);
     }
@@ -140,17 +129,17 @@
 
   function getEffectiveSettingsPayload() {
     const musicVolume = typeof document !== 'undefined' ? document.querySelector('#musicVolume') : null;
-    const vol = musicVolume ? Number(musicVolume.value) : currentVolume;
+    const vol = musicVolume ? Number(musicVolume.value) : editorState.get('currentVolume');
     return {
-      type: currentType,
-      music: selectedMusic,
+      type: editorState.get('currentType'),
+      music: editorState.get('selectedMusic'),
       volume: Number.isFinite(vol) ? Math.max(0, Math.min(1, vol)) : 0.5,
-      narration: narrationEnabled,
-      preview_platform: currentPreviewPlatform,
-      platforms: Array.from(selectedPlatforms),
-      video_pan_x: videoPanX / 100,
-      scene_dissolve_seconds: sceneDissolveSeconds,
-      caption_size: captionSizeLevel
+      narration: editorState.get('narrationEnabled'),
+      preview_platform: editorState.get('currentPreviewPlatform'),
+      platforms: Array.from(editorState.get('selectedPlatforms')),
+      video_pan_x: editorState.get('videoPanX') / 100,
+      scene_dissolve_seconds: editorState.get('sceneDissolveSeconds'),
+      caption_size: editorState.get('captionSizeLevel')
     };
   }
 
@@ -180,28 +169,28 @@
 
   function setSceneCropPositions(positions) {
     if (positions && typeof positions === 'object') {
-      sceneCropPositions = JSON.parse(JSON.stringify(positions));
+      editorState.set('sceneCropPositions', positions);
     }
   }
 
   function getSceneCropPositions() {
-    return JSON.parse(JSON.stringify(sceneCropPositions || {}));
+    return editorState.get('sceneCropPositions');
   }
 
   function applyStoredSceneCrop() {
-    const scene = scenes[currentScene];
+    const scene = scenes[editorState.get('currentScene')];
     const format = currentCropFormat();
-    const panX = RatioProfiles ? RatioProfiles.getStoredSceneCropPosition(sceneCropPositions, scene?.id, format) : 50;
+    const panX = RatioProfiles ? RatioProfiles.getStoredSceneCropPosition(editorState.get('sceneCropPositions'), scene?.id, format) : 50;
     setVideoPan(panX);
   }
 
   function storeCurrentSceneCrop() {
-    const scene = scenes[currentScene];
+    const scene = scenes[editorState.get('currentScene')];
     const format = currentCropFormat();
     if (!scene || !RatioProfiles) return null;
     const activeProjectId = (typeof window !== 'undefined' && window.activeProjectId) ? window.activeProjectId : null;
-    const res = RatioProfiles.storeSceneCropPosition(sceneCropPositions, activeProjectId, scene.id, format, videoPanX);
-    sceneCropPositions = res.updatedPositions;
+    const res = RatioProfiles.storeSceneCropPosition(editorState.get('sceneCropPositions'), activeProjectId, scene.id, format, editorState.get('videoPanX'));
+    editorState.set('sceneCropPositions', res.updatedPositions);
     return res.payload;
   }
 
@@ -220,14 +209,14 @@
     if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem('thinkcast-editor-settings-v1', JSON.stringify({
-        type: currentType,
-        music: selectedMusic,
+        type: editorState.get('currentType'),
+        music: editorState.get('selectedMusic'),
         volume: (typeof document !== 'undefined' && document.querySelector('#musicVolume')?.value) || '0.5',
-        videoPanX: videoPanX,
-        captionSize: captionSizeLevel,
-        narration: narrationEnabled,
-        previewPlatform: currentPreviewPlatform,
-        platforms: Array.from(selectedPlatforms)
+        videoPanX: editorState.get('videoPanX'),
+        captionSize: editorState.get('captionSizeLevel'),
+        narration: editorState.get('narrationEnabled'),
+        previewPlatform: editorState.get('currentPreviewPlatform'),
+        platforms: Array.from(editorState.get('selectedPlatforms'))
       }));
     } catch (e) {}
   }
@@ -258,21 +247,21 @@
     const preferredPlatforms = source.platforms;
     const restoredPlatforms = Array.isArray(preferredPlatforms) ? preferredPlatforms.filter(item => validPlatforms.size === 0 || validPlatforms.has(item)) : null;
 
-    sceneCropPositions = {};
+    editorState.set('sceneCropPositions', {});
     if (restoredPlatforms) {
-      selectedPlatforms.clear();
-      restoredPlatforms.forEach(item => selectedPlatforms.add(item));
+      editorState.set('selectedPlatforms', new Set(restoredPlatforms));
     }
     if (hasDoc) {
+      const selectedPlatforms = editorState.get('selectedPlatforms');
       platformButtons.forEach(btn => btn.setAttribute('aria-pressed', String(selectedPlatforms.has(btn.dataset.platform))));
     }
 
     const musicVolume = hasDoc ? document.querySelector('#musicVolume') : null;
     const rawVolume = source.volume;
     if (rawVolume !== undefined) {
-      currentVolume = Number.isFinite(Number(rawVolume)) ? Math.max(0, Math.min(1, Number(rawVolume))) : 0.5;
+      editorState.set('currentVolume', Number.isFinite(Number(rawVolume)) ? Math.max(0, Math.min(1, Number(rawVolume))) : 0.5);
     }
-    if (musicVolume) musicVolume.value = String(currentVolume);
+    if (musicVolume) musicVolume.value = String(editorState.get('currentVolume'));
 
     const rawPan = source.video_pan_x !== undefined ? source.video_pan_x : source.videoPanX;
     let panPercent = 50;
@@ -304,7 +293,8 @@
   }
 
   function setCaptionSize(level) {
-    captionSizeLevel = Math.max(-5, Math.min(5, level));
+    const captionSizeLevel = Math.max(-5, Math.min(5, level));
+    editorState.set('captionSizeLevel', captionSizeLevel);
     if (typeof document === 'undefined') return;
     const stage = document.querySelector('#stage');
     const captionSizeValue = document.querySelector('#captionSizeValue');
@@ -319,7 +309,8 @@
   }
 
   function setNarration(enabled) {
-    narrationEnabled = Boolean(enabled);
+    const narrationEnabled = Boolean(enabled);
+    editorState.set('narrationEnabled', narrationEnabled);
     if (typeof document !== 'undefined') {
       const narrationBtn = document.querySelector('#narrationBtn');
       if (narrationBtn) {
@@ -336,7 +327,7 @@
   }
 
   function setType(type) {
-    currentType = type;
+    editorState.set('currentType', type);
     if (typeof document === 'undefined') return;
     const stage = document.querySelector('#stage');
     if (stage) {
@@ -358,7 +349,7 @@
   };
 
   function setMusic(track) {
-    selectedMusic = track;
+    editorState.set('selectedMusic', track);
     if (typeof document === 'undefined') return;
     const bgm = document.querySelector('#bgm');
     const video = document.querySelector('#video');
@@ -382,7 +373,7 @@
     if (typeof document === 'undefined') return;
     const config = RatioProfiles ? (RatioProfiles.getPlatformFormat ? RatioProfiles.getPlatformFormat(platform) : RatioProfiles.PLATFORM_PREVIEW_FORMATS[platform]) : null;
     const format = config || { className: 'preview-landscape', label: 'YouTube · 16:9', safe: '' };
-    currentPreviewPlatform = platform;
+    editorState.set('currentPreviewPlatform', platform);
     const stageCard = document.querySelector('#stageCard') || document.querySelector('.stage-card');
     const previewFormatBadge = document.querySelector('#previewFormatBadge');
     const formatSafeZone = document.querySelector('#formatSafeZone');
@@ -413,17 +404,18 @@
   }
 
   function stopNarration() {
+    const activeNarration = editorState.get('activeNarration');
     if (typeof window !== 'undefined' && activeNarration >= 0 && window.narrationAudios?.[activeNarration]) {
       window.narrationAudios[activeNarration].pause();
     }
-    activeNarration = -1;
+    editorState.set('activeNarration', -1);
   }
 
   function startNarration(index, t) {
     if (typeof window === 'undefined') return;
     const narrations = window.narrations || [];
     const narrationAudios = window.narrationAudios || [];
-    if (!narrationEnabled || index < 0 || !narrations[index] || !narrationAudios[index]) {
+    if (!editorState.get('narrationEnabled') || index < 0 || !narrations[index] || !narrationAudios[index]) {
       stopNarration();
       return;
     }
@@ -433,9 +425,9 @@
     const audioDuration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : duration;
     const targetTime = Math.min(Math.max(0, audioDuration - 0.03), Math.max(0, t - target.start) / duration * audioDuration);
 
-    if (activeNarration !== index) {
+    if (editorState.get('activeNarration') !== index) {
       stopNarration();
-      activeNarration = index;
+      editorState.set('activeNarration', index);
       audio.currentTime = targetTime;
       audio.play().catch(() => {});
     } else if (Math.abs(audio.currentTime - targetTime) > 0.25) {
@@ -448,7 +440,7 @@
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     const narrations = window.narrations || [];
     const video = document.querySelector('#video');
-    if (!narrationEnabled || !video || video.paused) {
+    if (!editorState.get('narrationEnabled') || !video || video.paused) {
       stopNarration();
       return;
     }
@@ -464,7 +456,7 @@
     if (typeof document === 'undefined') return;
     const video = document.querySelector('#video');
     const bgm = document.querySelector('#bgm');
-    if (!video || !bgm || selectedMusic === 'none') return;
+    if (!video || !bgm || editorState.get('selectedMusic') === 'none') return;
     if (bgm.readyState >= 1 && Number.isFinite(bgm.duration) && bgm.duration > 0) {
       const targetTime = video.currentTime % bgm.duration;
       if (Math.abs(bgm.currentTime - targetTime) > 0.25) bgm.currentTime = targetTime;
@@ -476,7 +468,7 @@
     const sceneList = document.querySelector('#sceneList');
     if (!sceneList) return;
     sceneList.innerHTML = scenes.map((scene, i) => `
-      <button class="scene-btn ${i === currentScene ? 'active' : ''}" type="button" data-index="${i}">
+      <button class="scene-btn ${i === editorState.get('currentScene') ? 'active' : ''}" type="button" data-index="${i}">
         <span class="scene-no">${String(i + 1).padStart(2, '0')}</span>
         <span class="scene-name">${scene.name || `장면 ${i + 1}`}</span>
         <span class="scene-time">${fmt(scene.start)}~${fmt(scene.end)}</span>
@@ -493,7 +485,7 @@
     if (mobileSceneSelect && MobileSync) {
       const mobileState = MobileSync.computeMobileSyncState(
         scenes,
-        currentScene,
+        editorState.get('currentScene'),
         false,
         0,
         timelineDuration()
@@ -539,12 +531,12 @@
     const clock = document.querySelector('#clock');
 
     if (!video || !stage) return;
-    stage.style.setProperty('--scene-dissolve-seconds', `${sceneDissolveSeconds}s`);
+    stage.style.setProperty('--scene-dissolve-seconds', `${editorState.get('sceneDissolveSeconds')}s`);
     const t = video.currentTime || 0;
     const idx = sceneAt(t);
 
-    if (idx !== currentScene) {
-      currentScene = idx;
+    if (idx !== editorState.get('currentScene')) {
+      editorState.set('currentScene', idx);
       if (sceneImage) {
         sceneImage.src = scenes[idx]?.image || '';
         sceneImage.alt = `${scenes[idx]?.name || ''} 장면 이미지`;
@@ -563,6 +555,7 @@
     stage.classList.toggle('has-outro-preview', showOutro);
 
     const titleText = document.querySelector('#titleText');
+    const currentScene = editorState.get('currentScene');
     const currentSceneItem = scenes[currentScene];
     const captionText = currentSceneItem ? (currentSceneItem.text || currentSceneItem.script || currentSceneItem.narration || currentSceneItem.line || currentSceneItem.name || '') : '';
     if (titleText) titleText.textContent = captionText;
@@ -632,7 +625,7 @@
       cueStart: scene.cueStart != null ? Number(scene.cueStart) : (scene.cue_start != null ? Number(scene.cue_start) : Number(scene.start || 0)),
       cueEnd: scene.cueEnd != null ? Number(scene.cueEnd) : (scene.cue_end != null ? Number(scene.cue_end) : Number(scene.end || 0))
     }));
-    currentScene = -1;
+    editorState.set('currentScene', -1);
     renderSceneList();
     const duration = timelineDuration();
     if (typeof document !== 'undefined') {
@@ -687,10 +680,10 @@
       setCaptionSize,
       setNarration,
       persistRenderSettings,
-      getSelectedMusic: () => selectedMusic,
-      getCaptionSize: () => captionSizeLevel,
-      getNarrationEnabled: () => narrationEnabled,
-      setCurrentVolume: value => { currentVolume = value; saveEditorSettings(); },
+      getSelectedMusic: () => editorState.get('selectedMusic'),
+      getCaptionSize: () => editorState.get('captionSizeLevel'),
+      getNarrationEnabled: () => editorState.get('narrationEnabled'),
+      setCurrentVolume: value => { editorState.set('currentVolume', value); saveEditorSettings(); },
       platformForRatio: ratio => ratio === '9x16' ? 'instagram' : ratio === '4x5' ? 'facebook' : ratio === '1x1' ? 'square' : 'youtube',
       resolveMobileSelection: value => MobileSync
         ? MobileSync.resolveMobileSelectChange(value, scenes, true)
@@ -712,7 +705,9 @@
       },
       toggleDistribution: (platform, button) => {
         if (!platform) return;
+        const selectedPlatforms = editorState.get('selectedPlatforms');
         selectedPlatforms.has(platform) ? selectedPlatforms.delete(platform) : selectedPlatforms.add(platform);
+        editorState.set('selectedPlatforms', selectedPlatforms);
         button.setAttribute('aria-pressed', String(selectedPlatforms.has(platform)));
         saveEditorSettings();
       }
@@ -732,7 +727,7 @@
     isConfigured: () => Boolean(configuredSettings),
     persistRenderSettings: persistRenderSettings,
     setSceneDissolveSeconds: setSceneDissolveSeconds,
-    getSceneDissolveSeconds: () => sceneDissolveSeconds,
+    getSceneDissolveSeconds: () => editorState.get('sceneDissolveSeconds'),
     getEffectiveSettingsPayload: getEffectiveSettingsPayload,
     getSceneCropPositions: getSceneCropPositions,
     setSceneCropPositions: setSceneCropPositions,

@@ -12,6 +12,7 @@ browserContext.globalThis = browserContext;
   '01_app/assets/video-editor/brand-selection.js',
   '01_app/assets/video-editor/mobile-sync.js',
   '01_app/assets/video-editor/index.js',
+  '01_app/assets/steps/step04/step04-store.js',
   '01_app/assets/steps/step04/step04-ui-bindings.js',
   '01_app/assets/steps/step04/step04-video.js'
 ].forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), browserContext, { filename: file }));
