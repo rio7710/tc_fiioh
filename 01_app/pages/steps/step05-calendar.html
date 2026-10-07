@@ -1,0 +1,43 @@
+<!-- Step 05 Content Calendar Partial Markup -->
+<section class="step-view flow-page" id="step5" hidden>
+  <div class="flow-card calendar-card">
+    <time class="page-date"></time>
+    <div class="calendar-heading">
+      <div><p class="flow-kicker">STEP 05 · CONTENT CALENDAR</p><h1 class="flow-title">제작과 배포 일정을<br>한눈에 기록해요.</h1></div>
+      <p class="flow-desc">스티커를 드래그해 날짜를 옮기거나, 우클릭·길게 눌러 배포 설정을 수정하세요.</p>
+    </div>
+    <section class="latest-export" id="latestExport" aria-label="최근 변환 영상" hidden>
+      <div class="latest-export-list" id="latestExportList"></div>
+      <div class="latest-export-actions"><button type="button" data-go="4">영상 디자인으로 돌아가기</button></div>
+    </section>
+    <div class="calendar-toolbar">
+      <div class="calendar-month-nav"><button id="calendarPrev" type="button" aria-label="이전 기간">←</button><strong class="calendar-month-title" id="calendarMonthTitle"></strong><button id="calendarNext" type="button" aria-label="다음 기간">→</button></div>
+      <div class="calendar-toolbar-actions"><div class="calendar-view-tabs" role="group" aria-label="캘린더 보기"><button class="calendar-view-btn" type="button" data-calendar-view="month" aria-pressed="true">월</button><button class="calendar-view-btn" type="button" data-calendar-view="week" aria-pressed="false">주</button><button class="calendar-view-btn" type="button" data-calendar-view="day" aria-pressed="false">오늘</button></div><button class="calendar-export" id="calendarExport" type="button">다른 캘린더로 내보내기 · .ics</button></div>
+    </div>
+    <div class="calendar-legend" aria-label="배포 상태 범례"><span><i class="legend-dot"></i>배포 완료</span><span><i class="legend-dot scheduled"></i>배포 예약</span><span><i class="legend-dot draft"></i>미배포</span><span><i class="legend-dot deleted"></i>삭제·제거</span></div>
+    <div class="calendar-scroll"><div class="calendar-grid" id="calendarGrid"></div></div>
+    <p class="calendar-help" id="calendarHelp" aria-live="polite">스티커를 다른 날짜로 드래그해 이동할 수 있습니다. 모바일에서는 길게 눌러 날짜를 수정하세요.</p>
+    <div class="flow-actions"><button class="flow-btn" type="button" data-go="4">이전 · 영상 디자인</button></div>
+  </div>
+</section>
+
+<div class="calendar-settings-modal" id="calendarSettingsModal" role="dialog" aria-modal="true" aria-labelledby="calendarSettingsTitle" hidden>
+  <div class="calendar-settings-dialog">
+    <div class="calendar-settings-head"><small>STICKER PIPELINE SETTINGS</small><h2 id="calendarSettingsTitle">콘텐츠 스티커 설정</h2></div>
+    <div class="calendar-settings-body"><label class="calendar-settings-date">콘텐츠 날짜<input id="calendarSettingsDate" type="date"></label><div class="calendar-settings-platforms" id="calendarSettingsPlatforms"></div></div>
+    <div class="calendar-settings-actions"><button class="view" id="calendarContentView" type="button">콘텐츠 보기</button><button id="calendarSettingsCancel" type="button">취소</button><button class="save" id="calendarSettingsSave" type="button">설정 저장</button></div>
+  </div>
+</div>
+
+<div class="calendar-settings-modal" id="contentUnavailableModal" role="dialog" aria-modal="true" aria-labelledby="contentUnavailableTitle" hidden>
+  <div class="calendar-settings-dialog"><div class="calendar-settings-head"><small>CONTENT PREVIEW</small><h2 id="contentUnavailableTitle">콘텐츠 보기</h2></div><p class="content-unavailable-copy">연결된 콘텐츠가 없습니다.</p><div class="calendar-settings-actions"><button class="save" id="contentUnavailableClose" type="button">확인</button></div></div>
+</div>
+
+<div class="calendar-settings-modal" id="calendarPreviewModal" role="dialog" aria-modal="true" aria-labelledby="calendarPreviewTitle" hidden>
+  <div class="calendar-settings-dialog calendar-preview-dialog">
+    <div class="calendar-settings-head"><small>FINAL CONTENT PREVIEW</small><h2 id="calendarPreviewTitle">최종 영상 미리보기</h2></div>
+    <div class="calendar-preview-stage"><video class="calendar-preview-video" id="calendarPreviewVideo" controls playsinline preload="metadata"></video><button class="calendar-preview-version-nav prev" id="calendarPreviewVersionPrev" type="button" aria-label="이전 최종 영상 버전">‹</button><button class="calendar-preview-version-nav next" id="calendarPreviewVersionNext" type="button" aria-label="다음 최종 영상 버전">›</button><span class="calendar-preview-version-count" id="calendarPreviewVersionCount" hidden></span></div>
+    <div class="calendar-preview-meta" id="calendarPreviewMeta"></div>
+    <div class="calendar-settings-actions"><a class="view" id="calendarPreviewDownload" download>MP4 다운로드</a><button class="save" id="calendarPreviewClose" type="button">닫기</button></div>
+  </div>
+</div>
