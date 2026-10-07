@@ -388,6 +388,13 @@
       btn.setAttribute('aria-pressed', String(btn.dataset.platform === platform));
     });
 
+    const formatKey = RatioProfiles ? RatioProfiles.calculateCropFormat(format.className) : '16x9';
+    document.querySelectorAll('.ratio-btn').forEach(btn => {
+      const match = btn.dataset.ratio === formatKey || (RatioProfiles ? RatioProfiles.calculateCropFormat(btn.dataset.ratio) === formatKey : false);
+      btn.classList.toggle('active', match);
+      btn.setAttribute('aria-pressed', String(match));
+    });
+
     applyStoredSceneCrop();
     updatePanAvailability();
     saveEditorSettings();
@@ -774,6 +781,13 @@
     document.querySelectorAll('.platform-preview-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         setPlatformPreview(btn.dataset.platform);
+        persistRenderSettings();
+      });
+    });
+    document.querySelectorAll('.ratio-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const platform = btn.dataset.platform || (btn.dataset.ratio === '9x16' ? 'instagram' : btn.dataset.ratio === '4x5' ? 'facebook' : btn.dataset.ratio === '1x1' ? 'square' : 'youtube');
+        setPlatformPreview(platform);
         persistRenderSettings();
       });
     });
