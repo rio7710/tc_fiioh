@@ -1839,6 +1839,14 @@ function renderBrandChoices(){
   if(scenes.length)renderSceneList();
 }
 function applyWatermarkPosition(element,position){const [vertical,horizontal]=position.split('-');element.style.inset='auto';element.style.transform='';if(horizontal==='left')element.style.left='3.5%';else if(horizontal==='right')element.style.right='3.5%';else{element.style.left='50%';element.style.transform='translateX(-50%)'}if(vertical==='top')element.style.top='3.5%';else if(vertical==='bottom')element.style.bottom='3.5%';else{element.style.top='50%';element.style.transform+=(element.style.transform?' ':'')+'translateY(-50%)'}}
+function currentCropFormat(){
+  if(window.Step04VideoEditor?.currentCropFormat){
+    return window.Step04VideoEditor.currentCropFormat();
+  }
+  const stageCard=document.querySelector('#stageCard')||document.querySelector('.stage-card');
+  if(!stageCard)return '16x9';
+  return window.RatioProfiles?window.RatioProfiles.calculateCropFormat(stageCard.className):'16x9';
+}
 function activeWatermarkProfile(){const format=currentCropFormat();return watermarkProfiles[format]||{position:watermarkPosition,width_ratio:watermarkWidthRatio}}
 function updateWatermarkPreview(){const controls=brandRoleControls('watermark');const preview=document.querySelector('#brandWatermarkPreview');preview.hidden=!controls.enabled.checked||!controls.select.value;preview.src=preview.hidden?'':`/api/brand-asset?version_id=${encodeURIComponent(controls.select.value)}`;preview.style.opacity=document.querySelector('#brandWatermarkOpacity').value;const profile=activeWatermarkProfile();preview.style.width=`${Number(profile.width_ratio||.15)*100}%`;applyWatermarkPosition(preview,profile.position||'top-right')}
 function activeOutroProfile(){const format=currentCropFormat();return outroProfiles[format]||{position:outroPosition,width_ratio:outroWidthRatio,background:outroBackground,background_opacity:outroBackgroundOpacity}}
