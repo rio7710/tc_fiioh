@@ -1115,6 +1115,14 @@ document.querySelectorAll('.page-date').forEach(item=>{
 });
 let scenes=[];
 let titleSceneIndexes=[];
+function normalizeNarrationSrc(src){
+  if(!src)return '';
+  const str=String(src);
+  const match=str.match(/^(?:https?:\/\/[^\/]+)?(\/02_media\/narration\/audio_\d+)/i);
+  if(match)return `${match[1]}.mp3`;
+  return str.replace(/\/02_media\/narration\/audio_(\d+).*\.mp3$/i, '/02_media/narration/audio_$1.mp3');
+}
+
 let narrationTracks=[
   {rate:1,src:'/02_media/narration/audio_0.mp3'},
   {rate:1.1,src:'/02_media/narration/audio_1.mp3'},
@@ -1133,8 +1141,9 @@ let narrationTracks=[
 ];
 let narrations=[];
 let narrationAudios=narrationTracks.map(item=>{
-  if(!item.src)return null;
-  const audio=new Audio(item.src);
+  const src=normalizeNarrationSrc(item?.src);
+  if(!src)return null;
+  const audio=new Audio(src);
   audio.preload='auto';
   audio.volume=.95;
   audio.playbackRate=item.rate;
@@ -1147,7 +1156,10 @@ function setNarrationTracks(tracks){
   }
   activeNarration=-1;
   const list=(Array.isArray(tracks)&&tracks.length)?tracks:narrationTracks;
-  narrationTracks=list.map(item=>({rate:Number(item?.rate)||1,src:String(item?.src||'')}));
+  narrationTracks=list.map(item=>({
+    rate:Number(item?.rate)||1,
+    src:normalizeNarrationSrc(item?.src)
+  }));
   narrationAudios=narrationTracks.map(item=>{
     if(!item.src)return null;
     const audio=new Audio(item.src);
