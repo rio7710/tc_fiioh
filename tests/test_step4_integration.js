@@ -25,20 +25,20 @@ console.log('✓ File integrity checks passed');
 // 2. Headless VM Execution Test: Pre-Partial Script Evaluation MUST NOT Throw (No Null Query Errors)
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 
-assert.match(html, /href="\/01_app\/assets\/video-editor\/video-editor\.css"/, 'HTML links video-editor.css');
-assert.match(html, /href="\/01_app\/assets\/steps\/step04\/step04-video\.css"/, 'HTML links step04-video.css');
-const sceneNavigationScript = html.indexOf('src="/01_app/assets/video-editor/scene-navigation.js"');
-const ratioProfilesScript = html.indexOf('src="/01_app/assets/video-editor/ratio-profiles.js"');
-const brandSelectionScript = html.indexOf('src="/01_app/assets/video-editor/brand-selection.js"');
-const mobileSyncScript = html.indexOf('src="/01_app/assets/video-editor/mobile-sync.js"');
-const videoEditorIndexScript = html.indexOf('src="/01_app/assets/video-editor/index.js"');
+assert.match(html, /href="\/01_app\/assets\/video-editor\/video-editor\.css(?:\?v=[^"]+)?"/, 'HTML links video-editor.css');
+assert.match(html, /href="\/01_app\/assets\/steps\/step04\/step04-video\.css(?:\?v=[^"]+)?"/, 'HTML links step04-video.css');
+const sceneNavigationScript = html.indexOf('/01_app/assets/video-editor/scene-navigation.js');
+const ratioProfilesScript = html.indexOf('/01_app/assets/video-editor/ratio-profiles.js');
+const brandSelectionScript = html.indexOf('/01_app/assets/video-editor/brand-selection.js');
+const mobileSyncScript = html.indexOf('/01_app/assets/video-editor/mobile-sync.js');
+const videoEditorIndexScript = html.indexOf('/01_app/assets/video-editor/index.js');
 assert.ok(sceneNavigationScript >= 0, 'HTML loads browser scene navigation dependency');
 assert.ok(ratioProfilesScript >= 0, 'HTML loads browser ratio profiles dependency');
 assert.ok(brandSelectionScript >= 0, 'HTML loads browser brand selection dependency');
 assert.ok(mobileSyncScript >= 0, 'HTML loads browser mobile sync dependency');
 assert.ok(Math.max(sceneNavigationScript, ratioProfilesScript, brandSelectionScript, mobileSyncScript) < videoEditorIndexScript, 'browser dependencies load before video-editor index.js');
-assert.match(html, /src="\/01_app\/assets\/video-editor\/index\.js"/, 'HTML loads video-editor index.js');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js"/, 'HTML loads step04-video.js');
+assert.match(html, /src="\/01_app\/assets\/video-editor\/index\.js(?:\?v=[^"]+)?"/, 'HTML loads video-editor index.js');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js(?:\?v=[^"]+)?"/, 'HTML loads step04-video.js');
 
 // Verify top-level script contains no direct querySelector('#video') causing null binding at startup
 assert.doesNotMatch(html, /const video=document\.querySelector\('#video'\);/, 'HTML must not query #video at top-level script parse time');
