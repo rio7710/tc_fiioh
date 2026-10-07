@@ -1,5 +1,22 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
 const Step04 = require('../01_app/assets/steps/step04/step04-video.js');
+
+const browserContext = vm.createContext({ console });
+browserContext.self = browserContext;
+browserContext.globalThis = browserContext;
+[
+  '01_app/assets/video-editor/scene-navigation.js',
+  '01_app/assets/video-editor/ratio-profiles.js',
+  '01_app/assets/video-editor/brand-selection.js',
+  '01_app/assets/video-editor/mobile-sync.js',
+  '01_app/assets/video-editor/index.js',
+  '01_app/assets/steps/step04/step04-video.js'
+].forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), browserContext, { filename: file }));
+assert.ok(browserContext.VideoEditor.SceneNav, 'browser bundle exposes scene navigation');
+assert.ok(browserContext.VideoEditor.MobileSync, 'browser bundle exposes mobile synchronization');
+assert.ok(browserContext.Step04VideoEditor, 'browser bundle initializes Step 4 after its dependencies');
 
 const scenes = [
   { id: 'one', name: 'One', start: 0, end: 5, cueStart: 0.5, text: 'one' },
