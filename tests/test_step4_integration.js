@@ -9,6 +9,7 @@ console.log('--- Step 4 Partial Lifecycle & Strict Browser Runtime Safety Tests 
 const partialPath = '01_app/pages/steps/step04-video.html';
 const cssPath = '01_app/assets/steps/step04/step04-video.css';
 const jsPath = '01_app/assets/steps/step04/step04-video.js';
+const brandStatePath = '01_app/assets/steps/step04/step04-brand-state.js';
 const storePath = '01_app/assets/steps/step04/step04-store.js';
 const bindingsPath = '01_app/assets/steps/step04/step04-ui-bindings.js';
 const videoEditorPath = '01_app/assets/video-editor/index.js';
@@ -16,6 +17,7 @@ const videoEditorPath = '01_app/assets/video-editor/index.js';
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
 assert.ok(fs.existsSync(jsPath), 'step04-video.js must exist');
+assert.ok(fs.existsSync(brandStatePath), 'step04-brand-state.js must exist');
 assert.ok(fs.existsSync(storePath), 'step04-store.js must exist');
 assert.ok(fs.existsSync(bindingsPath), 'step04-ui-bindings.js must exist');
 assert.ok(fs.existsSync(videoEditorPath), 'video-editor/index.js must exist');
@@ -38,6 +40,7 @@ const ratioProfilesScript = html.indexOf('/01_app/assets/video-editor/ratio-prof
 const brandSelectionScript = html.indexOf('/01_app/assets/video-editor/brand-selection.js');
 const mobileSyncScript = html.indexOf('/01_app/assets/video-editor/mobile-sync.js');
 const videoEditorIndexScript = html.indexOf('/01_app/assets/video-editor/index.js');
+const step04BrandStateScript = html.indexOf('/01_app/assets/steps/step04/step04-brand-state.js');
 const step04StoreScript = html.indexOf('/01_app/assets/steps/step04/step04-store.js');
 const step04BindingsScript = html.indexOf('/01_app/assets/steps/step04/step04-ui-bindings.js');
 assert.ok(sceneNavigationScript >= 0, 'HTML loads browser scene navigation dependency');
@@ -46,11 +49,14 @@ assert.ok(brandSelectionScript >= 0, 'HTML loads browser brand selection depende
 assert.ok(mobileSyncScript >= 0, 'HTML loads browser mobile sync dependency');
 assert.ok(Math.max(sceneNavigationScript, ratioProfilesScript, brandSelectionScript, mobileSyncScript) < videoEditorIndexScript, 'browser dependencies load before video-editor index.js');
 assert.ok(videoEditorIndexScript < step04BindingsScript, 'Step 4 UI bindings load after video editor dependencies');
+assert.ok(videoEditorIndexScript < step04BrandStateScript, 'Step 4 brand state loads after video editor dependencies');
+assert.ok(step04BrandStateScript < step04StoreScript, 'Step 4 brand state loads before related Step 4 scripts');
 assert.ok(videoEditorIndexScript < step04StoreScript, 'Step 4 store loads after video editor dependencies');
 assert.ok(step04StoreScript < html.indexOf('/01_app/assets/steps/step04/step04-video.js'), 'Step 4 store loads before the controller');
 assert.ok(step04BindingsScript < html.indexOf('/01_app/assets/steps/step04/step04-video.js'), 'Step 4 UI bindings load before the controller');
 assert.match(html, /src="\/01_app\/assets\/video-editor\/index\.js(?:\?v=[^"]+)?"/, 'HTML loads video-editor index.js');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js(?:\?v=[^"]+)?"/, 'HTML loads step04-video.js');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-brand-state\.js\?v=20261007_v5"/, 'HTML cache-busts step04-brand-state.js');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-store\.js\?v=20261007_v4"/, 'HTML cache-busts step04-store.js');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261007_v4"/, 'HTML cache-busts the Step 4 controller');
 assert.match(html, /Object\.assign\(window,\{[\s\S]*updateCommonOutroPreview[\s\S]*updateWatermarkPreview[\s\S]*\}\)/, 'shell exposes Step 4 preview callbacks after async isolation');
@@ -58,9 +64,9 @@ assert.match(html, /Object\.defineProperty\(window,'brandAssets',[\s\S]*get:\(\)
 for (const declaration of [
   "let brandAssets=[];",
   "let brandSelections=[];",
-  "let watermarkProfiles={};",
-  "let outroProfiles={};"
+  "const brandOverlayState=Step04BrandState.create();"
 ]) assert.ok(html.indexOf(declaration) > 0 && html.indexOf(declaration) < html.indexOf('function activeWatermarkProfile'), `${declaration} is initialized before Step 4 settings restore`);
+assert.doesNotMatch(html, /let (?:watermarkPosition|watermarkWidthRatio|watermarkProfiles|outroPosition|outroWidthRatio|outroBackground|outroBackgroundOpacity|outroProfiles)=/, 'brand overlay state must not be duplicated in P1 globals');
 
 // Verify top-level script contains no direct querySelector('#video') causing null binding at startup
 assert.doesNotMatch(html, /const video=document\.querySelector\('#video'\);/, 'HTML must not query #video at top-level script parse time');
@@ -172,6 +178,7 @@ function createPrePartialContext() {
   const context = vm.createContext({
     console,
     URL,
+    Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),
     setInterval: () => 1,
     clearInterval: () => {},
     setTimeout: (fn) => {
