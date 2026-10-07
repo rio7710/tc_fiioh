@@ -29,11 +29,26 @@ const video = { currentTime: 0, paused: true };
 const sceneList = { innerHTML: '' };
 const mobileSelect = { innerHTML: '', value: '' };
 const originalDocument = global.document;
+const originalWindow = global.window;
+let outroRefreshes = 0;
+let watermarkRefreshes = 0;
+const stageCard = {
+  className: 'stage-card preview-landscape',
+  classList: {
+    remove() { stageCard.className = 'stage-card'; },
+    add(name) { stageCard.className += ` ${name}`; }
+  }
+};
+global.window = {
+  updateCommonOutroPreview() { outroRefreshes += 1; },
+  updateWatermarkPreview() { watermarkRefreshes += 1; }
+};
 global.document = {
   querySelector(selector) {
     if (selector === '#video') return video;
     if (selector === '#sceneList') return sceneList;
     if (selector === '#mobileSceneSelect') return mobileSelect;
+    if (selector === '#stageCard' || selector === '.stage-card') return stageCard;
     return null;
   },
   querySelectorAll() { return []; }
@@ -63,8 +78,14 @@ try {
   state = Step04.navigatePreview({ type: 'SEEK_OUTRO' });
   assert.equal(state.isOutro, true, 'scene can return directly to OUT');
   assert.equal(video.currentTime, 11.95);
+
+  Step04.setPlatformPreview('instagram');
+  assert.match(stageCard.className, /preview-portrait/, 'ratio selection updates the preview frame');
+  assert.equal(outroRefreshes, 1, 'ratio selection refreshes the ratio-specific outro');
+  assert.equal(watermarkRefreshes, 1, 'ratio selection refreshes the ratio-specific watermark');
 } finally {
   global.document = originalDocument;
+  global.window = originalWindow;
 }
 
 console.log('Step 4 preview navigation integration passed');

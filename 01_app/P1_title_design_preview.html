@@ -3393,6 +3393,16 @@ function setMusic(m){return window.Step04VideoEditor?.setMusic(m);}
 function setType(t){return window.Step04VideoEditor?.setType(t);}
 function restoreEditorSettings(){return window.Step04VideoEditor?.restoreEditorSettings();}
 
+// Explicit callbacks used by the isolated Step 04 controller.
+Object.assign(window,{
+  api,
+  ensureOutroRatioAssets,
+  saveBrandSelections,
+  updateCommonOutroPreview,
+  updateWatermarkPreview
+});
+Object.defineProperty(window,'brandAssets',{configurable:true,get:()=>brandAssets});
+
 document.querySelector('#calendarPrev').addEventListener('click',()=>moveCalendarPeriod(-1));
 document.querySelector('#calendarNext').addEventListener('click',()=>moveCalendarPeriod(1));
 document.querySelectorAll('.calendar-view-btn').forEach(button=>button.addEventListener('click',()=>{
