@@ -1246,7 +1246,11 @@ function connectStoryboardAssetsToEditor(){
     ...narrationTracks[index]
   }));
   scenes.forEach(scene=>{if(scene.image){const preload=new Image();preload.src=scene.image}});
-  renderSceneList();
+  if(window.Step04VideoEditor?.applyTimeline){
+    window.Step04VideoEditor.applyTimeline({ scenes });
+  }else{
+    renderSceneList();
+  }
   currentScene=-1;
   video.currentTime=0;
   sync();
@@ -3254,7 +3258,6 @@ document.querySelector('#scriptSaveBtn').addEventListener('click',async()=>{
 
 
 // Thin Adapter Bridge for Step 04 Video Editor
-function applyTimeline(tl){return window.Step04VideoEditor?.applyTimeline(tl);}
 function sync(){return window.Step04VideoEditor?.sync();}
 function seekScene(idx){return window.Step04VideoEditor?.seekScene(idx);}
 function seekOutroPreview(){return window.Step04VideoEditor?.seekOutroPreview();}

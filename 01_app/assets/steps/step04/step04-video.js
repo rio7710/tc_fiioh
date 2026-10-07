@@ -594,7 +594,12 @@
 
   function applyTimeline(timeline) {
     const source = Array.isArray(timeline?.scenes) ? timeline.scenes : [];
-    scenes = source.map(scene => ({ ...scene }));
+    scenes = source.map(scene => ({
+      ...scene,
+      image: scene.image || scene.preview_uri || '',
+      cueStart: scene.cueStart != null ? Number(scene.cueStart) : (scene.cue_start != null ? Number(scene.cue_start) : Number(scene.start || 0)),
+      cueEnd: scene.cueEnd != null ? Number(scene.cueEnd) : (scene.cue_end != null ? Number(scene.cue_end) : Number(scene.end || 0))
+    }));
     renderSceneList();
     const duration = timelineDuration();
     if (typeof document !== 'undefined') {
