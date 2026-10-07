@@ -14,6 +14,8 @@
 
   // Step 4 State (Single Source of Truth)
   let scenes = [];
+  let narrations = [];
+  let narrationAudios = [];
   const editorState = Step04Store.create();
   let pendingDissolveOverlay = null;
   let isStep4Initialized = false;
@@ -415,16 +417,13 @@
 
   function stopNarration() {
     const activeNarration = editorState.get('activeNarration');
-    if (typeof window !== 'undefined' && activeNarration >= 0 && window.narrationAudios?.[activeNarration]) {
-      window.narrationAudios[activeNarration].pause();
+    if (activeNarration >= 0 && narrationAudios[activeNarration]) {
+      narrationAudios[activeNarration].pause();
     }
     editorState.set('activeNarration', -1);
   }
 
   function startNarration(index, t) {
-    if (typeof window === 'undefined') return;
-    const narrations = window.narrations || [];
-    const narrationAudios = window.narrationAudios || [];
     if (!editorState.get('narrationEnabled') || index < 0 || !narrations[index] || !narrationAudios[index]) {
       stopNarration();
       return;
@@ -447,8 +446,7 @@
   }
 
   function syncNarration(t, force = false) {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
-    const narrations = window.narrations || [];
+    if (typeof document === 'undefined') return;
     const video = document.querySelector('#video');
     if (!editorState.get('narrationEnabled') || !video || video.paused) {
       stopNarration();
@@ -567,6 +565,12 @@
     }
   }
 
+  function setNarrationTracks(payload) {
+    stopNarration();
+    narrations = Array.isArray(payload?.narrations) ? payload.narrations.slice() : [];
+    narrationAudios = Array.isArray(payload?.narrationAudios) ? payload.narrationAudios.slice() : [];
+  }
+
   function openImageRegeneration() {
     if (typeof document === 'undefined') return;
     const imageRegenerationModal = document.querySelector('#imageRegenerationModal');
@@ -659,6 +663,7 @@
     initStep4UI: initStep4UI,
     isInitialized: () => isStep4Initialized,
     applyTimeline: applyTimeline,
+    setNarrationTracks: setNarrationTracks,
     sync: sync,
     seekScene: seekScene,
     seekOutroPreview: seekOutroPreview,

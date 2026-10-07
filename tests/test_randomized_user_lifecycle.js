@@ -35,8 +35,11 @@ function lifecycle(seed) {
     .map(id => ({id, hidden: true}));
   const elements = {};
   const cropCalls = [];
+  let timelineResetCalls = 0;
+  let expectedProjectResets = 0;
   const context = vm.createContext({
     ThinkCastContentRoute, ThinkCastProjectStore,
+    timelineBridge: {reset() { timelineResetCalls += 1; }},
     URL,
     console,
     isLoggedIn: true,
@@ -113,15 +116,16 @@ function lifecycle(seed) {
   const resetWasComplete = () => assert.deepEqual(scopedSizes(), {
     scenes: 0, crops: 0, images: 0, imageCandidates: 0, voices: 0, videos: 0, videoCandidates: 0, keywords: 0
   });
+  const assertResetCount = () => assert.equal(timelineResetCalls, expectedProjectResets, 'timeline reset count follows successful create/delete resets');
 
   return {
     random,
     projects,
     async create(succeed) {
       dirtyScoped(); const before = scopedSizes();
-      if (!succeed) { assert.deepEqual(scopedSizes(), before); return; }
+      if (!succeed) { assert.deepEqual(scopedSizes(), before); assertResetCount(); return; }
       const id = `p-${++nextId}`; projects.add(id); syncProjects();
-      context.resetProjectScopedState(); vm.runInContext(`activeProjectId=${JSON.stringify(id)}`, context);
+      expectedProjectResets += 1; context.resetProjectScopedState(); assertResetCount(); vm.runInContext(`activeProjectId=${JSON.stringify(id)}`, context);
       storage.set('thinkcast-active-project-v1', id); vm.runInContext("showStep('2')", context); resetWasComplete();
       assert.deepEqual(context.userSettings, {voice: 'warm_female', watermark: 'user-logo'});
     },
@@ -158,8 +162,8 @@ function lifecycle(seed) {
     async remove(succeed) {
       const id = active(); if (!id) return;
       dirtyScoped(); const before = scopedSizes();
-      if (!succeed) { assert.ok(projects.has(id)); assert.equal(active(), id); assert.deepEqual(scopedSizes(), before); return; }
-      projects.delete(id); syncProjects(); context.resetProjectScopedState(); storage.delete('thinkcast-active-project-v1');
+      if (!succeed) { assert.ok(projects.has(id)); assert.equal(active(), id); assert.deepEqual(scopedSizes(), before); assertResetCount(); return; }
+      projects.delete(id); syncProjects(); expectedProjectResets += 1; context.resetProjectScopedState(); assertResetCount(); storage.delete('thinkcast-active-project-v1');
       vm.runInContext("activeProjectId=null;showStep('index')", context); resetWasComplete();
       assert.ok(!projects.has(id)); assert.equal(new URL(current).searchParams.has('project_id'), false);
       assert.deepEqual(context.userSettings, {voice: 'warm_female', watermark: 'user-logo'});

@@ -23,9 +23,10 @@
 <script src="/01_app/assets/steps/step04/step04-brand-state.js?v=20261007_v5"></script>
 <script src="/01_app/assets/steps/step04/step04-brand-overlay.js?v=20261007_v6"></script>
 <script src="/01_app/assets/steps/step04/step04-store.js?v=20261007_v4"></script>
+<script src="/01_app/assets/steps/step04/step04-timeline-bridge.js?v=20261007_v8"></script>
 <script src="/01_app/assets/steps/step04/step04-navigation-controller.js?v=20261007_v7"></script>
 <script src="/01_app/assets/steps/step04/step04-ui-bindings.js?v=20261007_v7"></script>
-<script src="/01_app/assets/steps/step04/step04-video.js?v=20261007_v7"></script>
+<script src="/01_app/assets/steps/step04/step04-video.js?v=20261007_v8"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar.js?v=20261007_v2"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
@@ -1127,106 +1128,36 @@ document.querySelectorAll('.page-date').forEach(item=>{
   item.textContent=`Date : ${todayParts.year}. ${todayParts.month}. ${todayParts.day}. ${todayParts.weekday}`;
 });
 let scenes=[];
-let titleSceneIndexes=[];
 let brandAssets=[];
 let brandSelections=[];
 const brandOverlayState=Step04BrandState.create();
-function normalizeNarrationSrc(src){
-  if(!src)return '';
-  const str=String(src);
-  const match=str.match(/^(?:https?:\/\/[^\/]+)?(\/02_media\/narration\/audio_\d+)/i);
-  if(match)return `${match[1]}.mp3`;
-  return str.replace(/\/02_media\/narration\/audio_(\d+).*\.mp3$/i, '/02_media/narration/audio_$1.mp3');
-}
-
-let narrationTracks=[
-  {rate:1,src:'/02_media/narration/audio_0.mp3'},
-  {rate:1.1,src:'/02_media/narration/audio_1.mp3'},
-  {rate:1,src:'/02_media/narration/audio_2.mp3'},
-  {rate:1,src:'/02_media/narration/audio_3.mp3'},
-  {rate:1,src:'/02_media/narration/audio_4.mp3'},
-  {rate:1,src:'/02_media/narration/audio_5.mp3'},
-  {rate:1,src:'/02_media/narration/audio_6.mp3'},
-  {rate:1.02,src:'/02_media/narration/audio_7.mp3'},
-  {rate:1.02,src:'/02_media/narration/audio_8.mp3'},
-  {rate:1,src:'/02_media/narration/audio_9.mp3'},
-  {rate:1,src:'/02_media/narration/audio_10.mp3'},
-  {rate:1.1,src:'/02_media/narration/audio_11.mp3'},
-  {rate:1,src:'/02_media/narration/audio_12.mp3'},
-  {rate:1.16,src:'/02_media/narration/audio_13.mp3'}
-];
-let narrations=[];
-let narrationAudios=narrationTracks.map(item=>{
-  const src=normalizeNarrationSrc(item?.src);
-  if(!src)return null;
-  const audio=new Audio(src);
-  audio.preload='auto';
-  audio.volume=.95;
-  audio.playbackRate=item.rate;
-  return audio;
+const timelineBridge=Step04TimelineBridge.create({
+  createAudio:src=>new Audio(src),
+  applyEditorTimeline:timeline=>window.Step04VideoEditor?.applyTimeline(timeline),
+  setEditorNarrationTracks:payload=>window.Step04VideoEditor?.setNarrationTracks(payload),
+  resetActiveNarration:()=>window.Step04VideoEditor?.stopNarration(),
+  getStoryboardImage:id=>storedStoryboardImages.get(id),
+  getStoryboardVideo:id=>storedStoryboardVideos.get(id),
+  getSceneVoice:id=>sceneVoiceContext(id).voice,
+  onTimelineApplied:nextScenes=>{
+    const duration=nextScenes.length?nextScenes[nextScenes.length-1].end:0;
+    sceneTimelineSummary.textContent=`타임라인 기준 · 총 ${nextScenes.length}장면 · ${duration}초`;
+    nextScenes.forEach(scene=>{if(scene.image){const preload=new Image();preload.src=scene.image}});
+  }
 });
-
-function setNarrationTracks(tracks){
-  if(Array.isArray(narrationAudios)){
-    narrationAudios.forEach(audio=>{if(audio&&typeof audio.pause==='function')audio.pause()});
-  }
-  activeNarration=-1;
-  const list=(Array.isArray(tracks)&&tracks.length)?tracks:narrationTracks;
-  narrationTracks=list.map(item=>({
-    rate:Number(item?.rate)||1,
-    src:normalizeNarrationSrc(item?.src)
-  }));
-  narrationAudios=narrationTracks.map(item=>{
-    if(!item.src)return null;
-    const audio=new Audio(item.src);
-    audio.preload=item.src?'auto':'none';
-    audio.volume=.95;
-    audio.playbackRate=item.rate;
-    return audio;
-  });
-  if(typeof window!=='undefined'){
-    window.narrationTracks=narrationTracks;
-    window.narrations=narrations;
-    window.narrationAudios=narrationAudios;
-  }
-}
-
+const normalizeNarrationSrc=src=>timelineBridge.normalizeNarrationSrc(src);
+const setNarrationTracks=tracks=>timelineBridge.setNarrationTracks(tracks);
 if(typeof window!=='undefined'){
-  window.narrationTracks=narrationTracks;
-  window.narrations=narrations;
-  window.narrationAudios=narrationAudios;
+  Object.defineProperties(window,{
+    narrationTracks:{configurable:true,get:()=>timelineBridge.getNarrationTracks()},
+    narrations:{configurable:true,get:()=>timelineBridge.getNarrations()},
+    narrationAudios:{configurable:true,get:()=>timelineBridge.getNarrationAudios()}
+  });
   window.setNarrationTracks=setNarrationTracks;
 }
 
 function applyTimeline(timeline){
-  const source=Array.isArray(timeline?.scenes)?timeline.scenes:[];
-  if(!source.length)throw new Error('이전 단계의 장면 타임라인이 없습니다.');
-  if(Array.isArray(timeline?.narration_tracks))setNarrationTracks(timeline.narration_tracks);
-  scenes=source.map((item,index)=>({
-    id:item.id||`scene-${index+1}`,
-    name:item.name||`장면 ${index+1}`,
-    mediaType:item.media_type==='video'?'video':'image',
-    image:item.preview_uri||'',
-    start:Number(item.start),
-    end:Number(item.end),
-    cueStart:item.cue_start==null?null:Number(item.cue_start),
-    cueEnd:item.cue_end==null?null:Number(item.cue_end),
-    scriptLineIndex:item.script_line_index==null?null:Number(item.script_line_index),
-    text:''
-  }));
-  titleSceneIndexes=scenes.map((scene,index)=>scene.scriptLineIndex==null?null:index).filter(index=>index!=null);
-  if(titleSceneIndexes.length!==narrationTracks.length&&titleSceneIndexes.length>0){
-    const adjustedTracks=titleSceneIndexes.map((_,index)=>narrationTracks[index]||{rate:1,src:''});
-    setNarrationTracks(adjustedTracks);
-  }
-  narrations=titleSceneIndexes.map((sceneIndex,index)=>({start:scenes[sceneIndex].cueStart,end:scenes[sceneIndex].cueEnd,...narrationTracks[index]}));
-  if(typeof window!=='undefined'){
-    window.narrations=narrations;
-    window.narrationAudios=narrationAudios;
-  }
-  const duration=scenes[scenes.length-1].end;
-  sceneTimelineSummary.textContent=`타임라인 기준 · 총 ${scenes.length}장면 · ${duration}초`;
-  scenes.forEach(scene=>{if(scene.image){const preload=new Image();preload.src=scene.image}});
+  scenes=timelineBridge.applyTimeline(timeline).scenes;
 }
 
 const SETTINGS_STORAGE_KEY='greenhill-p1-editor-settings-v1';
@@ -1316,34 +1247,7 @@ function setStoryboardVideoCandidates(items){
   });
 }
 function connectStoryboardAssetsToEditor(){
-  scenes.forEach(scene=>{
-    const image=storedStoryboardImages.get(scene.id);
-    const generatedVideo=storedStoryboardVideos.get(scene.id);
-    scene.image=image?.uri||scene.image;
-    scene.storyboardImage=image||null;
-    scene.generatedVideo=generatedVideo||null;
-  });
-  const connectedNarrationTracks=titleSceneIndexes.map((sceneIndex,index)=>{
-    const scene=scenes[sceneIndex];
-    const voice=sceneVoiceContext(scene.id).voice;
-    return {rate:Number(narrationTracks[index]?.rate)||1,src:voice?.uri||narrationTracks[index]?.src||''};
-  });
-  setNarrationTracks(connectedNarrationTracks);
-  narrations=titleSceneIndexes.map((sceneIndex,index)=>({
-    start:scenes[sceneIndex].cueStart,
-    end:scenes[sceneIndex].cueEnd,
-    ...narrationTracks[index]
-  }));
-  if(typeof window!=='undefined'){
-    window.narrations=narrations;
-    window.narrationAudios=narrationAudios;
-  }
-  scenes.forEach(scene=>{if(scene.image){const preload=new Image();preload.src=scene.image}});
-  if(window.Step04VideoEditor?.applyTimeline){
-    window.Step04VideoEditor.applyTimeline({ scenes });
-  }else{
-    renderSceneList();
-  }
+  scenes=timelineBridge.connectStoryboardAssetsToEditor(scenes).scenes;
   currentScene=-1;
   const targetVideo=document.querySelector('#video');
   if(targetVideo)targetVideo.currentTime=0;
@@ -1356,6 +1260,7 @@ function connectStoryboardAssetsToEditor(){
 let selectedKeywords=new Set();
 function resetProjectScopedState(){
   scenes=[];
+  timelineBridge.reset();
   sceneCropPositions={};
   storedStoryboardImages=new Map();
   storedStoryboardImageCandidates=new Map();
@@ -1463,13 +1368,6 @@ async function requestImageRegeneration(){
     imageRegenerateBtn.disabled=false;
     if(imageRegenerationModal.hidden)updateImageVariantCount();
   }
-}
-function renderSceneList(){
-  const outroSelection=brandSelections.find(item=>item.role==='outro');
-  const hasOutro=Boolean(outroSelection?.enabled&&outroSelection?.version_id);
-  const outroButton=hasOutro?`<button class="scene-btn" type="button" data-outro="true"><span class="scene-no">OUT</span><span class="scene-name">아웃트로</span><span class="scene-time">미리보기</span></button>`:'';
-  sceneList.innerHTML=scenes.map((s,i)=>`<button class="scene-btn" type="button" data-index="${i}"><span class="scene-no">${String(i+1).padStart(2,'0')}</span><span class="scene-name">${escapeHtml(s.name)}</span><span class="scene-time">${Math.max(0,s.end-s.start).toFixed(2)}초</span></button>`).join('')+outroButton;
-  mobileSceneSelect.innerHTML=scenes.map((s,i)=>`<option value="${i}">${String(i+1).padStart(2,'0')} · ${escapeHtml(s.name)} · ${Math.max(0,s.end-s.start).toFixed(2)}초</option>`).join('')+(hasOutro?'<option value="outro">OUT · 아웃트로 · 미리보기</option>':'');
 }
 let frontendApi=null;
 async function api(path,options={}){
@@ -2712,7 +2610,7 @@ function setupCaptionProgressBadges(role){
   const holder=document.createElement('div');holder.className='scene-conversion-badges';holder.setAttribute('aria-label','문장별 자막 PNG 생성 상태');
   const formatLabels={"preview-landscape":'16:9',"preview-portrait":'9:16',"preview-feed":'4:5',"preview-square":'1:1'};
   const formats=[];[...selectedPlatforms].forEach(platform=>{const key=platformPreviewFormats[platform]?.className;if(key&&!formats.includes(key))formats.push(key)});
-  holder.innerHTML=formats.flatMap(format=>titleSceneIndexes.map((sceneIndex,index)=>`<span class="scene-conversion-badge" data-format="${formatLabels[format]}" data-status="queued" title="${formatLabels[format]} · 자막 ${String(index+1).padStart(2,'0')} · ${escapeHtml(scenes[sceneIndex]?.name||'문장')} · 대기">${formatLabels[format]}·${String(index+1).padStart(2,'0')}</span>`)).join('');
+  holder.innerHTML=formats.flatMap(format=>timelineBridge.getTitleSceneIndexes().map((sceneIndex,index)=>`<span class="scene-conversion-badge" data-format="${formatLabels[format]}" data-status="queued" title="${formatLabels[format]} · 자막 ${String(index+1).padStart(2,'0')} · ${escapeHtml(scenes[sceneIndex]?.name||'문장')} · 대기">${formatLabels[format]}·${String(index+1).padStart(2,'0')}</span>`)).join('');
   role.querySelector('.ai-role-copy').append(holder);
 }
 function applySequentialCaptionProgress(role,completed){
@@ -3060,7 +2958,7 @@ window.startRenderWorkflow=async function(){
   }
 };
 function applyScript(script){
-  titleSceneIndexes.forEach(sceneIndex=>{const scene=scenes[sceneIndex];scene.text=script.lines[scene.scriptLineIndex]||''});
+  scenes=timelineBridge.applyScript(script).scenes;
   document.querySelector('#projectTitle').textContent=script.headline||'하루를 보면 마음이 보입니다';
   renderSceneList();
   currentScene=-1;

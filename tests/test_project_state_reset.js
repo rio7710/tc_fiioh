@@ -8,7 +8,11 @@ const resetStart = html.indexOf('function resetProjectScopedState()');
 const resetEnd = html.indexOf('\nconst keywordTilts=', resetStart);
 assert.ok(resetStart >= 0 && resetEnd > resetStart, 'project reset helper must exist');
 
-const context = vm.createContext({window:{Step04VideoEditor:{setSceneCropPositions(value){context.editorCropPositions=value;}}}});
+const context = vm.createContext({
+  timelineBridge: { reset() { context.timelineBridgeResetCount += 1; } },
+  timelineBridgeResetCount: 0,
+  window: { Step04VideoEditor: { setSceneCropPositions(value) { context.editorCropPositions = value; } } }
+});
 vm.runInContext(`
   let scenes=[{id:'old'}];
   let sceneCropPositions={old:{x:1}};
@@ -35,6 +39,7 @@ for (const expression of [
 ]) assert.equal(vm.runInContext(expression,context),0,`${expression} must be cleared`);
 assert.equal(vm.runInContext('activeProjectId',context),'old-project','helper must not clear project identity');
 assert.equal(Object.keys(context.editorCropPositions).length,0,'Step 4 crop state must be cleared');
+assert.equal(context.timelineBridgeResetCount,1,'Step 4 timeline bridge state must be reset exactly once');
 
 const deleteStart = html.indexOf("document.querySelector('#projectDeleteButton')");
 const deleteEnd = html.indexOf("document.querySelector('#createProjectButton')",deleteStart);
