@@ -1,13 +1,13 @@
 /* Step 04 Video Editor Isolated JS Controller */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
-    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js', './step04-ratio-crop-controller.js', './step04-playback-controller.js'], factory);
+    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js', './step04-ratio-crop-controller.js', './step04-playback-controller.js', './step04-settings-controller.js'], factory);
   } else if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'), require('./step04-ratio-crop-controller.js'), require('./step04-playback-controller.js'));
+    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'), require('./step04-ratio-crop-controller.js'), require('./step04-playback-controller.js'), require('./step04-settings-controller.js'));
   } else {
-    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController, root.Step04RatioCropController, root.Step04PlaybackController);
+    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController, root.Step04RatioCropController, root.Step04PlaybackController, root.Step04SettingsController);
   }
-}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController, RatioCropController, PlaybackController) {
+}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController, RatioCropController, PlaybackController, SettingsController) {
   'use strict';
 
   const { SceneNav, RatioProfiles, BrandSelection, MobileSync } = VideoEditor || {};
@@ -17,8 +17,6 @@
   const editorState = Step04Store.create();
   let pendingDissolveOverlay = null;
   let isStep4Initialized = false;
-  let configuredSettings = null;
-  let configuredCatalog = null;
   const navigationController = NavigationController.create({
     SceneNav,
     MobileSync,
@@ -67,12 +65,25 @@
     getRoot: () => typeof document !== 'undefined' ? document : null,
     getSelectedMusic: () => editorState.get('selectedMusic'),
     setSelectedMusic: value => editorState.set('selectedMusic', value),
-    getCatalog: () => configuredCatalog,
+    getCatalog: () => settingsController.getConfiguredCatalog(),
     saveEditorSettings: () => saveEditorSettings(),
     sync: () => sync(),
     stopNarration: () => stopNarration(),
     syncNarration: (time, force) => syncNarration(time, force),
     updatePanAvailability: () => updatePanAvailability(),
+    onError: (name, error) => console.error(`[Step04:${name}]`, error)
+  });
+  const settingsController = SettingsController.create({
+    getRoot: () => typeof document !== 'undefined' ? document : null,
+    storage: typeof localStorage !== 'undefined' ? localStorage : null,
+    storageKey: 'thinkcast-editor-settings-v1',
+    api: (...args) => typeof window !== 'undefined' && typeof window.api === 'function' ? window.api(...args) : undefined,
+    getState: key => editorState.get(key), setState: (key, value) => editorState.set(key, value),
+    configureRatioCatalog: catalog => RatioProfiles?.configureCatalog?.(catalog),
+    clampVideoPan: value => RatioProfiles ? RatioProfiles.clampVideoPan(value) : Math.max(0, Math.min(100, Number(value) || 50)),
+    setVideoPan: value => setVideoPan(value), setCaptionSize: value => setCaptionSize(value),
+    setNarration: value => setNarration(value), setType: value => setType(value), setMusic: value => setMusic(value),
+    setPlatformPreview: value => setPlatformPreview(value), setSceneDissolveSeconds: value => setSceneDissolveSeconds(value),
     onError: (name, error) => console.error(`[Step04:${name}]`, error)
   });
 
@@ -111,88 +122,9 @@
     }
   }
 
-  function configure(settings, catalog) {
-    if (catalog) {
-      configuredCatalog = catalog;
-      if (RatioProfiles && typeof RatioProfiles.configureCatalog === 'function') {
-        RatioProfiles.configureCatalog(catalog);
-      }
-    }
-    if (settings && typeof settings === 'object') {
-      configuredSettings = settings;
-      if (settings.type !== undefined) editorState.set('currentType', settings.type);
-      if (settings.music !== undefined) editorState.set('selectedMusic', settings.music);
-      if (settings.preview_platform !== undefined || settings.previewPlatform !== undefined) {
-        editorState.set('currentPreviewPlatform', settings.preview_platform || settings.previewPlatform);
-      }
-      if (Array.isArray(settings.platforms)) {
-        editorState.set('selectedPlatforms', new Set(settings.platforms));
-      }
-      const rawVolume = settings.volume;
-      if (rawVolume !== undefined) {
-        editorState.set('currentVolume', Number.isFinite(Number(rawVolume)) ? Math.max(0, Math.min(1, Number(rawVolume))) : 0.5);
-      }
-      const rawPan = settings.video_pan_x !== undefined ? settings.video_pan_x : settings.videoPanX;
-      if (Number.isFinite(Number(rawPan))) {
-        const numPan = Number(rawPan);
-        const panPercent = numPan <= 1.0 ? numPan * 100 : numPan;
-        editorState.set('videoPanX', RatioProfiles ? RatioProfiles.clampVideoPan(panPercent) : Math.max(0, Math.min(100, panPercent)));
-      }
-      const rawDissolve = settings.scene_dissolve_seconds !== undefined ? settings.scene_dissolve_seconds : settings.sceneDissolveSeconds;
-      if (Number.isFinite(Number(rawDissolve))) {
-        editorState.set('sceneDissolveSeconds', Math.max(0, Math.min(3, Number(rawDissolve))));
-      }
-      const rawCaptionSize = settings.caption_size !== undefined ? settings.caption_size : settings.captionSize;
-      if (Number.isFinite(Number(rawCaptionSize))) {
-        editorState.set('captionSizeLevel', Math.max(-5, Math.min(5, Number(rawCaptionSize))));
-      }
-      if (settings.narration !== undefined) {
-        editorState.set('narrationEnabled', Boolean(settings.narration));
-      }
-      restoreEditorSettings(settings);
-    }
-    return { settings: configuredSettings, catalog: configuredCatalog };
-  }
-
-  function getEffectiveSettingsPayload() {
-    const musicVolume = typeof document !== 'undefined' ? document.querySelector('#musicVolume') : null;
-    const vol = musicVolume ? Number(musicVolume.value) : editorState.get('currentVolume');
-    return {
-      type: editorState.get('currentType'),
-      music: editorState.get('selectedMusic'),
-      volume: Number.isFinite(vol) ? Math.max(0, Math.min(1, vol)) : 0.5,
-      narration: editorState.get('narrationEnabled'),
-      preview_platform: editorState.get('currentPreviewPlatform'),
-      platforms: Array.from(editorState.get('selectedPlatforms')),
-      video_pan_x: editorState.get('videoPanX') / 100,
-      scene_dissolve_seconds: editorState.get('sceneDissolveSeconds'),
-      caption_size: editorState.get('captionSizeLevel')
-    };
-  }
-
-  async function persistRenderSettings() {
-    saveEditorSettings();
-    if (typeof window === 'undefined' || typeof window.api !== 'function') return;
-    const overridesPayload = getEffectiveSettingsPayload();
-    const body = {
-      schema_version: 'render-settings.v1',
-      overrides: overridesPayload
-    };
-    try {
-      const res = await window.api('/api/render-settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      return res;
-    } catch (error) {
-      console.error('Render settings save failed:', error);
-      if (typeof document !== 'undefined') {
-        const rs = document.querySelector('#renderStatus');
-        if (rs) rs.textContent = '설정 저장 실패 (오프라인/오류)';
-      }
-    }
-  }
+  function configure(settings, catalog) { return settingsController.configure(settings, catalog); }
+  function getEffectiveSettingsPayload() { return settingsController.getEffectiveSettingsPayload(); }
+  function persistRenderSettings() { return settingsController.persistRenderSettings(); }
 
   function setSceneCropPositions(positions) {
     return ratioCropController.setSceneCropPositions(positions);
@@ -214,92 +146,9 @@
     return ratioCropController.persistCurrentSceneCrop();
   }
 
-  function saveEditorSettings() {
-    if (typeof localStorage === 'undefined') return;
-    try {
-      localStorage.setItem('thinkcast-editor-settings-v1', JSON.stringify({
-        type: editorState.get('currentType'),
-        music: editorState.get('selectedMusic'),
-        volume: (typeof document !== 'undefined' && document.querySelector('#musicVolume')?.value) || '0.5',
-        videoPanX: editorState.get('videoPanX'),
-        captionSize: editorState.get('captionSizeLevel'),
-        narration: editorState.get('narrationEnabled'),
-        previewPlatform: editorState.get('currentPreviewPlatform'),
-        platforms: Array.from(editorState.get('selectedPlatforms'))
-      }));
-    } catch (e) {}
-  }
-
-  function loadEditorSettings() {
-    if (typeof localStorage === 'undefined') return null;
-    try {
-      const raw = localStorage.getItem('thinkcast-editor-settings-v1');
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function restoreEditorSettings(settingsOverride) {
-    const apiSettings = settingsOverride || configuredSettings;
-    const localCache = loadEditorSettings() || {};
-    const source = apiSettings || localCache;
-    if (!source) return;
-
-    const hasDoc = typeof document !== 'undefined';
-    const typeButtons = hasDoc ? Array.from(document.querySelectorAll('.type-btn')) : [];
-    const musicButtons = hasDoc ? Array.from(document.querySelectorAll('.music-btn[data-music]')) : [];
-    const platformButtons = hasDoc ? Array.from(document.querySelectorAll('.distribution-btn')) : [];
-    const validTypes = new Set(typeButtons.map(btn => btn.dataset.type));
-    const validMusic = new Set(musicButtons.map(btn => btn.dataset.music));
-    const validPlatforms = new Set(platformButtons.map(btn => btn.dataset.platform));
-    const preferredPlatforms = source.platforms;
-    const restoredPlatforms = Array.isArray(preferredPlatforms) ? preferredPlatforms.filter(item => validPlatforms.size === 0 || validPlatforms.has(item)) : null;
-
-    editorState.set('sceneCropPositions', {});
-    if (restoredPlatforms) {
-      editorState.set('selectedPlatforms', new Set(restoredPlatforms));
-    }
-    if (hasDoc) {
-      const selectedPlatforms = editorState.get('selectedPlatforms');
-      platformButtons.forEach(btn => btn.setAttribute('aria-pressed', String(selectedPlatforms.has(btn.dataset.platform))));
-    }
-
-    const musicVolume = hasDoc ? document.querySelector('#musicVolume') : null;
-    const rawVolume = source.volume;
-    if (rawVolume !== undefined) {
-      editorState.set('currentVolume', Number.isFinite(Number(rawVolume)) ? Math.max(0, Math.min(1, Number(rawVolume))) : 0.5);
-    }
-    if (musicVolume) musicVolume.value = String(editorState.get('currentVolume'));
-
-    const rawPan = source.video_pan_x !== undefined ? source.video_pan_x : source.videoPanX;
-    let panPercent = 50;
-    if (Number.isFinite(Number(rawPan))) {
-      const numPan = Number(rawPan);
-      panPercent = numPan <= 1.0 ? numPan * 100 : numPan;
-    }
-    setVideoPan(panPercent);
-
-    const rawCaptionSize = source.caption_size !== undefined ? source.caption_size : source.captionSize;
-    setCaptionSize(Number.isFinite(Number(rawCaptionSize)) ? Number(rawCaptionSize) : 0);
-
-    const rawNarration = source.narration;
-    setNarration(rawNarration !== false);
-
-    const rawType = source.type;
-    setType((validTypes.size === 0 || validTypes.has(rawType)) ? rawType : 'editorial');
-
-    const rawMusic = source.music;
-    setMusic((validMusic.size === 0 || validMusic.has(rawMusic)) ? rawMusic : 'satie');
-
-    const rawPlatform = source.preview_platform || source.previewPlatform;
-    setPlatformPreview((validPlatforms.size === 0 || validPlatforms.has(rawPlatform)) ? rawPlatform : 'youtube');
-
-    const rawDissolve = source.scene_dissolve_seconds !== undefined ? source.scene_dissolve_seconds : source.sceneDissolveSeconds;
-    setSceneDissolveSeconds(Number.isFinite(Number(rawDissolve)) ? Number(rawDissolve) : 0.5);
-
-    saveEditorSettings();
-  }
+  function saveEditorSettings() { return settingsController.saveEditorSettings(); }
+  function loadEditorSettings() { return settingsController.loadEditorSettings(); }
+  function restoreEditorSettings(settingsOverride) { return settingsController.restoreEditorSettings(settingsOverride); }
 
   function setCaptionSize(level) {
     const captionSizeLevel = Math.max(-5, Math.min(5, level));
@@ -505,9 +354,9 @@
 
   return {
     configure: configure,
-    getConfiguredSettings: () => configuredSettings,
-    getConfiguredCatalog: () => configuredCatalog,
-    isConfigured: () => Boolean(configuredSettings),
+    getConfiguredSettings: () => settingsController.getConfiguredSettings(),
+    getConfiguredCatalog: () => settingsController.getConfiguredCatalog(),
+    isConfigured: () => settingsController.isConfigured(),
     persistRenderSettings: persistRenderSettings,
     setSceneDissolveSeconds: setSceneDissolveSeconds,
     getSceneDissolveSeconds: () => editorState.get('sceneDissolveSeconds'),
