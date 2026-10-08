@@ -20,6 +20,7 @@ const playbackControllerPath = '01_app/assets/steps/step04/step04-playback-contr
 const settingsControllerPath = '01_app/assets/steps/step04/step04-settings-controller.js';
 const styleControllerPath = '01_app/assets/steps/step04/step04-style-controller.js';
 const timelineOrchestratorPath = '01_app/assets/steps/step04/step04-timeline-orchestrator.js';
+const lifecycleControllerPath = '01_app/assets/steps/step04/step04-lifecycle-controller.js';
 const renderControllerPath = '01_app/assets/steps/step04/step04-render-controller.js';
 const navigationControllerPath = '01_app/assets/steps/step04/step04-navigation-controller.js';
 const bindingsPath = '01_app/assets/steps/step04/step04-ui-bindings.js';
@@ -39,6 +40,7 @@ assert.ok(fs.existsSync(playbackControllerPath), 'step04-playback-controller.js 
 assert.ok(fs.existsSync(settingsControllerPath), 'step04-settings-controller.js must exist');
 assert.ok(fs.existsSync(styleControllerPath), 'step04-style-controller.js must exist');
 assert.ok(fs.existsSync(timelineOrchestratorPath), 'step04-timeline-orchestrator.js must exist');
+assert.ok(fs.existsSync(lifecycleControllerPath), 'step04-lifecycle-controller.js must exist');
 assert.ok(fs.existsSync(renderControllerPath), 'step04-render-controller.js must exist');
 assert.ok(fs.existsSync(navigationControllerPath), 'step04-navigation-controller.js must exist');
 assert.ok(fs.existsSync(bindingsPath), 'step04-ui-bindings.js must exist');
@@ -73,6 +75,7 @@ const step04PlaybackScript = html.indexOf('/01_app/assets/steps/step04/step04-pl
 const step04SettingsScript = html.indexOf('/01_app/assets/steps/step04/step04-settings-controller.js');
 const step04StyleScript = html.indexOf('/01_app/assets/steps/step04/step04-style-controller.js');
 const step04TimelineOrchestratorScript = html.indexOf('/01_app/assets/steps/step04/step04-timeline-orchestrator.js');
+const step04LifecycleScript = html.indexOf('/01_app/assets/steps/step04/step04-lifecycle-controller.js');
 const step04RenderScript = html.indexOf('/01_app/assets/steps/step04/step04-render-controller.js');
 const step04NavigationScript = html.indexOf('/01_app/assets/steps/step04/step04-navigation-controller.js');
 const step04BindingsScript = html.indexOf('/01_app/assets/steps/step04/step04-ui-bindings.js');
@@ -94,6 +97,7 @@ assert.ok(step04RatioCropScript < step04PlaybackScript && step04PlaybackScript <
 assert.ok(step04PlaybackScript < step04SettingsScript && step04SettingsScript < step04NavigationScript, 'settings controller loads before Step 4 controllers');
 assert.ok(step04SettingsScript < step04StyleScript && step04StyleScript < step04NavigationScript, 'style controller loads before Step 4 controllers');
 assert.ok(step04StyleScript < step04TimelineOrchestratorScript && step04TimelineOrchestratorScript < step04NavigationScript, 'timeline orchestrator loads before Step 4 controllers');
+assert.ok(step04TimelineOrchestratorScript < step04LifecycleScript && step04LifecycleScript < step04NavigationScript, 'lifecycle controller loads before Step 4 controllers');
 assert.ok(step04PlaybackScript < step04RenderScript && step04RenderScript < step04NavigationScript, 'render controller loads before Step 4 controllers');
 assert.ok(step04NavigationScript < step04BindingsScript, 'Step 4 navigation controller loads before UI bindings');
 assert.ok(videoEditorIndexScript < step04StoreScript, 'Step 4 store loads after video editor dependencies');
@@ -113,8 +117,9 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-playback-contro
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-settings-controller\.js\?v=20261008_v14"/, 'HTML cache-busts settings controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-style-controller\.js\?v=20261008_v15"/, 'HTML cache-busts style controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-orchestrator\.js\?v=20261008_v16"/, 'HTML cache-busts timeline orchestrator');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-lifecycle-controller\.js\?v=20261008_v18"/, 'HTML cache-busts lifecycle controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-render-controller\.js\?v=20261008_v13"/, 'HTML cache-busts render controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261008_v17"/, 'HTML cache-busts Step 4 controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261008_v18"/, 'HTML cache-busts Step 4 controller');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /#prevBtn|#nextBtn|#mobileSceneSelect|#sceneList/, 'UI bindings do not duplicate navigation listeners');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /feature\('playback'|#playBtn|addEventListener\('play'|addEventListener\('pause'/, 'UI bindings do not duplicate playback listeners');
 assert.doesNotMatch(html, /const watermarkPreviewRatios=|let watermarkPreviewItem=|let outroPreviewItem=|function activateWatermarkRatio\(|function renderOutroPreviewSlide\(/, 'P1 does not retain overlay controller state or implementation');
