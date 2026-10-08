@@ -17,6 +17,7 @@ const narrationControllerPath = '01_app/assets/steps/step04/step04-narration-con
 const timelinePreviewControllerPath = '01_app/assets/steps/step04/step04-timeline-preview-controller.js';
 const ratioCropControllerPath = '01_app/assets/steps/step04/step04-ratio-crop-controller.js';
 const playbackControllerPath = '01_app/assets/steps/step04/step04-playback-controller.js';
+const renderControllerPath = '01_app/assets/steps/step04/step04-render-controller.js';
 const navigationControllerPath = '01_app/assets/steps/step04/step04-navigation-controller.js';
 const bindingsPath = '01_app/assets/steps/step04/step04-ui-bindings.js';
 const videoEditorPath = '01_app/assets/video-editor/index.js';
@@ -32,6 +33,7 @@ assert.ok(fs.existsSync(narrationControllerPath), 'step04-narration-controller.j
 assert.ok(fs.existsSync(timelinePreviewControllerPath), 'step04-timeline-preview-controller.js must exist');
 assert.ok(fs.existsSync(ratioCropControllerPath), 'step04-ratio-crop-controller.js must exist');
 assert.ok(fs.existsSync(playbackControllerPath), 'step04-playback-controller.js must exist');
+assert.ok(fs.existsSync(renderControllerPath), 'step04-render-controller.js must exist');
 assert.ok(fs.existsSync(navigationControllerPath), 'step04-navigation-controller.js must exist');
 assert.ok(fs.existsSync(bindingsPath), 'step04-ui-bindings.js must exist');
 assert.ok(fs.existsSync(videoEditorPath), 'video-editor/index.js must exist');
@@ -62,6 +64,7 @@ const step04NarrationControllerScript = html.indexOf('/01_app/assets/steps/step0
 const step04TimelinePreviewScript = html.indexOf('/01_app/assets/steps/step04/step04-timeline-preview-controller.js');
 const step04RatioCropScript = html.indexOf('/01_app/assets/steps/step04/step04-ratio-crop-controller.js');
 const step04PlaybackScript = html.indexOf('/01_app/assets/steps/step04/step04-playback-controller.js');
+const step04RenderScript = html.indexOf('/01_app/assets/steps/step04/step04-render-controller.js');
 const step04NavigationScript = html.indexOf('/01_app/assets/steps/step04/step04-navigation-controller.js');
 const step04BindingsScript = html.indexOf('/01_app/assets/steps/step04/step04-ui-bindings.js');
 assert.ok(sceneNavigationScript >= 0, 'HTML loads browser scene navigation dependency');
@@ -79,6 +82,7 @@ assert.ok(step04TimelineBridgeScript < step04NarrationControllerScript && step04
 assert.ok(step04NarrationControllerScript < step04TimelinePreviewScript && step04TimelinePreviewScript < step04NavigationScript, 'timeline preview controller loads before Step 4 controllers');
 assert.ok(step04TimelinePreviewScript < step04RatioCropScript && step04RatioCropScript < step04NavigationScript, 'ratio crop controller loads before Step 4 controllers');
 assert.ok(step04RatioCropScript < step04PlaybackScript && step04PlaybackScript < step04NavigationScript, 'playback controller loads before Step 4 controllers');
+assert.ok(step04PlaybackScript < step04RenderScript && step04RenderScript < step04NavigationScript, 'render controller loads before Step 4 controllers');
 assert.ok(step04NavigationScript < step04BindingsScript, 'Step 4 navigation controller loads before UI bindings');
 assert.ok(videoEditorIndexScript < step04StoreScript, 'Step 4 store loads after video editor dependencies');
 assert.ok(step04StoreScript < html.indexOf('/01_app/assets/steps/step04/step04-video.js'), 'Step 4 store loads before the controller');
@@ -94,6 +98,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-narration-contr
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-preview-controller\.js\?v=20261007_v10"/, 'HTML cache-busts timeline preview controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ratio-crop-controller\.js\?v=20261008_v11"/, 'HTML cache-busts ratio crop controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-playback-controller\.js\?v=20261008_v12"/, 'HTML cache-busts playback controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-render-controller\.js\?v=20261008_v13"/, 'HTML cache-busts render controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261008_v12"/, 'HTML cache-busts Step 4 controller');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /#prevBtn|#nextBtn|#mobileSceneSelect|#sceneList/, 'UI bindings do not duplicate navigation listeners');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /feature\('playback'|#playBtn|addEventListener\('play'|addEventListener\('pause'/, 'UI bindings do not duplicate playback listeners');
@@ -107,6 +112,8 @@ for (const declaration of [
   "const brandOverlayState=Step04BrandState.create();"
 ]) assert.ok(html.indexOf(declaration) > 0 && html.indexOf(declaration) < html.indexOf('function activeWatermarkProfile'), `${declaration} is initialized before Step 4 settings restore`);
 assert.doesNotMatch(html, /let (?:watermarkPosition|watermarkWidthRatio|watermarkProfiles|outroPosition|outroWidthRatio|outroBackground|outroBackgroundOpacity|outroProfiles)=/, 'brand overlay state must not be duplicated in P1 globals');
+assert.doesNotMatch(html, /window\.startRenderWorkflow=async function/, 'P1 does not retain the large render workflow implementation');
+assert.match(html, /window\.startRenderWorkflow=\(\)=>renderController\.start\(\);/, 'P1 keeps a thin render workflow compatibility wrapper');
 assert.equal((html.match(/function renderSceneList\(\)/g) || []).length, 1, 'P1 keeps only the final Step04VideoEditor renderSceneList compatibility wrapper');
 assert.match(html, /function applyScript\(script\)\{\s*scenes=timelineBridge\.applyScript\(script\)\.scenes;/, 'P1 script application delegates scene text ownership to timeline bridge');
 
@@ -223,6 +230,7 @@ function createPrePartialContext() {
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),
     BrandOverlayController: require('../01_app/assets/steps/step04/step04-brand-overlay.js'),
     Step04TimelineBridge: require('../01_app/assets/steps/step04/step04-timeline-bridge.js'),
+    Step04RenderController: require('../01_app/assets/steps/step04/step04-render-controller.js'),
     Step04NavigationController: require('../01_app/assets/steps/step04/step04-navigation-controller.js'),
     setInterval: () => 1,
     clearInterval: () => {},

@@ -28,6 +28,7 @@ class PipelineContractTests(unittest.TestCase):
     def setUpClass(cls):
         step4_html = (ROOT / "01_app" / "pages" / "steps" / "step04-video.html").read_text(encoding="utf-8")
         step4_js = (ROOT / "01_app" / "assets" / "steps" / "step04" / "step04-video.js").read_text(encoding="utf-8")
+        cls.render_controller = (ROOT / "01_app" / "assets" / "steps" / "step04" / "step04-render-controller.js").read_text(encoding="utf-8")
         step5_html = (ROOT / "01_app" / "pages" / "steps" / "step05-calendar.html").read_text(encoding="utf-8")
         step5_css = (ROOT / "01_app" / "assets" / "steps" / "step05" / "step05-calendar.css").read_text(encoding="utf-8")
         cls.html = "\n".join((HTML_PATH.read_text(encoding="utf-8"), step4_html, step4_js, step5_html, step5_css))
@@ -87,6 +88,7 @@ class PipelineContractTests(unittest.TestCase):
             self.server.validate_caption_overlays({}, 1)
 
     def test_timeline_and_calendar_rules_are_not_hardcoded_in_ui(self):
+        render_workflow = self.html + "\n" + self.render_controller
         self.assertIn("applyTimeline(demoData.timeline)", self.html)
         self.assertNotRegex(self.html, r"const scenes\s*=\s*\[")
         self.assertNotRegex(self.html, r"\{start:[0-9.]*,end:[0-9.]*,rate:")
@@ -97,7 +99,7 @@ class PipelineContractTests(unittest.TestCase):
         self.assertIn('id="calendarContentView"', self.html)
         self.assertIn('id="contentUnavailableModal"', self.html)
         self.assertIn("연결된 콘텐츠가 없습니다.", self.html)
-        self.assertIn("recordCurrentProduction(result)", self.html)
+        self.assertIn("recordCurrentProduction(result)", render_workflow)
         self.assertIn("renderCalendar({preserveScroll:true})", self.html)
         self.assertIn("overflow-anchor:none", self.html)
         self.assertIn("applySceneProgressEvent", self.html)
@@ -106,7 +108,7 @@ class PipelineContractTests(unittest.TestCase):
         self.assertIn("const sceneId=card.dataset.scene", self.html)
         self.assertIn(".storyboard-video-status", self.html)
         self.assertIn("async function pollSceneVideo", self.html)
-        self.assertIn("장면별 최종 영상 합성 상태", self.html)
+        self.assertIn("장면별 최종 영상 합성 상태", render_workflow)
         self.assertIn("applySequentialSceneProgress", self.html)
         self.assertIn("selectedOutputFormatGroups", self.html)
         self.assertIn("setupCompositeFormatBadges", self.html)
