@@ -1,13 +1,13 @@
 /* Step 04 Video Editor Isolated JS Controller */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
-    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js'], factory);
+    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js', './step04-ratio-crop-controller.js'], factory);
   } else if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'));
+    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'), require('./step04-ratio-crop-controller.js'));
   } else {
-    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController);
+    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController, root.Step04RatioCropController);
   }
-}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController) {
+}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController, RatioCropController) {
   'use strict';
 
   const { SceneNav, RatioProfiles, BrandSelection, MobileSync } = VideoEditor || {};
@@ -46,6 +46,23 @@
     applyStoredSceneCrop: () => applyStoredSceneCrop(),
     syncNavigation: view => navigationController.sync(view)
   });
+  const ratioCropController = RatioCropController.create({
+    getRoot: () => typeof document !== 'undefined' ? document : null,
+    RatioProfiles,
+    getScenes: () => scenes,
+    getCurrentScene: () => editorState.get('currentScene'),
+    getCropPositions: () => editorState.get('sceneCropPositions'),
+    setCropPositions: value => editorState.set('sceneCropPositions', value),
+    getVideoPanX: () => editorState.get('videoPanX'),
+    setVideoPanX: value => editorState.set('videoPanX', value),
+    setCurrentPreviewPlatform: value => editorState.set('currentPreviewPlatform', value),
+    getActiveProjectId: () => typeof window !== 'undefined' ? window.activeProjectId : null,
+    api: (...args) => typeof window !== 'undefined' && typeof window.api === 'function' ? window.api(...args) : undefined,
+    saveEditorSettings: () => saveEditorSettings(),
+    updateWatermarkPreview: () => callShellFeature('updateWatermarkPreview'),
+    updateCommonOutroPreview: () => callShellFeature('updateCommonOutroPreview'),
+    onError: (message, error) => console.error(message, error)
+  });
 
   function callShellFeature(name, ...args) {
     if (typeof window === 'undefined' || typeof window[name] !== 'function') return undefined;
@@ -62,36 +79,15 @@
   }
 
   function currentCropFormat() {
-    if (typeof document === 'undefined') return '16x9';
-    const stageCard = document.querySelector('#stageCard') || document.querySelector('.stage-card');
-    if (!stageCard) return '16x9';
-    return RatioProfiles ? RatioProfiles.calculateCropFormat(stageCard.className) : '16x9';
+    return ratioCropController.currentCropFormat();
   }
 
   function updatePanAvailability() {
-    if (typeof document === 'undefined') return;
-    const stage = document.querySelector('#stage');
-    const stageCard = document.querySelector('#stageCard') || document.querySelector('.stage-card');
-    const sceneVideo = document.querySelector('#sceneVideo');
-    const sceneImage = document.querySelector('#sceneImage');
-    if (!stage || !stageCard || !sceneVideo || !sceneImage) return;
-
-    const sourceWidth = stage.classList.contains('has-scene-video') ? sceneVideo.videoWidth : sceneImage.naturalWidth;
-    const sourceHeight = stage.classList.contains('has-scene-video') ? sceneVideo.videoHeight : sceneImage.naturalHeight;
-
-    const canPan = RatioProfiles
-      ? RatioProfiles.calculatePanAvailability(stageCard.className, sourceWidth, sourceHeight)
-      : false;
-
-    stage.classList.toggle('can-pan', canPan);
+    return ratioCropController.updatePanAvailability();
   }
 
   function setVideoPan(value) {
-    const videoPanX = RatioProfiles ? RatioProfiles.clampVideoPan(value) : Math.max(0, Math.min(100, Number(value) || 50));
-    editorState.set('videoPanX', videoPanX);
-    if (typeof document === 'undefined') return;
-    const stage = document.querySelector('#stage');
-    if (stage) stage.style.setProperty('--video-pan-x', `${videoPanX}%`);
+    return ratioCropController.setVideoPan(value);
   }
 
   function setSceneDissolveSeconds(seconds) {
@@ -187,41 +183,23 @@
   }
 
   function setSceneCropPositions(positions) {
-    if (positions && typeof positions === 'object') {
-      editorState.set('sceneCropPositions', positions);
-    }
+    return ratioCropController.setSceneCropPositions(positions);
   }
 
   function getSceneCropPositions() {
-    return editorState.get('sceneCropPositions');
+    return ratioCropController.getSceneCropPositions();
   }
 
   function applyStoredSceneCrop() {
-    const scene = scenes[editorState.get('currentScene')];
-    const format = currentCropFormat();
-    const panX = RatioProfiles ? RatioProfiles.getStoredSceneCropPosition(editorState.get('sceneCropPositions'), scene?.id, format) : 50;
-    setVideoPan(panX);
+    return ratioCropController.applyStoredSceneCrop();
   }
 
   function storeCurrentSceneCrop() {
-    const scene = scenes[editorState.get('currentScene')];
-    const format = currentCropFormat();
-    if (!scene || !RatioProfiles) return null;
-    const activeProjectId = (typeof window !== 'undefined' && window.activeProjectId) ? window.activeProjectId : null;
-    const res = RatioProfiles.storeSceneCropPosition(editorState.get('sceneCropPositions'), activeProjectId, scene.id, format, editorState.get('videoPanX'));
-    editorState.set('sceneCropPositions', res.updatedPositions);
-    return res.payload;
+    return ratioCropController.storeCurrentSceneCrop();
   }
 
   async function persistCurrentSceneCrop() {
-    const position = storeCurrentSceneCrop();
-    saveEditorSettings();
-    if (!position?.project_id || typeof window === 'undefined' || typeof window.api !== 'function') return;
-    try {
-      await window.api('/api/project/crop-position', { method: 'POST', body: JSON.stringify(position) });
-    } catch (error) {
-      console.error('씬 크롭 위치 저장 실패', error);
-    }
+    return ratioCropController.persistCurrentSceneCrop();
   }
 
   function saveEditorSettings() {
@@ -389,37 +367,7 @@
   }
 
   function setPlatformPreview(platform) {
-    if (typeof document === 'undefined') return;
-    const config = RatioProfiles ? (RatioProfiles.getPlatformFormat ? RatioProfiles.getPlatformFormat(platform) : RatioProfiles.PLATFORM_PREVIEW_FORMATS[platform]) : null;
-    const format = config || { className: 'preview-landscape', label: 'YouTube · 16:9', safe: '' };
-    editorState.set('currentPreviewPlatform', platform);
-    const stageCard = document.querySelector('#stageCard') || document.querySelector('.stage-card');
-    const previewFormatBadge = document.querySelector('#previewFormatBadge');
-    const formatSafeZone = document.querySelector('#formatSafeZone');
-
-    if (stageCard) {
-      stageCard.classList.remove('preview-landscape', 'preview-portrait', 'preview-feed', 'preview-square');
-      stageCard.classList.add(format.className);
-    }
-    if (previewFormatBadge) previewFormatBadge.textContent = format.label;
-    if (formatSafeZone) formatSafeZone.dataset.label = format.safe;
-
-    document.querySelectorAll('.platform-preview-btn').forEach(btn => {
-      btn.setAttribute('aria-pressed', String(btn.dataset.platform === platform));
-    });
-
-    const formatKey = RatioProfiles ? RatioProfiles.calculateCropFormat(format.className) : '16x9';
-    document.querySelectorAll('.ratio-btn').forEach(btn => {
-      const match = btn.dataset.ratio === formatKey || (RatioProfiles ? RatioProfiles.calculateCropFormat(btn.dataset.ratio) === formatKey : false);
-      btn.classList.toggle('active', match);
-      btn.setAttribute('aria-pressed', String(match));
-    });
-
-    applyStoredSceneCrop();
-    updatePanAvailability();
-    callShellFeature('updateWatermarkPreview');
-    callShellFeature('updateCommonOutroPreview');
-    saveEditorSettings();
+    return ratioCropController.setPlatformPreview(platform);
   }
 
   function stopNarration() {
