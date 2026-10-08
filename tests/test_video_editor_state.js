@@ -152,6 +152,19 @@ console.log('Testing Ratio Profiles (16x9, 9x16, 4x5, 1x1)...');
   assert.equal(p11.safeZoneLabel, 'SQUARE SAFE AREA');
   assert.equal(p11.aspectRatio, 1.0);
 
+  const ratioInputs = {
+    '16x9': 'preview-landscape',
+    '9x16': 'preview-portrait',
+    '4x5': 'preview-feed',
+    '1x1': 'preview-square'
+  };
+  Object.entries(ratioInputs).forEach(([key, className]) => {
+    assert.equal(RatioProfiles.calculateCropFormat(key), key, `${key} key resolves`);
+    assert.equal(RatioProfiles.calculateCropFormat(className), key, `${className} single class resolves`);
+    assert.equal(RatioProfiles.calculateCropFormat(`stage-card ${className} active`), key, `${className} multi-class DOM string resolves`);
+  });
+  assert.equal(RatioProfiles.calculateCropFormat('stage-card unknown-class'), '16x9', 'unknown DOM classes keep the landscape fallback');
+
   // Platform mapping
   assert.equal(RatioProfiles.getProfileByPlatform('youtube').key, '16x9');
   assert.equal(RatioProfiles.getProfileByPlatform('instagram').key, '9x16');

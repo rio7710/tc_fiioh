@@ -89,10 +89,23 @@
   function getProfileByKey(key) {
     if (!key) return activeRatioProfiles['16x9'] || RATIO_PROFILES['16x9'];
     const normalized = String(key).toLowerCase().trim();
-    if (normalized === 'portrait' || normalized === 'preview-portrait') return activeRatioProfiles['9x16'] || RATIO_PROFILES['9x16'];
-    if (normalized === 'feed' || normalized === 'preview-feed') return activeRatioProfiles['4x5'] || RATIO_PROFILES['4x5'];
-    if (normalized === 'square' || normalized === 'preview-square') return activeRatioProfiles['1x1'] || RATIO_PROFILES['1x1'];
-    return activeRatioProfiles[normalized] || RATIO_PROFILES[normalized] || RATIO_PROFILES['16x9'];
+    const aliases = {
+      landscape: '16x9', 'preview-landscape': '16x9',
+      portrait: '9x16', 'preview-portrait': '9x16',
+      feed: '4x5', 'preview-feed': '4x5',
+      square: '1x1', 'preview-square': '1x1'
+    };
+    const resolveToken = token => {
+      const profileKey = aliases[token] || token;
+      if (activeRatioProfiles[profileKey] || RATIO_PROFILES[profileKey]) {
+        return activeRatioProfiles[profileKey] || RATIO_PROFILES[profileKey];
+      }
+      return Object.values(activeRatioProfiles).find(profile => String(profile?.className || '').toLowerCase() === token)
+        || Object.values(RATIO_PROFILES).find(profile => String(profile?.className || '').toLowerCase() === token);
+    };
+    return resolveToken(normalized)
+      || normalized.split(/\s+/).map(resolveToken).find(Boolean)
+      || activeRatioProfiles['16x9'] || RATIO_PROFILES['16x9'];
   }
 
   function getProfileByPlatform(platform) {

@@ -64,7 +64,7 @@ assert.match(html, /href="\/01_app\/assets\/video-editor\/video-editor\.css(?:\?
 assert.match(html, /href="\/01_app\/assets\/steps\/step04\/step04-video\.css(?:\?v=[^"]+)?"/, 'HTML links step04-video.css');
 const sceneNavigationScript = html.indexOf('/01_app/assets/video-editor/scene-navigation.js');
 const ratioProfilesScript = html.indexOf('/01_app/assets/video-editor/ratio-profiles.js');
-assert.match(html, /src="\/01_app\/assets\/video-editor\/ratio-profiles\.js\?v=20261008_v23"/, 'HTML cache-busts ratio profiles');
+assert.match(html, /src="\/01_app\/assets\/video-editor\/ratio-profiles\.js\?v=20261008_v24"/, 'HTML cache-busts ratio profiles');
 const brandSelectionScript = html.indexOf('/01_app/assets/video-editor/brand-selection.js');
 const mobileSyncScript = html.indexOf('/01_app/assets/video-editor/mobile-sync.js');
 const videoEditorIndexScript = html.indexOf('/01_app/assets/video-editor/index.js');
