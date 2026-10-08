@@ -14,7 +14,7 @@
 
   function create(dependencies) {
     const deps = dependencies || {};
-    for (const name of ['state', 'getBrandAssets', 'saveSelection', 'applyPosition', 'backgroundColor', 'updateWatermarkPreview', 'updateOutroPreview', 'onError']) {
+    for (const name of ['state', 'getBrandAssets', 'prepareOutroPreview', 'saveSelection', 'applyPosition', 'backgroundColor', 'updateWatermarkPreview', 'updateOutroPreview', 'onError']) {
       if (typeof deps[name] !== (name === 'state' ? 'object' : 'function')) throw new TypeError(`BrandOverlayController requires ${name}`);
     }
 
@@ -187,6 +187,7 @@
       outro.item = item;
       outro.snapshot = deps.state.snapshot();
       outro.saved = false;
+      deps.prepareOutroPreview(item);
       activateOutroRatio(0);
       requireNode('#outroPreviewName').textContent = `${item.name} · v${item.version}`;
       renderOutro();

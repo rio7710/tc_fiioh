@@ -21,7 +21,7 @@
 <script src="/01_app/assets/video-editor/mobile-sync.js?v=20261007_v2"></script>
 <script src="/01_app/assets/video-editor/index.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step04/step04-brand-state.js?v=20261007_v5"></script>
-<script src="/01_app/assets/steps/step04/step04-brand-overlay.js?v=20261007_v6"></script>
+<script src="/01_app/assets/steps/step04/step04-brand-overlay.js?v=20261008_v25"></script>
 <script src="/01_app/assets/steps/step04/step04-store.js?v=20261007_v4"></script>
 <script src="/01_app/assets/steps/step04/step04-timeline-bridge.js?v=20261007_v8"></script>
 <script src="/01_app/assets/steps/step04/step04-narration-controller.js?v=20261008_v17"></script>
@@ -32,7 +32,7 @@
 <script src="/01_app/assets/steps/step04/step04-style-controller.js?v=20261008_v15"></script>
 <script src="/01_app/assets/steps/step04/step04-timeline-orchestrator.js?v=20261008_v22"></script>
 <script src="/01_app/assets/steps/step04/step04-lifecycle-controller.js?v=20261008_v18"></script>
-<script src="/01_app/assets/steps/step04/step04-ui-actions-controller.js?v=20261008_v20"></script>
+<script src="/01_app/assets/steps/step04/step04-ui-actions-controller.js?v=20261008_v25"></script>
 <script src="/01_app/assets/steps/step04/step04-render-controller.js?v=20261008_v13"></script>
 <script src="/01_app/assets/steps/step04/step04-navigation-controller.js?v=20261007_v7"></script>
 <script src="/01_app/assets/steps/step04/step04-ui-bindings.js?v=20261007_v7"></script>
@@ -1750,12 +1750,16 @@ async function loadProjectContent(projectId,token){
 }
 function brandRoleControls(role){const title=role[0].toUpperCase()+role.slice(1);return {enabled:document.querySelector(`#brand${title}Enabled`),select:document.querySelector(`#brand${title}Version`)}}
 function isOutroRatioCompanion(item){return item?.role==='outro'&&/^greenhill_outro_v4_(9x16|4x5|1x1)\.png$/.test(item.uri||'')}
-function ensureOutroRatioAssets(item){
+function ensureOutroRatioAssets(item,options={}){
   if(!item)return;
+  const force=options.force===true;
   const isGreenhillV4=item.uri==='greenhill_outro_v4_16x9.png'||/^greenhill_outro_v4_/.test(item.uri||'');
   const nextState=brandOverlayState.snapshot();
   ['16x9','9x16','4x5','1x1'].forEach(ratio=>{
     if(!nextState.outroProfiles[ratio])nextState.outroProfiles[ratio]=brandOverlayState.activeOutroProfile(ratio);
+    const currentVersionId=nextState.outroProfiles[ratio].version_id;
+    const hasValidVersion=Boolean(currentVersionId&&brandAssets.some(asset=>asset.role==='outro'&&asset.version_id===currentVersionId&&asset.active!==false));
+    if(!force&&hasValidVersion)return;
     if(isGreenhillV4){
       const ratioAsset=brandAssets.find(asset=>asset.role==='outro'&&asset.uri===`greenhill_outro_v4_${ratio}.png`);
       nextState.outroProfiles[ratio].version_id=ratioAsset?ratioAsset.version_id:item.version_id;
@@ -2962,14 +2966,14 @@ document.addEventListener('click',async event=>{
   try{await navigateProjectStep(button.dataset.go)}
   catch(error){const note=document.querySelector('#projectDetailNote')||document.querySelector('#contentIndexMessage');if(note)note.textContent=error.message}
 });
-const brandOverlayController=BrandOverlayController.create({state:brandOverlayState,getBrandAssets:()=>brandAssets,saveSelection:saveBrandSelections,applyPosition:applyWatermarkPosition,backgroundColor:outroBackgroundColor,updateWatermarkPreview,updateOutroPreview:updateCommonOutroPreview,onError:(feature,error)=>console.error(`[BrandOverlay:${feature}]`,error)});
+const brandOverlayController=BrandOverlayController.create({state:brandOverlayState,getBrandAssets:()=>brandAssets,prepareOutroPreview:item=>ensureOutroRatioAssets(item,{force:true}),saveSelection:saveBrandSelections,applyPosition:applyWatermarkPosition,backgroundColor:outroBackgroundColor,updateWatermarkPreview,updateOutroPreview:updateCommonOutroPreview,onError:(feature,error)=>console.error(`[BrandOverlay:${feature}]`,error)});
 function openWatermarkPreview(versionId){return brandOverlayController.openWatermarkPreview(versionId)}
 function openOutroPreview(versionId){return brandOverlayController.openOutroPreview(versionId)}
 async function refreshBrandLibrary(){const result=await api('/api/brand-assets');brandAssets=result.assets||[];const visibleAssets=brandAssets.filter(item=>!isOutroRatioCompanion(item));document.querySelector('#brandVersionCount').textContent=String(visibleAssets.length).padStart(2,'0');document.querySelector('#brandLibraryList').innerHTML=visibleAssets.map(item=>{const original=`/api/brand-asset?version_id=${encodeURIComponent(item.version_id)}`;const preview=item.role==='watermark'?`<i>|</i><button type="button" data-watermark-preview="${escapeHtml(item.version_id)}">적용 미리보기</button>`:item.role==='outro'?`<i>|</i><button type="button" data-outro-preview="${escapeHtml(item.version_id)}">적용 미리보기</button>`:'';return `<article class="brand-library-row"><strong>${escapeHtml({intro:'인트로',outro:'아웃트로',watermark:'워터마크'}[item.role])}</strong><span>${escapeHtml(item.name)} <small>v${item.version} · ${item.media_type==='video'?'영상':'이미지'}</small></span><span class="brand-library-actions"><a href="${original}" target="_blank">원본 보기</a>${preview}</span></article>`}).join('')||'<p class="flow-desc">등록된 개인 브랜드 리소스가 없습니다.</p>';renderBrandChoices()}
 function showBrandLibrary(show){document.querySelector('#contentIndex').hidden=show;document.querySelector('#brandLibraryPanel').hidden=!show;document.querySelector('#brandLibraryOpen').classList.toggle('active',show)}
 document.querySelector('#brandLibraryOpen').addEventListener('click',async()=>{showBrandLibrary(true);await refreshBrandLibrary()});
 document.querySelector('#brandLibraryClose').addEventListener('click',()=>showBrandLibrary(false));
-document.querySelector('#brandLibraryList').addEventListener('click',event=>{const watermarkButton=event.target.closest('[data-watermark-preview]');if(watermarkButton){openWatermarkPreview(watermarkButton.dataset.watermarkPreview);return}const outroButton=event.target.closest('[data-outro-preview]');if(outroButton){ensureOutroRatioAssets(brandAssets.find(item=>item.version_id===outroButton.dataset.outroPreview));openOutroPreview(outroButton.dataset.outroPreview)}});
+document.querySelector('#brandLibraryList').addEventListener('click',event=>{const watermarkButton=event.target.closest('[data-watermark-preview]');if(watermarkButton){openWatermarkPreview(watermarkButton.dataset.watermarkPreview);return}const outroButton=event.target.closest('[data-outro-preview]');if(outroButton)openOutroPreview(outroButton.dataset.outroPreview)});
 const brandOverlayMount=brandOverlayController.mount(document);if(!brandOverlayMount.watermark.ok)console.error('[BrandOverlay:watermark]',brandOverlayMount.watermark.error);if(!brandOverlayMount.outro.ok)console.error('[BrandOverlay:outro]',brandOverlayMount.outro.error);
 document.querySelector('#brandUploadButton').addEventListener('click',async()=>{const message=document.querySelector('#brandLibraryMessage');const file=document.querySelector('#brandUploadFile').files[0];if(!file){message.textContent='등록할 파일을 선택해 주세요.';return}try{message.textContent='업로드 중입니다.';const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file)});await api('/api/brand-assets/upload',{method:'POST',body:JSON.stringify({role:document.querySelector('#brandUploadRole').value,name:document.querySelector('#brandUploadName').value,data_url:dataUrl})});document.querySelector('#brandUploadFile').value='';message.textContent='새 버전을 등록했습니다.';await refreshBrandLibrary()}catch(error){message.textContent=error.message}});
 document.querySelector('#contentIndex').addEventListener('click',event=>{const row=event.target.closest('[data-project-id]');if(row)openIndexProject(row.dataset.projectId)});

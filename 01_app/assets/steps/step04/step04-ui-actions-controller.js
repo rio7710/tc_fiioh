@@ -30,7 +30,7 @@
     async function brandChanged(event) {
       if (event.target.id === 'brandOutroVersion') {
         const assets = d.getBrandAssets?.() || [];
-        d.callShellFeature?.('ensureOutroRatioAssets', assets.find(item => item.version_id === event.target.value));
+        d.callShellFeature?.('ensureOutroRatioAssets', assets.find(item => item.version_id === event.target.value), {force: true});
       }
       d.callShellFeature?.('updateWatermarkPreview');
       d.callShellFeature?.('updateCommonOutroPreview');

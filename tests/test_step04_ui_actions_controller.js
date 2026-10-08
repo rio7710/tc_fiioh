@@ -7,7 +7,7 @@ const UIActionsController = require('../01_app/assets/steps/step04/step04-ui-act
   let renderCalls=0;let selected=new Set(['youtube']);let saves=0;const shellOrder=[];
   let saveResult;
   const controller=UIActionsController.create({root,getBody:()=>({classList:{add:v=>bodyClasses.push(v)}}),startRender:()=>{renderCalls++;return 'rendered';},
-    getBrandAssets:()=>[{version_id:'v1'},{version_id:'v2'}],callShellFeature:(name,arg)=>{shellOrder.push([name,arg?.version_id]);if(name==='saveBrandSelections')return saveResult;},
+    getBrandAssets:()=>[{version_id:'v1'},{version_id:'v2'}],callShellFeature:(name,arg,options)=>{shellOrder.push([name,arg?.version_id,options?.force]);if(name==='saveBrandSelections')return saveResult;},
     getSelectedPlatforms:()=>selected,setSelectedPlatforms:value=>{shellOrder.push(['state']);selected=value;},saveEditorSettings:()=>{shellOrder.push(['save']);saves++;}});
   assert.equal(controller.openImageRegeneration(),undefined);assert.equal(imageModal.hidden,false);
   assert.equal(controller.closeImageRegeneration(),undefined);assert.equal(imageModal.hidden,true);
@@ -26,9 +26,9 @@ const UIActionsController = require('../01_app/assets/steps/step04/step04-ui-act
   assert.equal(controller.openDistributionHelp(),undefined);assert.equal(helpModal.hidden,false);assert.deepEqual(bodyClasses,['modal-open']);
 
   shellOrder.length=0;saveResult=undefined;const regular=controller.brandChanged({target:{id:'brandWatermarkVersion',value:'v1'}});assert.ok(regular instanceof Promise);await regular;
-  assert.deepEqual(shellOrder,[['updateWatermarkPreview',undefined],['updateCommonOutroPreview',undefined],['saveBrandSelections',undefined]]);
+  assert.deepEqual(shellOrder,[['updateWatermarkPreview',undefined,undefined],['updateCommonOutroPreview',undefined,undefined],['saveBrandSelections',undefined,undefined]]);
   shellOrder.length=0;saveResult=Promise.resolve().then(()=>shellOrder.push(['saved-async']));await controller.brandChanged({target:{id:'brandOutroVersion',value:'v2'}});
-  assert.deepEqual(shellOrder,[['ensureOutroRatioAssets','v2'],['updateWatermarkPreview',undefined],['updateCommonOutroPreview',undefined],['saveBrandSelections',undefined],['saved-async']]);
+  assert.deepEqual(shellOrder,[['ensureOutroRatioAssets','v2',true],['updateWatermarkPreview',undefined,undefined],['updateCommonOutroPreview',undefined,undefined],['saveBrandSelections',undefined,undefined],['saved-async']]);
 
   const button={attrs:{},setAttribute(k,v){shellOrder.push(['aria',v]);this.attrs[k]=v;}};
   shellOrder.length=0;assert.equal(controller.toggleDistribution('instagram',button),undefined);assert.equal(selected.has('instagram'),true);assert.deepEqual(shellOrder,[['state'],['aria','true'],['save']]);

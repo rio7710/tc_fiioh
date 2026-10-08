@@ -65,6 +65,11 @@ function fixture() {
   const controller = BrandOverlayController.create({
     state,
     getBrandAssets: () => assets,
+    prepareOutroPreview: item => {
+      const next = state.snapshot();
+      Object.values(next.outroProfiles).forEach(profile => { profile.version_id = item.version_id; });
+      state.hydrate(next);
+    },
     saveSelection: async () => { saves += 1; },
     applyPosition: (element, position) => { element.position = position; },
     backgroundColor: profile => `${profile.background}:${profile.background_opacity}`,
@@ -79,6 +84,7 @@ function fixture() {
   assert.equal(mounted.outro.ok, true);
   assert.deepEqual(controller.mount(ui.root), {mounted: false, reason: 'already-mounted'}, 'mount is idempotent');
 
+  const beforeOutroPreview = state.snapshot();
   controller.openOutroPreview('outro-main');
   const widths = [state.snapshot().outroWidthRatio];
   for (let index = 0; index < 3; index += 1) {
@@ -88,6 +94,8 @@ function fixture() {
   assert.deepEqual(widths, [0.1, 0.2, 0.3, 0.4], 'four ratio profiles navigate independently');
   const markup = ui.nodes['#outroPreviewGrid'].innerHTML;
   assert.ok(markup.indexOf('outro-preview-background') < markup.indexOf('outro-preview-asset'), 'background layer precedes transparent PNG/MP4');
+  ui.nodes['#outroPreviewClose'].dispatch('click');
+  assert.deepEqual(state.snapshot(), beforeOutroPreview, 'outro cancel restores all four profiles from the pre-mapping snapshot');
 
   const beforeCancel = state.snapshot();
   controller.openWatermarkPreview('watermark-1');
@@ -108,9 +116,10 @@ function fixture() {
   assert.equal(ui.nodes['#brandOutroVersion'].value, 'outro-main');
   assert.equal(ui.nodes['#brandOutroEnabled'].checked, true);
   assert.equal(outroRefreshes, 1);
+  assert.deepEqual(Object.values(state.snapshot().outroProfiles).map(profile => profile.version_id), Array(4).fill('outro-main'), 'outro save retains the forced ratio mapping');
 
   const refreshController = BrandOverlayController.create({
-    state, getBrandAssets: () => assets, saveSelection: async () => {}, applyPosition() {}, backgroundColor: () => 'transparent',
+    state, getBrandAssets: () => assets, prepareOutroPreview() {}, saveSelection: async () => {}, applyPosition() {}, backgroundColor: () => 'transparent',
     updateWatermarkPreview() { throw new Error('watermark failed'); },
     updateOutroPreview() { outroRefreshes += 1; },
     onError: (feature, error) => errors.push({feature, error})
@@ -123,7 +132,7 @@ function fixture() {
   const incompleteUi = fixture();
   delete incompleteUi.nodes['#watermarkPreviewSave'];
   const incompleteController = BrandOverlayController.create({
-    state, getBrandAssets: () => assets, saveSelection: async () => {}, applyPosition() {}, backgroundColor: () => 'transparent',
+    state, getBrandAssets: () => assets, prepareOutroPreview() {}, saveSelection: async () => {}, applyPosition() {}, backgroundColor: () => 'transparent',
     updateWatermarkPreview() {}, updateOutroPreview() {}, onError: (feature, error) => errors.push({feature, error})
   });
   const incompleteMount = incompleteController.mount(incompleteUi.root);
