@@ -23,7 +23,8 @@
     "kakaotalk": {"width": 1280, "height": 720, "format": "16x9"},
     "threads": {"width": 720, "height": 1280, "format": "9x16"},
     "x": {"width": 1280, "height": 720, "format": "16x9"},
-    "linkedin": {"width": 720, "height": 900, "format": "4x5"}
+    "linkedin": {"width": 720, "height": 900, "format": "4x5"},
+    "square": {"width": 1080, "height": 1080, "format": "1x1"}
   },
   "platform_preview_formats": {
     "youtube": {"formatKey": "16x9", "className": "preview-landscape", "label": "YouTube · 16:9", "safe": ""},
@@ -41,7 +42,7 @@
     "16x9": {"key": "16x9", "label": "16:9 Landscape", "aspectRatio": 1.7777777778, "width": 1920, "height": 1080, "defaultWidth": 1280, "defaultHeight": 720, "className": "preview-landscape", "safeZoneLabel": "", "platforms": ["youtube", "naver", "kakaotalk", "x"]},
     "9x16": {"key": "9x16", "label": "9:16 Vertical / Short-form", "aspectRatio": 0.5625, "width": 1080, "height": 1920, "defaultWidth": 720, "defaultHeight": 1280, "className": "preview-portrait", "safeZoneLabel": "REELS SAFE AREA", "platforms": ["instagram", "tiktok", "threads"]},
     "4x5": {"key": "4x5", "label": "4:5 Feed Portrait", "aspectRatio": 0.8, "width": 1080, "height": 1350, "defaultWidth": 720, "defaultHeight": 900, "className": "preview-feed", "safeZoneLabel": "FEED SAFE AREA", "platforms": ["facebook", "linkedin"]},
-    "1x1": {"key": "1x1", "label": "1:1 Square", "aspectRatio": 1.0, "width": 1080, "height": 1080, "defaultWidth": 720, "defaultHeight": 720, "className": "preview-square", "safeZoneLabel": "SQUARE SAFE AREA", "platforms": ["instagram_post", "square"]}
+    "1x1": {"key": "1x1", "label": "1:1 Square", "aspectRatio": 1.0, "width": 1080, "height": 1080, "defaultWidth": 720, "defaultHeight": 720, "className": "preview-square", "safeZoneLabel": "SQUARE SAFE AREA", "platforms": ["square"]}
   },
   "defaults": {
     "type": "editorial",

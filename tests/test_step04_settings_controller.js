@@ -6,7 +6,8 @@ const SettingsController = require('../01_app/assets/steps/step04/step04-setting
 function button(key, value) { return { dataset:{[key]:value}, attrs:{}, setAttribute(k,v){this.attrs[k]=v;} }; }
 const volume={value:'0.7'}, status={textContent:''};
 const types=[button('type','minimal')], music=[button('music','debussy')], platforms=[button('platform','youtube'),button('platform','threads')];
-const root={querySelector:s=>s==='#musicVolume'?volume:s==='#renderStatus'?status:null,querySelectorAll:s=>s==='.type-btn'?types:s==='.music-btn[data-music]'?music:s==='.distribution-btn'?platforms:[]};
+const previews=['youtube','instagram','facebook','square','threads'].map(value=>button('platform',value));
+const root={querySelector:s=>s==='#musicVolume'?volume:s==='#renderStatus'?status:null,querySelectorAll:s=>s==='.type-btn'?types:s==='.music-btn[data-music]'?music:s==='.distribution-btn'?platforms:s==='.platform-preview-btn, .ratio-btn[data-platform]'?previews:[]};
 const state={currentType:'editorial',selectedMusic:'satie',currentVolume:.5,videoPanX:50,captionSizeLevel:0,narrationEnabled:true,currentPreviewPlatform:'youtube',selectedPlatforms:new Set(['youtube']),sceneCropPositions:{old:{}} ,sceneDissolveSeconds:.5};
 const storageData=new Map(); const storage={setItem:(k,v)=>storageData.set(k,v),getItem:k=>storageData.get(k)||null};
 const calls=[]; let catalogSeen=null; let apiCall=null; let errors=0;
@@ -37,6 +38,13 @@ const localController=SettingsController.create({root,storage,storageKey:'thinkc
 localController.restoreEditorSettings();
 assert.deepEqual(localCalls,[['pan',150],['caption',-9],['narration',true],['type','editorial'],['music','satie'],['platform','youtube'],['dissolve',-2]]);
 assert.deepEqual([...localState.selectedPlatforms],['threads'],'DOM validity filters selected platforms');
+
+let restoredPreview='';
+const squareController=SettingsController.create({root,getState:k=>state[k],setState(){},setVideoPan(){},setCaptionSize(){},setNarration(){},setType(){},setMusic(){},setPlatformPreview:v=>{restoredPreview=v;},setSceneDissolveSeconds(){}});
+for (const previewPlatform of ['youtube','instagram','facebook','square']) {
+  squareController.restoreEditorSettings({type:'minimal',music:'debussy',preview_platform:previewPlatform,platforms:['youtube']});
+  assert.equal(restoredPreview,previewPlatform,`${previewPlatform} preview restores independently of distribution platforms`);
+}
 
 storageData.set('thinkcast-editor-settings-v1','{bad'); assert.equal(controller.loadEditorSettings(),null); assert.equal(errors,1);
 const broken=SettingsController.create({storage:{getItem(){throw new Error('read');},setItem(){throw new Error('write');}},storageKey:'x',getState:()=>null,onError:()=>{errors++;}});

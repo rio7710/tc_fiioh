@@ -56,7 +56,7 @@
       defaultHeight: 720,
       className: 'preview-square',
       safeZoneLabel: 'SQUARE SAFE AREA',
-      platforms: ['instagram_post', 'square']
+      platforms: ['square']
     }
   };
 

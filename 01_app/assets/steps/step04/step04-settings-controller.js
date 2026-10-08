@@ -61,9 +61,11 @@
       const typeButtons = all('.type-btn');
       const musicButtons = all('.music-btn[data-music]');
       const platformButtons = all('.distribution-btn');
+      const previewButtons = all('.platform-preview-btn, .ratio-btn[data-platform]');
       const validTypes = new Set(typeButtons.map(button => button.dataset.type));
       const validMusic = new Set(musicButtons.map(button => button.dataset.music));
       const validPlatforms = new Set(platformButtons.map(button => button.dataset.platform));
+      const validPreviewPlatforms = new Set(previewButtons.map(button => button.dataset.platform));
       const preferred = source.platforms;
       const restored = Array.isArray(preferred) ? preferred.filter(item => validPlatforms.size === 0 || validPlatforms.has(item)) : null;
       set('sceneCropPositions', {});
@@ -82,7 +84,7 @@
       d.setType(validTypes.size === 0 || validTypes.has(source.type) ? source.type : 'editorial');
       d.setMusic(validMusic.size === 0 || validMusic.has(source.music) ? source.music : 'satie');
       const platform = source.preview_platform || source.previewPlatform;
-      d.setPlatformPreview(validPlatforms.size === 0 || validPlatforms.has(platform) ? platform : 'youtube');
+      d.setPlatformPreview(validPreviewPlatforms.size === 0 || validPreviewPlatforms.has(platform) ? platform : 'youtube');
       const dissolve = source.scene_dissolve_seconds !== undefined ? source.scene_dissolve_seconds : source.sceneDissolveSeconds;
       d.setSceneDissolveSeconds(Number.isFinite(Number(dissolve)) ? Number(dissolve) : .5);
       saveEditorSettings();

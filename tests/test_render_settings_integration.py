@@ -66,6 +66,8 @@ class RenderSettingsIntegrationTests(unittest.TestCase):
         self.assertEqual(["youtube", "instagram", "naver"], catalog["defaults"]["platforms"])
         self.assertEqual(0.5, catalog["defaults"]["scene_dissolve_seconds"])
         self.assertEqual("preview-square", catalog["ratio_profiles"]["1x1"]["className"])
+        self.assertEqual(["square"], catalog["ratio_profiles"]["1x1"]["platforms"])
+        self.assertEqual((1080, 1080, "1x1"), SERVER.PLATFORM_FORMATS["square"])
         self.assertEqual("9x16", catalog["platform_preview_formats"]["instagram"]["formatKey"])
         self.assertEqual("editorial", SERVER.resolve_render_settings(self.user["user_id"])["type"])
 
@@ -97,6 +99,23 @@ class RenderSettingsIntegrationTests(unittest.TestCase):
         self.assertEqual(["youtube", "naver"], result["effective"]["platforms"])
         self.assertEqual(1.25, result["effective"]["scene_dissolve_seconds"])
         self.assertEqual("bach", self.auth.get_render_settings(self.user["user_id"])["music"])
+
+    def test_all_ratio_preview_platforms_save_and_restore(self):
+        expected = {
+            "youtube": "16x9", "instagram": "9x16", "facebook": "4x5", "square": "1x1",
+        }
+        for platform, format_key in expected.items():
+            with self.subTest(platform=platform):
+                status, result = self.request("POST", {
+                    "schema_version": "render-settings.v1",
+                    "overrides": {"preview_platform": platform},
+                })
+                self.assertEqual(200, status)
+                self.assertEqual(platform, result["effective"]["preview_platform"])
+                self.assertEqual(format_key, SERVER.PLATFORM_FORMATS[platform][2])
+                status, restored = self.request()
+                self.assertEqual(200, status)
+                self.assertEqual(platform, restored["overrides"]["preview_platform"])
 
     def test_settings_allowlist_and_catalog_values_are_validated(self):
         status, _ = self.request("POST", {

@@ -64,6 +64,7 @@ assert.match(html, /href="\/01_app\/assets\/video-editor\/video-editor\.css(?:\?
 assert.match(html, /href="\/01_app\/assets\/steps\/step04\/step04-video\.css(?:\?v=[^"]+)?"/, 'HTML links step04-video.css');
 const sceneNavigationScript = html.indexOf('/01_app/assets/video-editor/scene-navigation.js');
 const ratioProfilesScript = html.indexOf('/01_app/assets/video-editor/ratio-profiles.js');
+assert.match(html, /src="\/01_app\/assets\/video-editor\/ratio-profiles\.js\?v=20261008_v23"/, 'HTML cache-busts ratio profiles');
 const brandSelectionScript = html.indexOf('/01_app/assets/video-editor/brand-selection.js');
 const mobileSyncScript = html.indexOf('/01_app/assets/video-editor/mobile-sync.js');
 const videoEditorIndexScript = html.indexOf('/01_app/assets/video-editor/index.js');
@@ -119,7 +120,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-narration-contr
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-preview-controller\.js\?v=20261007_v10"/, 'HTML cache-busts timeline preview controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ratio-crop-controller\.js\?v=20261008_v11"/, 'HTML cache-busts ratio crop controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-playback-controller\.js\?v=20261008_v12"/, 'HTML cache-busts playback controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-settings-controller\.js\?v=20261008_v14"/, 'HTML cache-busts settings controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-settings-controller\.js\?v=20261008_v23"/, 'HTML cache-busts settings controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-style-controller\.js\?v=20261008_v15"/, 'HTML cache-busts style controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-orchestrator\.js\?v=20261008_v22"/, 'HTML cache-busts timeline orchestrator');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-lifecycle-controller\.js\?v=20261008_v18"/, 'HTML cache-busts lifecycle controller');
