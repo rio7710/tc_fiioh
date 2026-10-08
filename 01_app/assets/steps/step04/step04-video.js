@@ -20,8 +20,8 @@
     MobileSync,
     getScenes: () => timelineOrchestrator?.getScenes() || [],
     getCurrentScene: () => editorState.get('currentScene'),
-    getCurrentTime: () => typeof document !== 'undefined' ? (document.querySelector('#video')?.currentTime || 0) : 0,
-    setCurrentTime: value => { const video = typeof document !== 'undefined' ? document.querySelector('#video') : null; if (video) video.currentTime = value; },
+    getCurrentTime: () => timelineOrchestrator?.getPreviewTime() || 0,
+    setCurrentTime: value => timelineOrchestrator?.setPreviewTime(value),
     syncPreview: () => sync(),
     formatTime: fmt
   });
@@ -100,7 +100,8 @@
     previewSync: time => previewController.sync(time),
     updateSummary: () => previewController.updateSummary(),
     syncNarration: time => syncNarration(time),
-    scheduleFrame: callback => requestAnimationFrame(callback)
+    scheduleFrame: callback => requestAnimationFrame(callback),
+    onMediaSeekError: error => console.error('[Step04:media-seek]', error)
   });
   const uiActionsController = UIActionsController.create({
     getRoot: () => typeof document !== 'undefined' ? document : null,

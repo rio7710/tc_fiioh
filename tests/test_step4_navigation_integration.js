@@ -52,7 +52,13 @@ const scenes = [
 Step04.applyTimeline({ scenes });
 
 const videoListeners = {};
-const video = { currentTime: 0, paused: true, addEventListener(type, fn) { videoListeners[type] = fn; }, play() {}, pause() {} };
+let mediaTime = 0;
+let mediaSeekable = false;
+const video = { paused: true, addEventListener(type, fn) { videoListeners[type] = fn; }, play() {}, pause() {} };
+Object.defineProperty(video, 'currentTime', {
+  get() { return mediaTime; },
+  set(value) { if (mediaSeekable) mediaTime = value; }
+});
 const sceneListListeners = {};
 const sceneList = { innerHTML: '', addEventListener(type, fn) { sceneListListeners[type] = fn; }, removeEventListener() {} };
 const mobileSelect = { innerHTML: '', value: '' };
@@ -96,13 +102,16 @@ try {
   assert.match(mobileSelect.innerHTML, /value="outro"/);
 
   nextBtn.click();
-  assert.equal(video.currentTime, 5.55, 'mounted next button listener seeks to the next dynamic scene');
+  assert.equal(video.currentTime, 0, 'unseekable media clock remains unchanged');
+  assert.equal(Step04.currentNavigationState().currentSceneIndex, 1, 'mounted next listener advances logical preview');
   prevBtn.click();
-  assert.equal(video.currentTime, 0.55, 'mounted previous button listener seeks back');
+  assert.equal(Step04.currentNavigationState().currentSceneIndex, 0, 'mounted previous listener moves logical preview back');
   sceneListListeners.click({ target: { closest: () => ({ dataset: { index: '1' } }) } });
-  assert.equal(video.currentTime, 5.55, 'mounted scene-list delegation seeks the clicked scene');
+  assert.equal(Step04.currentNavigationState().currentSceneIndex, 1, 'mounted scene-list delegation updates logical preview');
   sceneListListeners.click({ target: { closest: () => ({ dataset: { outro: 'true' } }) } });
-  assert.equal(video.currentTime, 11.95, 'mounted scene-list delegation seeks OUT');
+  assert.equal(Step04.currentNavigationState().isOutro, true, 'mounted scene-list delegation activates OUT logically');
+  mediaSeekable = true;
+  Step04.navigatePreview({ type: 'SEEK_SCENE', index: 0 });
   video.currentTime = 0;
 
   let state = Step04.navigatePreview('NEXT_SCENE');

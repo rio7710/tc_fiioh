@@ -1,15 +1,19 @@
 const assert = require('node:assert/strict');
 const TimelineOrchestrator = require('../01_app/assets/steps/step04/step04-timeline-orchestrator.js');
 
-function make({hasRoot=true,paused=true,time=0}={}) {
-  const order=[]; const video={paused,currentTime:time}; let frame=null;
+function make({hasRoot=true,paused=true,time=0,seekable=true}={}) {
+  const order=[]; let mediaTime=time; const video={paused}; let frame=null;
+  Object.defineProperty(video,'currentTime',{
+    get:()=>mediaTime,
+    set:value=>{ if(seekable) mediaTime=value; }
+  });
   const controller=TimelineOrchestrator.create({
     getRoot:()=>hasRoot?{querySelector:s=>s==='#video'?video:null}:null,
     setCurrentScene:value=>order.push(['current',value]),renderSceneList:()=>order.push(['render']),
     updateSummary:()=>order.push(['summary']),previewSync:value=>{order.push(['preview',value]);return {time:value};},
     syncNarration:value=>order.push(['narration',value]),scheduleFrame:callback=>{order.push(['frame']);frame=callback;}
   });
-  return {controller,order,video,getFrame:()=>frame};
+  return {controller,order,video,setMediaTime:value=>{mediaTime=value;},getFrame:()=>frame};
 }
 
 const headless=make({hasRoot:false});
@@ -34,6 +38,21 @@ assert.equal(many.controller.getScenes().length,3);
 assert.deepEqual(many.controller.getScenes().map(s=>[s.text,s.image,s.cueStart,s.cueEnd]),[['Title','/existing.jpg',0,2],['Narration','',2.2,5.8],['Line','',6,9]]);
 assert.deepEqual(many.order.slice(-3),[['preview',7],['narration',7],['frame']],'playing sync schedules frame after preview and narration');
 assert.equal(typeof many.getFrame(),'function');
+
+const unseekable=make({paused:true,time:0,seekable:false});
+unseekable.controller.applyTimeline({scenes:[{start:0,end:3},{start:3,end:7}]});
+unseekable.order.length=0;
+assert.equal(unseekable.controller.setPreviewTime(3.55),undefined);
+assert.equal(unseekable.video.currentTime,0,'failed media seek does not change the media clock');
+assert.equal(unseekable.controller.getPreviewTime(),3.55,'logical preview time advances independently');
+unseekable.controller.sync();
+assert.deepEqual(unseekable.order,[['preview',3.55],['narration',3.55]],'paused preview remains at logical navigation time');
+unseekable.video.paused=false;
+unseekable.setMediaTime(1.25);
+unseekable.order.length=0;
+unseekable.controller.sync();
+assert.equal(unseekable.controller.getPreviewTime(),1.25,'active playback reflects the media clock into logical time');
+assert.deepEqual(unseekable.order,[['preview',1.25],['narration',1.25],['frame']]);
 
 const missingVideo=TimelineOrchestrator.create({getRoot:()=>({querySelector:()=>null}),previewSync:()=>{throw new Error('must not run');}});
 missingVideo.applyTimeline({scenes:[{start:0,end:1}]});assert.equal(missingVideo.sync(),undefined);
