@@ -1,13 +1,13 @@
 /* Step 04 Video Editor Isolated JS Controller */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
-    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js', './step04-ratio-crop-controller.js', './step04-playback-controller.js', './step04-settings-controller.js', './step04-style-controller.js', './step04-timeline-orchestrator.js', './step04-lifecycle-controller.js'], factory);
+    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js', './step04-ratio-crop-controller.js', './step04-playback-controller.js', './step04-settings-controller.js', './step04-style-controller.js', './step04-timeline-orchestrator.js', './step04-lifecycle-controller.js', './step04-ui-actions-controller.js'], factory);
   } else if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'), require('./step04-ratio-crop-controller.js'), require('./step04-playback-controller.js'), require('./step04-settings-controller.js'), require('./step04-style-controller.js'), require('./step04-timeline-orchestrator.js'), require('./step04-lifecycle-controller.js'));
+    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'), require('./step04-ratio-crop-controller.js'), require('./step04-playback-controller.js'), require('./step04-settings-controller.js'), require('./step04-style-controller.js'), require('./step04-timeline-orchestrator.js'), require('./step04-lifecycle-controller.js'), require('./step04-ui-actions-controller.js'));
   } else {
-    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController, root.Step04RatioCropController, root.Step04PlaybackController, root.Step04SettingsController, root.Step04StyleController, root.Step04TimelineOrchestrator, root.Step04LifecycleController);
+    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController, root.Step04RatioCropController, root.Step04PlaybackController, root.Step04SettingsController, root.Step04StyleController, root.Step04TimelineOrchestrator, root.Step04LifecycleController, root.Step04UIActionsController);
   }
-}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController, RatioCropController, PlaybackController, SettingsController, StyleController, TimelineOrchestrator, LifecycleController) {
+}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController, RatioCropController, PlaybackController, SettingsController, StyleController, TimelineOrchestrator, LifecycleController, UIActionsController) {
   'use strict';
 
   const { SceneNav, RatioProfiles, BrandSelection, MobileSync } = VideoEditor || {};
@@ -15,7 +15,6 @@
   // Step 4 State (Single Source of Truth)
   let timelineOrchestrator = null;
   const editorState = Step04Store.create();
-  let pendingDissolveOverlay = null;
   const navigationController = NavigationController.create({
     SceneNav,
     MobileSync,
@@ -102,6 +101,16 @@
     updateSummary: () => previewController.updateSummary(),
     syncNarration: time => syncNarration(time),
     scheduleFrame: callback => requestAnimationFrame(callback)
+  });
+  const uiActionsController = UIActionsController.create({
+    getRoot: () => typeof document !== 'undefined' ? document : null,
+    getBody: () => typeof document !== 'undefined' ? document.body : null,
+    startRender: () => typeof window !== 'undefined' && typeof window.startRenderWorkflow === 'function' ? window.startRenderWorkflow() : undefined,
+    getBrandAssets: () => typeof window !== 'undefined' ? (window.brandAssets || []) : [],
+    callShellFeature: (name, ...args) => callShellFeature(name, ...args),
+    getSelectedPlatforms: () => editorState.get('selectedPlatforms'),
+    setSelectedPlatforms: value => editorState.set('selectedPlatforms', value),
+    saveEditorSettings: () => saveEditorSettings()
   });
   const lifecycleController = LifecycleController.create({
     getDocument: () => typeof document !== 'undefined' ? document : null,
@@ -245,19 +254,15 @@
   }
 
   function openImageRegeneration() {
-    if (typeof document === 'undefined') return;
-    const imageRegenerationModal = document.querySelector('#imageRegenerationModal');
-    if (imageRegenerationModal) imageRegenerationModal.hidden = false;
+    return uiActionsController.openImageRegeneration();
   }
 
   function closeImageRegeneration() {
-    if (typeof document === 'undefined') return;
-    const imageRegenerationModal = document.querySelector('#imageRegenerationModal');
-    if (imageRegenerationModal) imageRegenerationModal.hidden = true;
+    return uiActionsController.closeImageRegeneration();
   }
 
   function requestImageRegeneration() {
-    closeImageRegeneration();
+    return uiActionsController.requestImageRegeneration();
   }
 
   function getStep4BindingOptions() {
@@ -274,30 +279,11 @@
       getCaptionSize: () => editorState.get('captionSizeLevel'),
       getNarrationEnabled: () => editorState.get('narrationEnabled'),
       setCurrentVolume: value => { editorState.set('currentVolume', value); saveEditorSettings(); },
-      platformForRatio: ratio => ratio === '9x16' ? 'instagram' : ratio === '4x5' ? 'facebook' : ratio === '1x1' ? 'square' : 'youtube',
-      startRender: () => typeof window.startRenderWorkflow === 'function' ? window.startRenderWorkflow() : undefined,
-      openDistributionHelp: () => {
-        const modal = document.querySelector('#platformGuideModal');
-        if (modal) { modal.hidden = false; document.body.classList.add('modal-open'); }
-      },
-      brandChanged: async event => {
-        if (event.target.id === 'brandOutroVersion') {
-          const assets = window.brandAssets || [];
-          callShellFeature('ensureOutroRatioAssets', assets.find(item => item.version_id === event.target.value));
-        }
-        callShellFeature('updateWatermarkPreview');
-        callShellFeature('updateCommonOutroPreview');
-        const saved = callShellFeature('saveBrandSelections');
-        if (saved && typeof saved.then === 'function') await saved;
-      },
-      toggleDistribution: (platform, button) => {
-        if (!platform) return;
-        const selectedPlatforms = editorState.get('selectedPlatforms');
-        selectedPlatforms.has(platform) ? selectedPlatforms.delete(platform) : selectedPlatforms.add(platform);
-        editorState.set('selectedPlatforms', selectedPlatforms);
-        button.setAttribute('aria-pressed', String(selectedPlatforms.has(platform)));
-        saveEditorSettings();
-      }
+      platformForRatio: ratio => uiActionsController.platformForRatio(ratio),
+      startRender: () => uiActionsController.startRender(),
+      openDistributionHelp: () => uiActionsController.openDistributionHelp(),
+      brandChanged: event => uiActionsController.brandChanged(event),
+      toggleDistribution: (platform, button) => uiActionsController.toggleDistribution(platform, button)
     };
   }
 
