@@ -51,9 +51,13 @@ const scenes = [
 
 Step04.applyTimeline({ scenes });
 
-const video = { currentTime: 0, paused: true };
-const sceneList = { innerHTML: '' };
+const videoListeners = {};
+const video = { currentTime: 0, paused: true, addEventListener(type, fn) { videoListeners[type] = fn; }, play() {}, pause() {} };
+const sceneListListeners = {};
+const sceneList = { innerHTML: '', addEventListener(type, fn) { sceneListListeners[type] = fn; }, removeEventListener() {} };
 const mobileSelect = { innerHTML: '', value: '' };
+const nextBtn = { disabled: false, addEventListener(type, fn) { this[type] = fn; }, removeEventListener() {} };
+const prevBtn = { disabled: false, addEventListener(type, fn) { this[type] = fn; }, removeEventListener() {} };
 const originalDocument = global.document;
 const originalWindow = global.window;
 let outroRefreshes = 0;
@@ -71,8 +75,11 @@ global.window = {
 };
 global.document = {
   querySelector(selector) {
+    if (selector === '#step4') return { id: 'step4' };
     if (selector === '#video') return video;
     if (selector === '#sceneList') return sceneList;
+    if (selector === '#nextBtn') return nextBtn;
+    if (selector === '#prevBtn') return prevBtn;
     if (selector === '#mobileSceneSelect') return mobileSelect;
     if (selector === '#stageCard' || selector === '.stage-card') return stageCard;
     return null;
@@ -81,11 +88,22 @@ global.document = {
 };
 
 try {
+  assert.equal(Step04.initStep4UI(), true, 'partial lifecycle mounts navigation before scene rendering');
   Step04.renderSceneList();
   assert.match(sceneList.innerHTML, /data-index="0"/);
   assert.match(sceneList.innerHTML, /data-index="1"/);
   assert.match(sceneList.innerHTML, /data-outro="true"/);
   assert.match(mobileSelect.innerHTML, /value="outro"/);
+
+  nextBtn.click();
+  assert.equal(video.currentTime, 5.55, 'mounted next button listener seeks to the next dynamic scene');
+  prevBtn.click();
+  assert.equal(video.currentTime, 0.55, 'mounted previous button listener seeks back');
+  sceneListListeners.click({ target: { closest: () => ({ dataset: { index: '1' } }) } });
+  assert.equal(video.currentTime, 5.55, 'mounted scene-list delegation seeks the clicked scene');
+  sceneListListeners.click({ target: { closest: () => ({ dataset: { outro: 'true' } }) } });
+  assert.equal(video.currentTime, 11.95, 'mounted scene-list delegation seeks OUT');
+  video.currentTime = 0;
 
   let state = Step04.navigatePreview('NEXT_SCENE');
   assert.equal(state.currentSceneIndex, 1);
@@ -105,14 +123,16 @@ try {
   assert.equal(state.isOutro, true, 'scene can return directly to OUT');
   assert.equal(video.currentTime, 11.95);
 
+  const outroBaseline = outroRefreshes;
+  const watermarkBaseline = watermarkRefreshes;
   Step04.setPlatformPreview('instagram');
   assert.match(stageCard.className, /preview-portrait/, 'ratio selection updates the preview frame');
-  assert.equal(outroRefreshes, 1, 'ratio selection refreshes the ratio-specific outro');
-  assert.equal(watermarkRefreshes, 1, 'ratio selection refreshes the ratio-specific watermark');
+  assert.equal(outroRefreshes, outroBaseline + 1, 'ratio selection refreshes the ratio-specific outro');
+  assert.equal(watermarkRefreshes, watermarkBaseline + 1, 'ratio selection refreshes the ratio-specific watermark');
 
   global.window.updateWatermarkPreview = () => { throw new Error('isolated watermark failure'); };
   assert.doesNotThrow(() => Step04.setPlatformPreview('youtube'), 'watermark failure must not stop ratio navigation');
-  assert.equal(outroRefreshes, 2, 'outro refresh continues when watermark refresh fails');
+  assert.equal(outroRefreshes, outroBaseline + 2, 'outro refresh continues when watermark refresh fails');
 } finally {
   global.document = originalDocument;
   global.window = originalWindow;

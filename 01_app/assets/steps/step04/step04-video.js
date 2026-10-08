@@ -218,7 +218,6 @@
   }
 
   function renderSceneList() {
-    if (typeof document !== 'undefined') navigationController.mount(document);
     return navigationController.render();
   }
 

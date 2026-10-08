@@ -53,6 +53,7 @@ const step04Source = fs.readFileSync(jsPath, 'utf8');
 assert.match(partialHtml, /id="step4"/, 'Partial HTML contains #step4');
 assert.match(partialHtml, /id="imageRegenerationModal"/, 'Partial HTML contains #imageRegenerationModal');
 assert.doesNotMatch(step04Source, /document\.addEventListener\('click',[\s\S]*\.ratio-btn/, 'ratio controls must not have a duplicate global click listener');
+assert.doesNotMatch(step04Source, /function renderSceneList\(\)\s*\{[^}]*navigationController\.mount/, 'scene rendering must not pre-mount navigation before the partial DOM lifecycle');
 
 console.log('✓ File integrity checks passed');
 
@@ -124,7 +125,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-orches
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-lifecycle-controller\.js\?v=20261008_v18"/, 'HTML cache-busts lifecycle controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-actions-controller\.js\?v=20261008_v20"/, 'HTML cache-busts UI actions controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-render-controller\.js\?v=20261008_v13"/, 'HTML cache-busts render controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261008_v20"/, 'HTML cache-busts Step 4 controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261008_v21"/, 'HTML cache-busts Step 4 controller');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /#prevBtn|#nextBtn|#mobileSceneSelect|#sceneList/, 'UI bindings do not duplicate navigation listeners');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /feature\('playback'|#playBtn|addEventListener\('play'|addEventListener\('pause'/, 'UI bindings do not duplicate playback listeners');
 assert.doesNotMatch(html, /const watermarkPreviewRatios=|let watermarkPreviewItem=|let outroPreviewItem=|function activateWatermarkRatio\(|function renderOutroPreviewSlide\(/, 'P1 does not retain overlay controller state or implementation');
