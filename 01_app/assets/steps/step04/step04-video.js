@@ -1,26 +1,26 @@
 /* Step 04 Video Editor Isolated JS Controller */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
-    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js', './step04-ratio-crop-controller.js', './step04-playback-controller.js', './step04-settings-controller.js', './step04-style-controller.js'], factory);
+    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js', './step04-ratio-crop-controller.js', './step04-playback-controller.js', './step04-settings-controller.js', './step04-style-controller.js', './step04-timeline-orchestrator.js'], factory);
   } else if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'), require('./step04-ratio-crop-controller.js'), require('./step04-playback-controller.js'), require('./step04-settings-controller.js'), require('./step04-style-controller.js'));
+    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'), require('./step04-ratio-crop-controller.js'), require('./step04-playback-controller.js'), require('./step04-settings-controller.js'), require('./step04-style-controller.js'), require('./step04-timeline-orchestrator.js'));
   } else {
-    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController, root.Step04RatioCropController, root.Step04PlaybackController, root.Step04SettingsController, root.Step04StyleController);
+    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController, root.Step04RatioCropController, root.Step04PlaybackController, root.Step04SettingsController, root.Step04StyleController, root.Step04TimelineOrchestrator);
   }
-}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController, RatioCropController, PlaybackController, SettingsController, StyleController) {
+}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController, RatioCropController, PlaybackController, SettingsController, StyleController, TimelineOrchestrator) {
   'use strict';
 
   const { SceneNav, RatioProfiles, BrandSelection, MobileSync } = VideoEditor || {};
 
   // Step 4 State (Single Source of Truth)
-  let scenes = [];
+  let timelineOrchestrator = null;
   const editorState = Step04Store.create();
   let pendingDissolveOverlay = null;
   let isStep4Initialized = false;
   const navigationController = NavigationController.create({
     SceneNav,
     MobileSync,
-    getScenes: () => scenes,
+    getScenes: () => timelineOrchestrator?.getScenes() || [],
     getCurrentScene: () => editorState.get('currentScene'),
     getCurrentTime: () => typeof document !== 'undefined' ? (document.querySelector('#video')?.currentTime || 0) : 0,
     setCurrentTime: value => { const video = typeof document !== 'undefined' ? document.querySelector('#video') : null; if (video) video.currentTime = value; },
@@ -37,7 +37,7 @@
     root: typeof document !== 'undefined' ? document : null,
     SceneNav,
     formatTime: fmt,
-    getScenes: () => scenes,
+    getScenes: () => timelineOrchestrator?.getScenes() || [],
     getCurrentScene: () => editorState.get('currentScene'),
     setCurrentScene: value => editorState.set('currentScene', value),
     getDissolveSeconds: () => editorState.get('sceneDissolveSeconds'),
@@ -47,7 +47,7 @@
   const ratioCropController = RatioCropController.create({
     getRoot: () => typeof document !== 'undefined' ? document : null,
     RatioProfiles,
-    getScenes: () => scenes,
+    getScenes: () => timelineOrchestrator?.getScenes() || [],
     getCurrentScene: () => editorState.get('currentScene'),
     getCropPositions: () => editorState.get('sceneCropPositions'),
     setCropPositions: value => editorState.set('sceneCropPositions', value),
@@ -91,6 +91,15 @@
     setState: (key, value) => editorState.set(key, value),
     getCatalog: () => settingsController.getConfiguredCatalog(),
     saveEditorSettings: () => saveEditorSettings()
+  });
+  timelineOrchestrator = TimelineOrchestrator.create({
+    getRoot: () => typeof document !== 'undefined' ? document : null,
+    setCurrentScene: value => editorState.set('currentScene', value),
+    renderSceneList: () => renderSceneList(),
+    previewSync: time => previewController.sync(time),
+    updateSummary: () => previewController.updateSummary(),
+    syncNarration: time => syncNarration(time),
+    scheduleFrame: callback => requestAnimationFrame(callback)
   });
 
   function callShellFeature(name, ...args) {
@@ -215,13 +224,7 @@
   }
 
   function sync() {
-    if (!scenes.length || typeof document === 'undefined') return;
-    const video = document.querySelector('#video');
-    if (!video) return;
-    const t = video.currentTime || 0;
-    const view = previewController.sync(t);
-    syncNarration(view.time);
-    if (!video.paused) requestAnimationFrame(sync);
+    return timelineOrchestrator.sync();
   }
 
   function seekScene(index) {
@@ -237,20 +240,7 @@
   }
 
   function applyTimeline(timeline) {
-    const source = Array.isArray(timeline?.scenes) ? timeline.scenes : [];
-    scenes = source.map(scene => ({
-      ...scene,
-      text: scene.text || scene.script || scene.narration || scene.line || scene.title || scene.name || '',
-      image: scene.image || scene.preview_uri || '',
-      cueStart: scene.cueStart != null ? Number(scene.cueStart) : (scene.cue_start != null ? Number(scene.cue_start) : Number(scene.start || 0)),
-      cueEnd: scene.cueEnd != null ? Number(scene.cueEnd) : (scene.cue_end != null ? Number(scene.cue_end) : Number(scene.end || 0))
-    }));
-    editorState.set('currentScene', -1);
-    renderSceneList();
-    if (typeof document !== 'undefined') {
-      previewController.updateSummary();
-      sync();
-    }
+    return timelineOrchestrator.applyTimeline(timeline);
   }
 
   function setNarrationTracks(payload) {

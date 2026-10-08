@@ -21,6 +21,7 @@ browserContext.globalThis = browserContext;
   '01_app/assets/steps/step04/step04-playback-controller.js',
   '01_app/assets/steps/step04/step04-settings-controller.js',
   '01_app/assets/steps/step04/step04-style-controller.js',
+  '01_app/assets/steps/step04/step04-timeline-orchestrator.js',
   '01_app/assets/steps/step04/step04-navigation-controller.js',
   '01_app/assets/steps/step04/step04-ui-bindings.js',
   '01_app/assets/steps/step04/step04-video.js'
@@ -36,6 +37,7 @@ assert.ok(browserContext.Step04RatioCropController, 'browser bundle exposes Step
 assert.ok(browserContext.Step04PlaybackController, 'browser bundle exposes Step 4 playback controller');
 assert.ok(browserContext.Step04SettingsController, 'browser bundle exposes Step 4 settings controller');
 assert.ok(browserContext.Step04StyleController, 'browser bundle exposes Step 4 style controller');
+assert.ok(browserContext.Step04TimelineOrchestrator, 'browser bundle exposes Step 4 timeline orchestrator');
 assert.ok(browserContext.Step04VideoEditor, 'browser bundle initializes Step 4 after its dependencies');
 
 const scenes = [
