@@ -18,6 +18,7 @@ browserContext.globalThis = browserContext;
   '01_app/assets/steps/step04/step04-narration-controller.js',
   '01_app/assets/steps/step04/step04-timeline-preview-controller.js',
   '01_app/assets/steps/step04/step04-ratio-crop-controller.js',
+  '01_app/assets/steps/step04/step04-playback-controller.js',
   '01_app/assets/steps/step04/step04-navigation-controller.js',
   '01_app/assets/steps/step04/step04-ui-bindings.js',
   '01_app/assets/steps/step04/step04-video.js'
@@ -30,6 +31,7 @@ assert.ok(browserContext.Step04NavigationController, 'browser bundle exposes Ste
 assert.ok(browserContext.Step04NarrationController, 'browser bundle exposes Step 4 narration controller');
 assert.ok(browserContext.Step04TimelinePreviewController, 'browser bundle exposes Step 4 timeline preview controller');
 assert.ok(browserContext.Step04RatioCropController, 'browser bundle exposes Step 4 ratio crop controller');
+assert.ok(browserContext.Step04PlaybackController, 'browser bundle exposes Step 4 playback controller');
 assert.ok(browserContext.Step04VideoEditor, 'browser bundle initializes Step 4 after its dependencies');
 
 const scenes = [

@@ -1,13 +1,13 @@
 /* Step 04 Video Editor Isolated JS Controller */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
-    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js', './step04-ratio-crop-controller.js'], factory);
+    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js', './step04-ratio-crop-controller.js', './step04-playback-controller.js'], factory);
   } else if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'), require('./step04-ratio-crop-controller.js'));
+    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'), require('./step04-ratio-crop-controller.js'), require('./step04-playback-controller.js'));
   } else {
-    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController, root.Step04RatioCropController);
+    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController, root.Step04RatioCropController, root.Step04PlaybackController);
   }
-}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController, RatioCropController) {
+}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController, RatioCropController, PlaybackController) {
   'use strict';
 
   const { SceneNav, RatioProfiles, BrandSelection, MobileSync } = VideoEditor || {};
@@ -62,6 +62,18 @@
     updateWatermarkPreview: () => callShellFeature('updateWatermarkPreview'),
     updateCommonOutroPreview: () => callShellFeature('updateCommonOutroPreview'),
     onError: (message, error) => console.error(message, error)
+  });
+  const playbackController = PlaybackController.create({
+    getRoot: () => typeof document !== 'undefined' ? document : null,
+    getSelectedMusic: () => editorState.get('selectedMusic'),
+    setSelectedMusic: value => editorState.set('selectedMusic', value),
+    getCatalog: () => configuredCatalog,
+    saveEditorSettings: () => saveEditorSettings(),
+    sync: () => sync(),
+    stopNarration: () => stopNarration(),
+    syncNarration: (time, force) => syncNarration(time, force),
+    updatePanAvailability: () => updatePanAvailability(),
+    onError: (name, error) => console.error(`[Step04:${name}]`, error)
   });
 
   function callShellFeature(name, ...args) {
@@ -339,31 +351,8 @@
     saveEditorSettings();
   }
 
-  const musicTracks = {
-    satie: '/02_media/music/01_Satie_Gymnopedie_No1_CC-BY-3.0.mp3',
-    debussy: '/02_media/music/02_Debussy_Clair_de_lune_CC-BY-3.0.mp3',
-    bach: '/02_media/music/03_Bach_Air_BWV1068_Public_Domain.mp3'
-  };
-
   function setMusic(track) {
-    editorState.set('selectedMusic', track);
-    if (typeof document === 'undefined') return;
-    const bgm = document.querySelector('#bgm');
-    const video = document.querySelector('#video');
-    if (bgm && track !== 'none') {
-      bgm.src = musicTracks[track] || `/02_media/music/${track}.mp3`;
-      bgm.addEventListener('loadedmetadata', () => {
-        alignMusic();
-        if (video && !video.paused) bgm.play().catch(() => {});
-      }, { once: true });
-      bgm.load();
-    }
-    document.querySelectorAll('.music-btn[data-music]').forEach(btn => {
-      const selected = btn.dataset.music === track;
-      btn.classList.toggle('active', selected);
-      btn.setAttribute('aria-pressed', String(selected));
-    });
-    saveEditorSettings();
+    return playbackController.setMusic(track);
   }
 
   function setPlatformPreview(platform) {
@@ -383,14 +372,7 @@
   }
 
   function alignMusic() {
-    if (typeof document === 'undefined') return;
-    const video = document.querySelector('#video');
-    const bgm = document.querySelector('#bgm');
-    if (!video || !bgm || editorState.get('selectedMusic') === 'none') return;
-    if (bgm.readyState >= 1 && Number.isFinite(bgm.duration) && bgm.duration > 0) {
-      const targetTime = video.currentTime % bgm.duration;
-      if (Math.abs(bgm.currentTime - targetTime) > 0.25) bgm.currentTime = targetTime;
-    }
+    return playbackController.alignMusic();
   }
 
   function renderSceneList() {
@@ -425,10 +407,7 @@
   }
 
   function togglePlay() {
-    if (typeof document === 'undefined') return;
-    const video = document.querySelector('#video');
-    if (!video) return;
-    video.paused ? video.play() : video.pause();
+    return playbackController.togglePlay();
   }
 
   function applyTimeline(timeline) {
@@ -475,15 +454,10 @@
     if (!step4) return false;
     if (isStep4Initialized) return true;
     navigationController.mount(document);
+    playbackController.mount();
     const result = UIBindings?.bind({
       document,
       root: step4,
-      togglePlay,
-      alignMusic,
-      sync,
-      stopNarration,
-      syncNarration,
-      updatePanAvailability,
       openImageRegeneration,
       closeImageRegeneration,
       requestImageRegeneration,
@@ -493,7 +467,6 @@
       setCaptionSize,
       setNarration,
       persistRenderSettings,
-      getSelectedMusic: () => editorState.get('selectedMusic'),
       getCaptionSize: () => editorState.get('captionSizeLevel'),
       getNarrationEnabled: () => editorState.get('narrationEnabled'),
       setCurrentVolume: value => { editorState.set('currentVolume', value); saveEditorSettings(); },

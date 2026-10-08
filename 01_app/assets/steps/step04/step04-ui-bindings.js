@@ -37,48 +37,6 @@
       } catch (error) { report(name, error); }
     };
 
-    feature('playback', () => {
-      const video = one('#video');
-      const playButton = one('#playBtn');
-      playButton?.addEventListener('click', options.togglePlay);
-      if (!video) return;
-      video.addEventListener('play', () => {
-        if (playButton) {
-          playButton.textContent = '일시정지';
-          playButton.setAttribute('aria-label', '일시정지');
-        }
-        const bgm = one('#bgm');
-        if (options.getSelectedMusic() !== 'none' && bgm) {
-          options.alignMusic();
-          bgm.play().catch(() => {});
-        }
-        options.sync();
-      });
-      video.addEventListener('pause', () => {
-        if (playButton) {
-          playButton.textContent = '재생';
-          playButton.setAttribute('aria-label', '재생');
-        }
-        one('#sceneVideo')?.pause();
-        one('#bgm')?.pause();
-        options.stopNarration();
-        options.sync();
-      });
-      video.addEventListener('seeked', () => {
-        options.alignMusic();
-        options.syncNarration(video.currentTime, true);
-        options.sync();
-      });
-      video.addEventListener('loadedmetadata', () => {
-        options.updatePanAvailability();
-        options.sync();
-      });
-      video.addEventListener('ended', () => {
-        one('#bgm')?.pause();
-        options.sync();
-      });
-    });
-
     feature('render', () => {
       one('#renderBtn')?.addEventListener('click', () => invoke('render', options.startRender));
     });
