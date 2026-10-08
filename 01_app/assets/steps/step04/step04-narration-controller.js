@@ -10,6 +10,7 @@
     const deps = dependencies || {};
     let narrations = [];
     let narrationAudios = [];
+    const root = () => deps.getRoot?.() || deps.root || null;
 
     function active() { return Number(deps.getActiveNarration?.() ?? -1); }
     function setActive(value) { if (typeof deps.setActiveNarration === 'function') deps.setActiveNarration(value); }
@@ -71,7 +72,24 @@
       narrationAudios = [];
     }
 
-    return { setTracks, stop, start, sync, reset };
+    function setEnabled(value) {
+      const next = Boolean(value);
+      deps.setNarrationEnabled?.(next);
+      const currentRoot = root();
+      if (currentRoot) {
+        const button = currentRoot.querySelector?.('#narrationBtn');
+        if (button) {
+          button.classList.toggle('active', next);
+          button.setAttribute('aria-pressed', String(next));
+          button.textContent = next ? 'STT 내레이션 켬' : 'STT 내레이션 끔';
+        }
+        const video = currentRoot.querySelector?.('#video');
+        if (video) next ? sync(video.currentTime, true) : stop();
+      }
+      deps.saveEditorSettings?.();
+    }
+
+    return { setTracks, stop, start, sync, reset, setEnabled };
   }
 
   return { create };

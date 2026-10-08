@@ -106,7 +106,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-brand-overlay\.
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-navigation-controller\.js\?v=20261007_v7"/, 'HTML cache-busts navigation controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-bindings\.js\?v=20261007_v7"/, 'HTML cache-busts UI bindings');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-bridge\.js\?v=20261007_v8"/, 'HTML cache-busts timeline bridge');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-narration-controller\.js\?v=20261007_v9"/, 'HTML cache-busts narration controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-narration-controller\.js\?v=20261008_v17"/, 'HTML cache-busts narration controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-preview-controller\.js\?v=20261007_v10"/, 'HTML cache-busts timeline preview controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ratio-crop-controller\.js\?v=20261008_v11"/, 'HTML cache-busts ratio crop controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-playback-controller\.js\?v=20261008_v12"/, 'HTML cache-busts playback controller');
@@ -114,7 +114,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-settings-contro
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-style-controller\.js\?v=20261008_v15"/, 'HTML cache-busts style controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-orchestrator\.js\?v=20261008_v16"/, 'HTML cache-busts timeline orchestrator');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-render-controller\.js\?v=20261008_v13"/, 'HTML cache-busts render controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261008_v16"/, 'HTML cache-busts Step 4 controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261008_v17"/, 'HTML cache-busts Step 4 controller');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /#prevBtn|#nextBtn|#mobileSceneSelect|#sceneList/, 'UI bindings do not duplicate navigation listeners');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /feature\('playback'|#playBtn|addEventListener\('play'|addEventListener\('pause'/, 'UI bindings do not duplicate playback listeners');
 assert.doesNotMatch(html, /const watermarkPreviewRatios=|let watermarkPreviewItem=|let outroPreviewItem=|function activateWatermarkRatio\(|function renderOutroPreviewSlide\(/, 'P1 does not retain overlay controller state or implementation');

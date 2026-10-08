@@ -28,10 +28,13 @@
     formatTime: fmt
   });
   const narrationController = NarrationController.create({
+    getRoot: () => typeof document !== 'undefined' ? document : null,
     isNarrationEnabled: () => editorState.get('narrationEnabled'),
+    setNarrationEnabled: value => editorState.set('narrationEnabled', value),
     getActiveNarration: () => editorState.get('activeNarration'),
     setActiveNarration: value => editorState.set('activeNarration', value),
-    getPreviewVideo: () => typeof document !== 'undefined' ? document.querySelector('#video') : null
+    getPreviewVideo: () => typeof document !== 'undefined' ? document.querySelector('#video') : null,
+    saveEditorSettings: () => saveEditorSettings()
   });
   const previewController = TimelinePreviewController.create({
     root: typeof document !== 'undefined' ? document : null,
@@ -165,21 +168,7 @@
   }
 
   function setNarration(enabled) {
-    const narrationEnabled = Boolean(enabled);
-    editorState.set('narrationEnabled', narrationEnabled);
-    if (typeof document !== 'undefined') {
-      const narrationBtn = document.querySelector('#narrationBtn');
-      if (narrationBtn) {
-        narrationBtn.classList.toggle('active', narrationEnabled);
-        narrationBtn.setAttribute('aria-pressed', String(narrationEnabled));
-        narrationBtn.textContent = narrationEnabled ? 'STT 내레이션 켬' : 'STT 내레이션 끔';
-      }
-      const video = document.querySelector('#video');
-      if (video) {
-        narrationEnabled ? syncNarration(video.currentTime, true) : stopNarration();
-      }
-    }
-    saveEditorSettings();
+    return narrationController.setEnabled(enabled);
   }
 
   function setType(type) {

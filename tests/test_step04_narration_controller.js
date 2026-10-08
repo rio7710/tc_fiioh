@@ -71,4 +71,39 @@ controller.reset();
 controller.sync(0);
 assert.equal(active, -1, 'reset leaves no playable cues');
 
+const uiOrder = [];
+let uiEnabled = false;
+let uiActive = -1;
+const uiAudio = audio(2);
+uiAudio.play = function () { uiOrder.push('sync'); this.paused = false; return Promise.resolve(); };
+uiAudio.pause = function () { uiOrder.push('stop'); this.paused = true; };
+const narrationButton = { textContent: '', attrs: {}, classList: { active: false, toggle(_name, value) { this.active = value; } }, setAttribute(key, value) { this.attrs[key] = value; } };
+const uiVideo = { currentTime: 1, paused: false };
+const uiController = NarrationController.create({
+  getRoot: () => ({ querySelector: selector => selector === '#narrationBtn' ? narrationButton : selector === '#video' ? uiVideo : null }),
+  isNarrationEnabled: () => uiEnabled,
+  setNarrationEnabled: value => { uiOrder.push(`state:${value}`); uiEnabled = value; },
+  getActiveNarration: () => uiActive, setActiveNarration: value => { uiActive = value; },
+  getPreviewVideo: () => uiVideo, saveEditorSettings: () => uiOrder.push('save')
+});
+uiController.setTracks({ narrations: [{ start: 0, end: 2 }], narrationAudios: [uiAudio] });
+uiOrder.length = 0;
+assert.equal(uiController.setEnabled('yes'), undefined, 'enable preserves the public undefined return');
+assert.equal(uiEnabled, true, 'enable Boolean-coerces state');
+assert.equal(narrationButton.classList.active, true);
+assert.equal(narrationButton.attrs['aria-pressed'], 'true');
+assert.equal(narrationButton.textContent, 'STT 내레이션 켬');
+assert.deepEqual(uiOrder, ['state:true', 'sync', 'save'], 'enable updates state, syncs video, then saves');
+uiOrder.length = 0;
+assert.equal(uiController.setEnabled(0), undefined, 'disable preserves the public undefined return');
+assert.equal(narrationButton.textContent, 'STT 내레이션 끔');
+assert.deepEqual(uiOrder, ['state:false', 'stop', 'save'], 'disable updates state, stops audio, then saves');
+
+let headlessSaves = 0;
+const headlessController = NarrationController.create({ setNarrationEnabled: value => { uiEnabled = value; }, saveEditorSettings: () => { headlessSaves += 1; } });
+assert.equal(headlessController.setEnabled([]), undefined);
+assert.equal(uiEnabled, true); assert.equal(headlessSaves, 1, 'headless enable still saves once');
+const missingControls = NarrationController.create({ root: { querySelector: () => null }, setNarrationEnabled() {}, saveEditorSettings: () => { headlessSaves += 1; } });
+assert.doesNotThrow(() => missingControls.setEnabled(false), 'missing button and video are safe');
+
 console.log('Step04 narration controller tests passed');
