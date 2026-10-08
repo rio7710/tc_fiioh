@@ -13,6 +13,14 @@ const UIActionsController = require('../01_app/assets/steps/step04/step04-ui-act
   assert.equal(controller.closeImageRegeneration(),undefined);assert.equal(imageModal.hidden,true);
   imageModal.hidden=false;assert.equal(controller.requestImageRegeneration(),undefined);assert.equal(imageModal.hidden,true);
   assert.doesNotThrow(()=>UIActionsController.create({}).openImageRegeneration(),'headless modal actions are safe');
+  const shellCalls=[];const requestPromise=Promise.resolve('requested');
+  const shellController=UIActionsController.create({root,hasShellFeature:name=>['openImageRegeneration','closeImageRegeneration','requestImageRegeneration'].includes(name),callShellFeature:(name,...args)=>{shellCalls.push([name,...args]);return name==='openImageRegeneration'?undefined:name==='closeImageRegeneration'?'closed':requestPromise;}});
+  imageModal.hidden=true;
+  assert.equal(shellController.openImageRegeneration('scene-1'),undefined);assert.equal(imageModal.hidden,true,'shell open returning undefined does not run fallback');
+  assert.equal(shellController.closeImageRegeneration('cancel'),'closed');assert.equal(imageModal.hidden,true);
+  assert.equal(shellController.requestImageRegeneration({prompt:'new'}),requestPromise,'request Promise is propagated unchanged');
+  assert.equal(await requestPromise,'requested');
+  assert.deepEqual(shellCalls,[['openImageRegeneration','scene-1'],['closeImageRegeneration','cancel'],['requestImageRegeneration',{prompt:'new'}]]);
   assert.deepEqual(['16x9','9x16','4x5','1x1','bad'].map(v=>controller.platformForRatio(v)),['youtube','instagram','facebook','square','youtube']);
   assert.equal(controller.startRender(),'rendered');assert.equal(renderCalls,1);assert.equal(UIActionsController.create({}).startRender(),undefined);
   assert.equal(controller.openDistributionHelp(),undefined);assert.equal(helpModal.hidden,false);assert.deepEqual(bodyClasses,['modal-open']);

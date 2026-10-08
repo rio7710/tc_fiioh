@@ -122,9 +122,9 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-settings-contro
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-style-controller\.js\?v=20261008_v15"/, 'HTML cache-busts style controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-orchestrator\.js\?v=20261008_v16"/, 'HTML cache-busts timeline orchestrator');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-lifecycle-controller\.js\?v=20261008_v18"/, 'HTML cache-busts lifecycle controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-actions-controller\.js\?v=20261008_v19"/, 'HTML cache-busts UI actions controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-actions-controller\.js\?v=20261008_v20"/, 'HTML cache-busts UI actions controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-render-controller\.js\?v=20261008_v13"/, 'HTML cache-busts render controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261008_v19"/, 'HTML cache-busts Step 4 controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261008_v20"/, 'HTML cache-busts Step 4 controller');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /#prevBtn|#nextBtn|#mobileSceneSelect|#sceneList/, 'UI bindings do not duplicate navigation listeners');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /feature\('playback'|#playBtn|addEventListener\('play'|addEventListener\('pause'/, 'UI bindings do not duplicate playback listeners');
 assert.doesNotMatch(html, /const watermarkPreviewRatios=|let watermarkPreviewItem=|let outroPreviewItem=|function activateWatermarkRatio\(|function renderOutroPreviewSlide\(/, 'P1 does not retain overlay controller state or implementation');
@@ -139,6 +139,11 @@ for (const declaration of [
 assert.doesNotMatch(html, /let (?:watermarkPosition|watermarkWidthRatio|watermarkProfiles|outroPosition|outroWidthRatio|outroBackground|outroBackgroundOpacity|outroProfiles)=/, 'brand overlay state must not be duplicated in P1 globals');
 assert.doesNotMatch(html, /window\.startRenderWorkflow=async function/, 'P1 does not retain the large render workflow implementation');
 assert.match(html, /window\.startRenderWorkflow=\(\)=>renderController\.start\(\);/, 'P1 keeps a thin render workflow compatibility wrapper');
+for (const shellAction of ['openImageRegeneration','closeImageRegeneration','requestImageRegeneration']) {
+  assert.match(html, new RegExp(`(?:async )?function ${shellAction}\\(`), `P1 retains the real ${shellAction} shell implementation`);
+}
+assert.match(step04Source, /hasShellFeature:\s*name\s*=>\s*typeof window !== 'undefined'\s*&&\s*typeof window\[name\] === 'function'/, 'Step 4 wires explicit shell feature detection');
+assert.match(step04Source, /callShellFeature:\s*\(name, \.\.\.args\)\s*=>\s*callShellFeature\(name, \.\.\.args\)/, 'Step 4 wires the shell feature adapter');
 assert.equal((html.match(/function renderSceneList\(\)/g) || []).length, 1, 'P1 keeps only the final Step04VideoEditor renderSceneList compatibility wrapper');
 assert.match(html, /function applyScript\(script\)\{\s*scenes=timelineBridge\.applyScript\(script\)\.scenes;/, 'P1 script application delegates scene text ownership to timeline bridge');
 

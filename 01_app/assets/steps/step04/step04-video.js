@@ -107,6 +107,7 @@
     getBody: () => typeof document !== 'undefined' ? document.body : null,
     startRender: () => typeof window !== 'undefined' && typeof window.startRenderWorkflow === 'function' ? window.startRenderWorkflow() : undefined,
     getBrandAssets: () => typeof window !== 'undefined' ? (window.brandAssets || []) : [],
+    hasShellFeature: name => typeof window !== 'undefined' && typeof window[name] === 'function',
     callShellFeature: (name, ...args) => callShellFeature(name, ...args),
     getSelectedPlatforms: () => editorState.get('selectedPlatforms'),
     setSelectedPlatforms: value => editorState.set('selectedPlatforms', value),

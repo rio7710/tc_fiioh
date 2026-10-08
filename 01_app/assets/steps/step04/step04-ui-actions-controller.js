@@ -9,9 +9,18 @@
     d = d || {};
     const root = () => d.getRoot?.() || d.root || null;
     const query = selector => root()?.querySelector?.(selector) || null;
-    function openImageRegeneration() { const modal = query('#imageRegenerationModal'); if (modal) modal.hidden = false; }
-    function closeImageRegeneration() { const modal = query('#imageRegenerationModal'); if (modal) modal.hidden = true; }
-    function requestImageRegeneration() { closeImageRegeneration(); }
+    function openImageRegeneration(...args) {
+      if (d.hasShellFeature?.('openImageRegeneration')) return d.callShellFeature?.('openImageRegeneration', ...args);
+      const modal = query('#imageRegenerationModal'); if (modal) modal.hidden = false;
+    }
+    function closeImageRegeneration(...args) {
+      if (d.hasShellFeature?.('closeImageRegeneration')) return d.callShellFeature?.('closeImageRegeneration', ...args);
+      const modal = query('#imageRegenerationModal'); if (modal) modal.hidden = true;
+    }
+    function requestImageRegeneration(...args) {
+      if (d.hasShellFeature?.('requestImageRegeneration')) return d.callShellFeature?.('requestImageRegeneration', ...args);
+      const modal = query('#imageRegenerationModal'); if (modal) modal.hidden = true;
+    }
     function platformForRatio(ratio) { return ratio === '9x16' ? 'instagram' : ratio === '4x5' ? 'facebook' : ratio === '1x1' ? 'square' : 'youtube'; }
     function startRender() { return typeof d.startRender === 'function' ? d.startRender() : undefined; }
     function openDistributionHelp() {
