@@ -1,13 +1,13 @@
 /* Step 04 Video Editor Isolated JS Controller */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
-    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js', './step04-ratio-crop-controller.js', './step04-playback-controller.js', './step04-settings-controller.js'], factory);
+    define(['/01_app/assets/video-editor/index.js', './step04-ui-bindings.js', './step04-store.js', './step04-navigation-controller.js', './step04-narration-controller.js', './step04-timeline-preview-controller.js', './step04-ratio-crop-controller.js', './step04-playback-controller.js', './step04-settings-controller.js', './step04-style-controller.js'], factory);
   } else if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'), require('./step04-ratio-crop-controller.js'), require('./step04-playback-controller.js'), require('./step04-settings-controller.js'));
+    module.exports = factory(require('../../video-editor/index.js'), require('./step04-ui-bindings.js'), require('./step04-store.js'), require('./step04-navigation-controller.js'), require('./step04-narration-controller.js'), require('./step04-timeline-preview-controller.js'), require('./step04-ratio-crop-controller.js'), require('./step04-playback-controller.js'), require('./step04-settings-controller.js'), require('./step04-style-controller.js'));
   } else {
-    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController, root.Step04RatioCropController, root.Step04PlaybackController, root.Step04SettingsController);
+    root.Step04VideoEditor = factory(root.VideoEditor, root.Step04UIBindings, root.Step04Store, root.Step04NavigationController, root.Step04NarrationController, root.Step04TimelinePreviewController, root.Step04RatioCropController, root.Step04PlaybackController, root.Step04SettingsController, root.Step04StyleController);
   }
-}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController, RatioCropController, PlaybackController, SettingsController) {
+}(typeof self !== 'undefined' ? self : this, function (VideoEditor, UIBindings, Step04Store, NavigationController, NarrationController, TimelinePreviewController, RatioCropController, PlaybackController, SettingsController, StyleController) {
   'use strict';
 
   const { SceneNav, RatioProfiles, BrandSelection, MobileSync } = VideoEditor || {};
@@ -86,6 +86,12 @@
     setPlatformPreview: value => setPlatformPreview(value), setSceneDissolveSeconds: value => setSceneDissolveSeconds(value),
     onError: (name, error) => console.error(`[Step04:${name}]`, error)
   });
+  const styleController = StyleController.create({
+    getRoot: () => typeof document !== 'undefined' ? document : null,
+    setState: (key, value) => editorState.set(key, value),
+    getCatalog: () => settingsController.getConfiguredCatalog(),
+    saveEditorSettings: () => saveEditorSettings()
+  });
 
   function callShellFeature(name, ...args) {
     if (typeof window === 'undefined' || typeof window[name] !== 'function') return undefined;
@@ -114,12 +120,7 @@
   }
 
   function setSceneDissolveSeconds(seconds) {
-    const val = Number.isFinite(Number(seconds)) ? Math.max(0, Math.min(3, Number(seconds))) : 0.5;
-    editorState.set('sceneDissolveSeconds', val);
-    if (typeof document !== 'undefined') {
-      const stage = document.querySelector('#stage');
-      if (stage) stage.style.setProperty('--scene-dissolve-seconds', `${val}s`);
-    }
+    return styleController.setSceneDissolveSeconds(seconds);
   }
 
   function configure(settings, catalog) { return settingsController.configure(settings, catalog); }
@@ -151,19 +152,7 @@
   function restoreEditorSettings(settingsOverride) { return settingsController.restoreEditorSettings(settingsOverride); }
 
   function setCaptionSize(level) {
-    const captionSizeLevel = Math.max(-5, Math.min(5, level));
-    editorState.set('captionSizeLevel', captionSizeLevel);
-    if (typeof document === 'undefined') return;
-    const stage = document.querySelector('#stage');
-    const captionSizeValue = document.querySelector('#captionSizeValue');
-    const captionSizeDown = document.querySelector('#captionSizeDown');
-    const captionSizeUp = document.querySelector('#captionSizeUp');
-
-    if (stage) stage.style.setProperty('--caption-size-offset', `${captionSizeLevel * .278}cqmin`);
-    if (captionSizeValue) captionSizeValue.textContent = captionSizeLevel === 0 ? '기본' : `${captionSizeLevel > 0 ? '+' : ''}${captionSizeLevel}`;
-    if (captionSizeDown) captionSizeDown.disabled = captionSizeLevel === -5;
-    if (captionSizeUp) captionSizeUp.disabled = captionSizeLevel === 5;
-    saveEditorSettings();
+    return styleController.setCaptionSize(level);
   }
 
   function setNarration(enabled) {
@@ -185,19 +174,7 @@
   }
 
   function setType(type) {
-    editorState.set('currentType', type);
-    if (typeof document === 'undefined') return;
-    const stage = document.querySelector('#stage');
-    if (stage) {
-      stage.classList.remove('type-card', 'type-minimal', 'type-editorial', 'type-bubble', 'type-block', 'type-action');
-      stage.classList.add(`type-${type}`);
-    }
-    document.querySelectorAll('.type-btn').forEach(btn => {
-      const selected = btn.dataset.type === type;
-      btn.classList.toggle('active', selected);
-      btn.setAttribute('aria-pressed', String(selected));
-    });
-    saveEditorSettings();
+    return styleController.setType(type);
   }
 
   function setMusic(track) {
