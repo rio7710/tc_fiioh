@@ -21,6 +21,7 @@
         try { video.currentTime = logicalTime; }
         catch (error) { d.onMediaSeekError?.(error); }
       }
+      d.syncNarration?.(logicalTime, true);
     }
     function sync() {
       if (!scenes.length) return;
@@ -29,10 +30,16 @@
       const video = root.querySelector?.('#video');
       if (!video) return;
       const mediaTime = Math.max(0, Number(video.currentTime) || 0);
+      const playbackValue = d.getPlaybackTime?.();
+      const playbackTime = Number(playbackValue);
+      const hasPlaybackTime = playbackValue != null && Number.isFinite(playbackTime) && playbackTime >= 0;
       if (pendingSeekTime != null) {
-        if (Math.abs(mediaTime - pendingSeekTime) <= 0.35) {
+        if (hasPlaybackTime && Math.abs(playbackTime - pendingSeekTime) <= 0.35) {
           pendingSeekTime = null;
-          if (!video.paused) logicalTime = mediaTime;
+          logicalTime = playbackTime;
+        } else if (Math.abs(mediaTime - pendingSeekTime) <= 0.35) {
+          pendingSeekTime = null;
+          if (!video.paused) logicalTime = hasPlaybackTime ? playbackTime : mediaTime;
         } else {
           // Safari can ignore a currentTime assignment until metadata/seek
           // ranges are ready. Keep the requested scene authoritative while
@@ -43,9 +50,9 @@
             catch (error) { d.onMediaSeekError?.(error); }
           }
         }
-      } else if (!video.paused) logicalTime = mediaTime;
+      } else if (!video.paused) logicalTime = hasPlaybackTime ? playbackTime : mediaTime;
       const view = d.previewSync?.(logicalTime);
-      d.syncNarration?.(view.time);
+      d.syncNarration?.(view.time, false);
       if (!video.paused) d.scheduleFrame?.(sync);
     }
     function applyTimeline(timeline) {

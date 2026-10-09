@@ -128,10 +128,15 @@
 
     function applyScript(script) {
       const lines = Array.isArray(script?.lines) ? script.lines : [];
-      scenes = scenes.map(scene => ({
-        ...scene,
-        text: scene.scriptLineIndex == null ? scene.text : (lines[scene.scriptLineIndex] || '')
-      }));
+      let activeCaption = '';
+      let hasActiveCaption = false;
+      scenes = scenes.map(scene => {
+        if (scene.scriptLineIndex != null) {
+          activeCaption = lines[scene.scriptLineIndex] || '';
+          hasActiveCaption = true;
+        }
+        return { ...scene, text: hasActiveCaption ? activeCaption : (scene.text || '') };
+      });
       if (typeof dependencies.applyEditorTimeline === 'function') dependencies.applyEditorTimeline({ scenes: getScenes() });
       return snapshot();
     }

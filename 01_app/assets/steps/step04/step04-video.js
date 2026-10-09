@@ -99,7 +99,8 @@
     renderSceneList: () => renderSceneList(),
     previewSync: time => previewController.sync(time),
     updateSummary: () => previewController.updateSummary(),
-    syncNarration: time => syncNarration(time),
+    syncNarration: (time, force) => syncNarration(time, force),
+    getPlaybackTime: () => narrationController.getTimelineTime(),
     scheduleFrame: callback => requestAnimationFrame(callback),
     onMediaSeekError: error => console.error('[Step04:media-seek]', error)
   });

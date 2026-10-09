@@ -10,6 +10,7 @@
     const deps = dependencies || {};
     let narrations = [];
     let narrationAudios = [];
+    let pendingTimelineTime = null;
     const root = () => deps.getRoot?.() || deps.root || null;
 
     function active() { return Number(deps.getActiveNarration?.() ?? -1); }
@@ -21,6 +22,7 @@
       const audio = index >= 0 ? narrationAudios[index] : null;
       if (audio && typeof audio.pause === 'function') audio.pause();
       setActive(-1);
+      pendingTimelineTime = null;
     }
 
     function setTracks(payload) {
@@ -42,16 +44,34 @@
       if (active() !== index) {
         stop();
         setActive(index);
+        pendingTimelineTime = time;
         audio.currentTime = targetTime;
         const playing = audio.play();
         if (playing && typeof playing.catch === 'function') playing.catch(() => {});
       } else if (Math.abs(audio.currentTime - targetTime) > 0.25) {
+        pendingTimelineTime = time;
         audio.currentTime = targetTime;
         if (audio.paused) {
           const playing = audio.play();
           if (playing && typeof playing.catch === 'function') playing.catch(() => {});
         }
+      } else pendingTimelineTime = null;
+    }
+
+    function getTimelineTime() {
+      const index = active();
+      const target = index >= 0 ? narrations[index] : null;
+      const audio = index >= 0 ? narrationAudios[index] : null;
+      if (!enabled() || !target || !audio) return null;
+      const cueDuration = Math.max(0.001, Number(target.end) - Number(target.start));
+      const audioDuration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : cueDuration;
+      if (pendingTimelineTime != null) {
+        const expected = Math.min(Math.max(0, audioDuration - 0.03), Math.max(0, pendingTimelineTime - target.start) / cueDuration * audioDuration);
+        if (Math.abs((Number(audio.currentTime) || 0) - expected) <= 0.25) pendingTimelineTime = null;
+        else return pendingTimelineTime;
       }
+      const progress = Math.max(0, Math.min(1, (Number(audio.currentTime) || 0) / audioDuration));
+      return Number(target.start) + progress * cueDuration;
     }
 
     function sync(time, force) {
@@ -89,7 +109,7 @@
       deps.saveEditorSettings?.();
     }
 
-    return { setTracks, stop, start, sync, reset, setEnabled };
+    return { setTracks, stop, start, sync, reset, setEnabled, getTimelineTime };
   }
 
   return { create };

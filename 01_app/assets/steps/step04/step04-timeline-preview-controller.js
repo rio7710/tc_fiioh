@@ -13,6 +13,50 @@
       ? deps.SceneNav.calculateTimelineDuration(scenes)
       : (scenes.length ? Number(scenes[scenes.length - 1].end) || 0 : 0);
 
+    function generatedVideoUri(scene) {
+      const value = scene?.generatedVideo || scene?.video || null;
+      if (typeof value === 'string') return value;
+      return value?.uri || value?.preview_uri || value?.url || '';
+    }
+
+    function syncSceneMedia(scene, time, changed) {
+      const stage = query('#stage');
+      const image = query('#sceneImage');
+      const video = query('#sceneVideo');
+      const clock = query('#video');
+      const badge = query('#sceneResourceBadge');
+      const videoUri = generatedVideoUri(scene);
+      const usesVideo = Boolean(videoUri);
+      if (changed && image) {
+        image.src = scene?.image || '';
+        image.alt = `${scene?.name || ''} 장면 이미지`;
+      }
+      stage?.classList?.toggle?.('has-scene-video', usesVideo);
+      if (badge) badge.textContent = usesVideo ? '영상' : '사진';
+      if (!video) return;
+      if (!usesVideo) {
+        video.pause?.();
+        return;
+      }
+      video.dataset = video.dataset || {};
+      if (changed || video.dataset.previewSrc !== videoUri) {
+        video.dataset.previewSrc = videoUri;
+        video.src = videoUri;
+        video.load?.();
+      }
+      let targetTime = Math.max(0, Number(time) - (Number(scene?.start) || 0));
+      if (Number.isFinite(video.duration) && video.duration > 0) targetTime = Math.min(targetTime, Math.max(0, video.duration - 0.03));
+      if (Math.abs((Number(video.currentTime) || 0) - targetTime) > 0.25) {
+        try { video.currentTime = targetTime; } catch (_) {}
+      }
+      if (clock && !clock.paused) {
+        if (video.paused) {
+          const playing = video.play?.();
+          if (playing && typeof playing.catch === 'function') playing.catch(() => {});
+        }
+      } else video.pause?.();
+    }
+
     function sync(time) {
       const scenes = deps.getScenes?.() || [];
       const t = Number(time) || 0;
@@ -26,14 +70,10 @@
       const changed = index !== deps.getCurrentScene?.();
       if (changed) {
         deps.setCurrentScene?.(index);
-        const image = query('#sceneImage');
-        if (image) {
-          image.src = scenes[index]?.image || '';
-          image.alt = `${scenes[index]?.name || ''} 장면 이미지`;
-        }
         deps.applyStoredSceneCrop?.();
       }
       const currentScene = deps.getCurrentScene?.() ?? index;
+      syncSceneMedia(scenes[currentScene], t, changed);
       const showOutro = deps.SceneNav?.isOutroActive
         ? deps.SceneNav.isOutroActive(t, duration, true)
         : t >= Math.max(0, duration - 2);

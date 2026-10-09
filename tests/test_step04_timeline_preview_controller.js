@@ -17,7 +17,8 @@ function element(classes = []) {
 for (const count of [1, 3, 7]) {
   const nodes = {
     '#stage': element(['preview-landscape', 'preview-portrait', 'preview-feed', 'preview-square']),
-    '#sceneImage': element(), '#brandOutroPreview': element(), '#titleText': element(),
+    '#sceneImage': element(), '#sceneVideo': {...element(), dataset: {}, paused: true, duration: 5, currentTime: 0, pauseCount: 0, playCount: 0, loadCount: 0, pause(){this.paused=true;this.pauseCount+=1}, play(){this.paused=false;this.playCount+=1;return Promise.resolve()}, load(){this.loadCount+=1}},
+    '#video': {paused: true}, '#sceneResourceBadge': element(), '#brandOutroPreview': element(), '#titleText': element(),
     '#progressFill': element(), '#clock': element(), '#sceneTimelineSummary': element()
   };
   const scenes = Array.from({ length: count }, (_, index) => ({
@@ -38,6 +39,7 @@ for (const count of [1, 3, 7]) {
   assert.equal(view.currentScene, 0, `${count} scenes select the start boundary`);
   assert.equal(nodes['#sceneImage'].src, '/s0.jpg');
   assert.equal(nodes['#sceneImage'].alt, 'Scene 0 장면 이미지');
+  assert.equal(nodes['#sceneResourceBadge'].textContent, '사진');
   assert.equal(cropCalls, 1, 'initial scene applies crop once');
   controller.sync(1);
   assert.equal(cropCalls, 1, 'same scene does not update image or crop');
@@ -65,6 +67,23 @@ for (const count of [1, 3, 7]) {
   }
   assert.deepEqual(controller.updateSummary(), { count, duration: count * 4 });
   assert.equal(nodes['#sceneTimelineSummary'].textContent, `타임라인 기준 · 총 ${count}장면 · ${count * 4}초`);
+}
+
+{
+  const nodes = {
+    '#stage': element(), '#sceneImage': element(), '#sceneResourceBadge': element(), '#brandOutroPreview': element(), '#titleText': element(),
+    '#progressFill': element(), '#clock': element(), '#sceneTimelineSummary': element(), '#video': {paused: false},
+    '#sceneVideo': {...element(), dataset: {}, paused: true, duration: 5, currentTime: 0, pauseCount: 0, playCount: 0, loadCount: 0, pause(){this.paused=true;this.pauseCount+=1}, play(){this.paused=false;this.playCount+=1;return Promise.resolve()}, load(){this.loadCount+=1}}
+  };
+  const scenes = [{id:'clip',name:'Clip',image:'/fallback.jpg',generatedVideo:{uri:'/clip.mp4'},start:0,end:4,text:'음성 자막'}];
+  let currentScene=-1;
+  const controller=PreviewController.create({root:{querySelector:s=>nodes[s]||null},SceneNav,getScenes:()=>scenes,getCurrentScene:()=>currentScene,setCurrentScene:value=>{currentScene=value},syncNavigation() {}});
+  controller.sync(1.5);
+  assert.equal(nodes['#stage'].classList.contains('has-scene-video'),true,'generated clip replaces its fallback image');
+  assert.equal(nodes['#sceneVideo'].src,'/clip.mp4');
+  assert.equal(nodes['#sceneVideo'].currentTime,1.5,'clip follows the narration timeline offset');
+  assert.equal(nodes['#sceneVideo'].paused,false,'clip plays while the narration clock is playing');
+  assert.equal(nodes['#sceneResourceBadge'].textContent,'영상');
 }
 
 const emptyViews = [];

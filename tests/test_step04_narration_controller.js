@@ -28,6 +28,7 @@ assert.equal(active, 0, 'cue includes its start boundary and clones payload');
 assert.equal(first.currentTime, 0, 'cue start maps to audio start');
 controller.sync(4);
 assert.equal(first.currentTime, 4, 'relative cue time maps proportionally to audio duration');
+assert.equal(controller.getTimelineTime(), 4, 'active narration exposes the canonical global timeline time');
 first.currentTime = 4.25;
 controller.sync(4);
 assert.equal(first.currentTime, 4.25, 'drift at exactly 0.25 seconds is preserved');
@@ -70,6 +71,19 @@ assert.equal(dynamicAudios[6].pauseCount, 1, 'track replacement stops the active
 controller.reset();
 controller.sync(0);
 assert.equal(active, -1, 'reset leaves no playable cues');
+
+{
+  let pendingActive=-1;
+  let ignoredTime=0;
+  const ignoredSeekAudio=audio(8);
+  Object.defineProperty(ignoredSeekAudio,'currentTime',{get:()=>ignoredTime,set:()=>{}});
+  const pendingController=NarrationController.create({isNarrationEnabled:()=>true,getActiveNarration:()=>pendingActive,setActiveNarration:value=>{pendingActive=value},getPreviewVideo:()=>({paused:false})});
+  pendingController.setTracks({narrations:[{start:2,end:6}],narrationAudios:[ignoredSeekAudio]});
+  pendingController.sync(4);
+  assert.equal(pendingController.getTimelineTime(),4,'ignored audio seek preserves the requested narration time');
+  ignoredTime=4;
+  assert.equal(pendingController.getTimelineTime(),4,'narration clock stays aligned after delayed audio seek confirmation');
+}
 
 const uiOrder = [];
 let uiEnabled = false;
