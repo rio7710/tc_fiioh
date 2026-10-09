@@ -8,6 +8,7 @@ const shell = fs.readFileSync(shellPath, 'utf8');
 
 const partials = [
   ['userSettingsContainer', '01_app/pages/components/user-settings.html'],
+  ['workflowProgressContainer', '01_app/pages/components/workflow-progress.html'],
   ['step01LoginContainer', '01_app/pages/steps/step01-login.html'],
   ['step01IndexContainer', '01_app/pages/steps/step01-content-index.html'],
   ['step01ProjectContainer', '01_app/pages/steps/step01-project.html'],
@@ -35,6 +36,7 @@ const root = { querySelector: selector => nodes[selector.slice(1)] || null };
   assert.match(nodes.step01LoginContainer.innerHTML, /id="step1"/);
   assert.match(nodes.step031Container.innerHTML, /id="step31"/);
   assert.match(nodes.userSettingsContainer.innerHTML, /id="userSettingsDialog"/);
+  assert.match(nodes.workflowProgressContainer.innerHTML, /id="aiWorkflowModal"/);
   const combined = Object.values(nodes).map(node => node.innerHTML).join('');
   const ids = [...combined.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
   assert.equal(new Set(ids).size, ids.length, 'loaded partials do not introduce duplicate ids');

@@ -57,6 +57,7 @@ const sceneVoicePlaybackControllerPath = '01_app/assets/steps/step03/scene-voice
 const sceneVoiceControllerPath = '01_app/assets/steps/step03/scene-voice-controller.js';
 const voiceProfileControllerPath = '01_app/assets/steps/step03/voice-profile-controller.js';
 const userSettingsControllerPath = '01_app/assets/core/user-settings-controller.js';
+const workflowProgressControllerPath = '01_app/assets/core/workflow-progress-controller.js';
 const storyboardGridRendererPath = '01_app/assets/steps/step03/storyboard-grid-renderer.js';
 const storyboardLookControllerPath = '01_app/assets/steps/step03/storyboard-look-controller.js';
 const storyboardFlowControllerPath = '01_app/assets/steps/step03/storyboard-flow-controller.js';
@@ -113,6 +114,7 @@ assert.ok(fs.existsSync(candidateSelectionControllerPath), 'candidate-selection-
 assert.ok(fs.existsSync(sceneVoicePlaybackControllerPath), 'scene-voice-playback-controller.js must exist');
 assert.ok(fs.existsSync(sceneVoiceControllerPath), 'scene-voice-controller.js must exist');
 assert.ok(fs.existsSync(voiceProfileControllerPath), 'voice-profile-controller.js must exist');
+assert.ok(fs.existsSync(workflowProgressControllerPath), 'workflow-progress-controller.js must exist');
 assert.ok(fs.existsSync(storyboardGridRendererPath), 'storyboard-grid-renderer.js must exist');
 assert.ok(fs.existsSync(storyboardLookControllerPath), 'storyboard-look-controller.js must exist');
 assert.ok(fs.existsSync(storyboardFlowControllerPath), 'storyboard-flow-controller.js must exist');
@@ -238,7 +240,10 @@ assert.match(html, /scriptGenerationController\.mount\(document\)/, 'P1 mounts s
 assert.match(html, /async function runAiWorkflow\(\)\{\s*return scriptGenerationController\.run\(\);\s*\}/, 'P1 keeps a thin script generation wrapper');
 assert.doesNotMatch(html, /activePhase=|waitingTimer=|configureWorkflowModal\('storyboard'\)/, 'P1 removes the storyboard workflow implementation');
 assert.match(fs.readFileSync(productionWorkflowControllerPath,'utf8'), /kicker:'AI IMAGE PRODUCTION TEAM'/, 'production workflow config moves intact to its controller');
-assert.match(html, /export:\{[\s\S]*kicker:'AI VIDEO & FINAL EXPORT TEAM'/, 'export workflow config remains in P1');
+assert.match(fs.readFileSync(workflowProgressControllerPath,'utf8'), /export:[\s\S]*kicker: 'AI VIDEO & FINAL EXPORT TEAM'/, 'export workflow config moves to workflow progress controller');
+assert.doesNotMatch(html, /const workflowConfigs=|kicker:'AI VIDEO & FINAL EXPORT TEAM'/, 'P1 removes workflow configuration body');
+assert.match(html, /workflow-progress-controller\.js\?v=20261009_v77/, 'P1 cache-busts workflow progress controller');
+assert.match(html, /workflowProgressController\.mount\(\)/, 'P1 mounts workflow progress controller');
 assert.match(fs.readFileSync(productionWorkflowControllerPath,'utf8'), /configureWorkflowModal\('production', productionConfig\)/, 'production controller keeps its modal configuration call');
 assert.match(fs.readFileSync(renderControllerPath,'utf8'), /configureWorkflowModal\('export'\)/, 'export controller keeps its modal configuration call');
 assert.match(html, /const productionWorkflowController=Step03ProductionWorkflowController\.create\(/, 'P1 wires the production workflow controller');
@@ -554,6 +559,7 @@ function createPrePartialContext() {
     ThinkCastPromptLabController: require('../01_app/assets/core/prompt-lab-controller.js'),
     ThinkCastProviderSettingsController: require('../01_app/assets/core/provider-settings-controller.js'),
     ThinkCastUserSettingsController: require('../01_app/assets/core/user-settings-controller.js'),
+    ThinkCastWorkflowProgressController: require('../01_app/assets/core/workflow-progress-controller.js'),
     Step03ScriptEditorController: require('../01_app/assets/steps/step03/step03-script-editor-controller.js'),
     Step02Keyword: require('../01_app/assets/steps/step02/step02-keyword.js'),
     Step02ScriptGenerationController: require('../01_app/assets/steps/step02/script-generation-controller.js'),

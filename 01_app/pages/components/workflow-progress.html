@@ -1,0 +1,23 @@
+<div class="ai-modal" id="aiWorkflowModal" role="dialog" aria-modal="true" aria-labelledby="aiWorkflowTitle" hidden>
+  <div class="ai-dialog">
+    <div class="ai-dialog-head">
+      <p class="ai-kicker" id="aiWorkflowKicker"><span class="ai-live-dot"></span>AI STORYBOARD TEAM</p>
+      <h2 class="ai-title" id="aiWorkflowTitle">스토리보드 제작 회의 중</h2>
+      <p class="ai-summary" id="aiWorkflowSummary">선택한 키워드를 역할별로 검토하고 있습니다.</p>
+      <div class="ai-now processing" id="aiNow" role="status" aria-live="polite">AI 팀을 호출하고 있습니다</div>
+      <div class="ai-engines" id="aiEngines" aria-label="AI API 연동 계획">
+        <span class="ai-engine-chip"><span class="ai-engine-mark gpt">GPT</span>ChatGPT API <em>연동 예정</em></span>
+        <span class="ai-engine-chip"><span class="ai-engine-mark claude">C</span>Claude API <em>연동 예정</em></span>
+      </div>
+    </div>
+    <div class="ai-progress"><div class="ai-progress-bar" id="aiProgressBar"></div></div>
+    <div class="ai-script-loader" aria-hidden="true"><span class="ai-script-book"><i class="ai-script-page"></i><i class="ai-script-page"></i><i class="ai-script-page"></i></span><span class="ai-script-loader-copy"><strong>대본을 엮고 있습니다</strong><span>1~3분 소요됩니다.</span></span></div>
+    <ol class="ai-role-list" id="aiRoleList">
+      <li class="ai-role" data-role="pd"><span class="ai-role-no">01</span><div class="ai-role-copy"><strong>콘텐츠 PD</strong><small>목표 · 타깃 · 핵심 메시지 설정</small><span class="ai-role-engine">ChatGPT 담당</span><p class="ai-role-result"></p></div><span class="ai-role-state">대기</span></li>
+      <li class="ai-role" data-role="writer"><span class="ai-role-no">02</span><div class="ai-role-copy"><strong>스토리 작가</strong><small>서사 흐름 · 내레이션 초안 구성</small><span class="ai-role-engine">Claude 담당</span><p class="ai-role-result"></p></div><span class="ai-role-state">대기</span></li>
+      <li class="ai-role" data-role="director"><span class="ai-role-no">03</span><div class="ai-role-copy"><strong>비주얼 디렉터</strong><small>구도 · 쇼트 · 장면 전환 설계</small><span class="ai-role-engine">ChatGPT 담당</span><p class="ai-role-result"></p></div><span class="ai-role-state">대기</span></li>
+      <li class="ai-role" data-role="editor"><span class="ai-role-no">04</span><div class="ai-role-copy"><strong>콘티 에디터</strong><small>씬 · 대사 · 타이밍 최종 통합</small><span class="ai-role-engine">Claude 담당</span><p class="ai-role-result"></p></div><span class="ai-role-state">대기</span></li>
+    </ol>
+    <div class="ai-dialog-foot"><span class="ai-foot-status" id="aiFootStatus">AI 팀을 호출하고 있습니다.</span></div>
+  </div>
+</div>

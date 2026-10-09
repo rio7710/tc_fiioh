@@ -24,6 +24,7 @@
 <script src="/01_app/assets/core/prompt-lab-controller.js?v=20261009_v37"></script>
 <script src="/01_app/assets/core/provider-settings-controller.js?v=20261009_v39"></script>
 <script src="/01_app/assets/core/user-settings-controller.js?v=20261009_v76"></script>
+<script src="/01_app/assets/core/workflow-progress-controller.js?v=20261009_v77"></script>
 <script src="/01_app/assets/core/project-store.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step-partial-loader.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step01/step01-project-index-view.js?v=20261009_v55"></script>
@@ -196,34 +197,13 @@
   </form>
 </div>
 
-<div class="ai-modal" id="aiWorkflowModal" role="dialog" aria-modal="true" aria-labelledby="aiWorkflowTitle" hidden>
-  <div class="ai-dialog">
-    <div class="ai-dialog-head">
-      <p class="ai-kicker" id="aiWorkflowKicker"><span class="ai-live-dot"></span>AI STORYBOARD TEAM</p>
-      <h2 class="ai-title" id="aiWorkflowTitle">스토리보드 제작 회의 중</h2>
-      <p class="ai-summary" id="aiWorkflowSummary">선택한 키워드를 역할별로 검토하고 있습니다.</p>
-      <div class="ai-now processing" id="aiNow" role="status" aria-live="polite">AI 팀을 호출하고 있습니다</div>
-      <div class="ai-engines" id="aiEngines" aria-label="AI API 연동 계획">
-        <span class="ai-engine-chip"><span class="ai-engine-mark gpt">GPT</span>ChatGPT API <em>연동 예정</em></span>
-        <span class="ai-engine-chip"><span class="ai-engine-mark claude">C</span>Claude API <em>연동 예정</em></span>
-      </div>
-    </div>
-    <div class="ai-progress"><div class="ai-progress-bar" id="aiProgressBar"></div></div>
-    <div class="ai-script-loader" aria-hidden="true"><span class="ai-script-book"><i class="ai-script-page"></i><i class="ai-script-page"></i><i class="ai-script-page"></i></span><span class="ai-script-loader-copy"><strong>대본을 엮고 있습니다</strong><span>1~3분 소요됩니다.</span></span></div>
-    <ol class="ai-role-list" id="aiRoleList">
-      <li class="ai-role" data-role="pd"><span class="ai-role-no">01</span><div class="ai-role-copy"><strong>콘텐츠 PD</strong><small>목표 · 타깃 · 핵심 메시지 설정</small><span class="ai-role-engine">ChatGPT 담당</span><p class="ai-role-result"></p></div><span class="ai-role-state">대기</span></li>
-      <li class="ai-role" data-role="writer"><span class="ai-role-no">02</span><div class="ai-role-copy"><strong>스토리 작가</strong><small>서사 흐름 · 내레이션 초안 구성</small><span class="ai-role-engine">Claude 담당</span><p class="ai-role-result"></p></div><span class="ai-role-state">대기</span></li>
-      <li class="ai-role" data-role="director"><span class="ai-role-no">03</span><div class="ai-role-copy"><strong>비주얼 디렉터</strong><small>구도 · 쇼트 · 장면 전환 설계</small><span class="ai-role-engine">ChatGPT 담당</span><p class="ai-role-result"></p></div><span class="ai-role-state">대기</span></li>
-      <li class="ai-role" data-role="editor"><span class="ai-role-no">04</span><div class="ai-role-copy"><strong>콘티 에디터</strong><small>씬 · 대사 · 타이밍 최종 통합</small><span class="ai-role-engine">Claude 담당</span><p class="ai-role-result"></p></div><span class="ai-role-state">대기</span></li>
-    </ol>
-    <div class="ai-dialog-foot"><span class="ai-foot-status" id="aiFootStatus">AI 팀을 호출하고 있습니다.</span></div>
-  </div>
-</div>
+<div id="workflowProgressContainer"></div>
 
 <script>
 (async()=>{
 const stepPartialDefinitions=[
   {container:'#userSettingsContainer',path:'/01_app/pages/components/user-settings.html'},
+  {container:'#workflowProgressContainer',path:'/01_app/pages/components/workflow-progress.html'},
   {container:'#step01LoginContainer',path:'/01_app/pages/steps/step01-login.html'},
   {container:'#step01IndexContainer',path:'/01_app/pages/steps/step01-content-index.html'},
   {container:'#step01ProjectContainer',path:'/01_app/pages/steps/step01-project.html'},
@@ -620,34 +600,10 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function selectedKeywordLabels(){
   return (demoData?.keywords||[]).filter(item=>selectedKeywords.has(item.id)).map(item=>item.label);
 }
-const workflowConfigs={
-  export:{
-    kicker:'AI VIDEO & FINAL EXPORT TEAM',
-    title:'최종 영상 제작 중',
-    summary:'콘티에서 확정한 장면 미디어를 선택 설정으로 최종 파일에 합성하고 있습니다.',
-    engines:[
-      {mark:'FF',kind:'encoder',name:'FFmpeg Worker',status:'내부 모듈'},
-      {mark:'H',kind:'internal',name:'H.264 Encoder',status:'모바일 호환'},
-      {mark:'SNS',kind:'videoai',name:'Platform Preset',status:'배포 규격'}
-    ],
-    roles:[
-      {name:'콘티 미디어 확정',description:'장면별 선택 이미지·영상 · 순서 · 타이밍 잠금',engine:'Production Orchestrator'},
-      {name:'자막 PNG 생성',description:'선택한 자막 디자인을 문장별 투명 PNG로 렌더링',engine:'Browser Caption Renderer'},
-      {name:'최종 영상 합성',description:'타임라인 조립 · 비율별 크롭 · H.264/AAC 모바일 호환 출력',engine:'FFmpeg Worker · Platform Preset'},
-      {name:'배포 파일 등록',description:'MP4 다운로드 파일 생성 · 콘텐츠 캘린더 기록',engine:'Distribution Worker'}
-    ]
-  }
-};
+const workflowProgressController=ThinkCastWorkflowProgressController.create({getRoot:()=>document});
+workflowProgressController.mount();
 function configureWorkflowModal(type,configOverride=null){
-  const config=configOverride||workflowConfigs[type];
-  const modal=document.querySelector('#aiWorkflowModal');
-  modal.dataset.workflow=type;
-  document.querySelector('#aiWorkflowKicker').innerHTML=`<span class="ai-live-dot"></span>${config.kicker}`;
-  document.querySelector('#aiWorkflowTitle').textContent=config.title;
-  document.querySelector('#aiWorkflowSummary').textContent=config.summary;
-  document.querySelector('#aiEngines').innerHTML=config.engines.map(engine=>`<span class="ai-engine-chip"><span class="ai-engine-mark ${engine.kind}">${engine.mark}</span>${engine.name} <em>${engine.status}</em></span>`).join('');
-  document.querySelector('#aiRoleList').innerHTML=config.roles.map((role,index)=>`<li class="ai-role"><span class="ai-role-no">${String(index+1).padStart(2,'0')}</span><div class="ai-role-copy"><strong>${role.name}</strong><small>${role.description}</small><span class="ai-role-engine">${role.engine}</span><p class="ai-role-result"></p></div><span class="ai-role-state">대기</span></li>`).join('');
-  return modal;
+  return workflowProgressController.configure(type,configOverride);
 }
 function setupSceneProgressBadges(role,label){
   const holder=document.createElement('div');
