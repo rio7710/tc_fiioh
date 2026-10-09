@@ -14,6 +14,7 @@
 <script src="/01_app/assets/core/shell-navigation-controller.js?v=20261009_v32"></script>
 <script src="/01_app/assets/core/session-bootstrap-controller.js?v=20261009_v33"></script>
 <script src="/01_app/assets/core/auth-ui-controller.js?v=20261009_v34"></script>
+<script src="/01_app/assets/core/project-hydration-controller.js?v=20261009_v35"></script>
 <script src="/01_app/assets/core/project-store.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step-partial-loader.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step01/step01-project-index-controller.js?v=20261009_v31"></script>
@@ -1589,32 +1590,7 @@ function openIndexProject(projectId,historyMode='push'){
   return contentIndexController.openProject(projectId,historyMode);
 }
 async function loadProjectContent(projectId,token){
-  const result=await api(`/api/project-content?project_id=${encodeURIComponent(projectId)}`);
-  if(isStaleNav(token)||projectId!==activeProjectId)return result;
-  if(result.scene_crop_positions){sceneCropPositions=result.scene_crop_positions;if(window.Step04VideoEditor?.setSceneCropPositions)window.Step04VideoEditor.setSceneCropPositions(result.scene_crop_positions);}
-  demoData.timeline=result.timeline;
-  demoData.state={...(demoData.state||{}),script:result.script,selected_keywords:result.selected_keyword_ids||[]};
-  selectedKeywords=new Set(result.selected_keyword_ids||[]);
-  activeStoryboardDocument=result.document||null;
-  setKeywordStageLocked(Boolean(result.document));
-  storedStoryboardImages=new Map((result.storyboard_images||[]).map(item=>[item.scene_id,item]));
-  setStoryboardImageCandidates(result.storyboard_image_candidates||[]);
-  storedStoryboardVoiceClips=new Map((result.storyboard_voice_clips||[]).filter(item=>!item.profile_id||item.profile_id===(result.voice_profile||'warm_female')).map(item=>[item.scene_id,item]));
-  storedStoryboardVideos=new Map((result.storyboard_videos||[]).map(item=>[item.scene_id,item]));
-  setStoryboardVideoCandidates(result.storyboard_video_candidates||[]);
-  setVoiceProfile(result.voice_profile||'warm_female');
-  brandSelectionController.hydrate({assets:result.brand_assets||[],selections:result.brand_selections||[]});renderBrandChoices();
-  if(Array.isArray(result.automation_editor?.channels)){
-    const channels=result.automation_editor.channels.filter(channel=>platformButtons.some(button=>button.dataset.platform===channel));
-    selectedPlatforms.clear();channels.forEach(channel=>selectedPlatforms.add(channel));
-    platformButtons.forEach(button=>button.setAttribute('aria-pressed',String(selectedPlatforms.has(button.dataset.platform))));
-    if(channels.length)setPlatformPreview(channels[0]);
-  }
-  applyTimeline(result.timeline);
-  connectStoryboardAssetsToEditor();
-  fillScript(result.script);
-  applyScript(result.script);
-  return result;
+  return projectHydrationController.loadContent(projectId,token);
 }
 let outroRatioAssets=null;
 let brandStagePreview=null;
@@ -2735,6 +2711,7 @@ function refreshBrandLibrary(){return brandLibraryController.refresh()}
 function showBrandLibrary(show){return brandLibraryController.show(show)}
 brandLibraryController.mount(document);
 const brandOverlayMount=brandOverlayController.mount(document);if(!brandOverlayMount.watermark.ok)console.error('[BrandOverlay:watermark]',brandOverlayMount.watermark.error);if(!brandOverlayMount.outro.ok)console.error('[BrandOverlay:outro]',brandOverlayMount.outro.error);
+const projectHydrationController=ThinkCastProjectHydrationController.create({request:(...args)=>api(...args),isStale:isStaleNav,getActiveProjectId:()=>activeProjectId,setSceneCropPositions:positions=>{sceneCropPositions=positions;if(window.Step04VideoEditor?.setSceneCropPositions)window.Step04VideoEditor.setSceneCropPositions(positions)},setDemoTimeline:timeline=>{demoData.timeline=timeline},mergeDemoState:values=>{demoData.state={...(demoData.state||{}),...values}},setSelectedKeywords:value=>{selectedKeywords=value},setActiveStoryboardDocument:value=>{activeStoryboardDocument=value},setKeywordStageLocked,setStoryboardImages:value=>{storedStoryboardImages=value},setStoryboardImageCandidates,setStoryboardVoiceClips:value=>{storedStoryboardVoiceClips=value},setStoryboardVideos:value=>{storedStoryboardVideos=value},setStoryboardVideoCandidates,setVoiceProfile,hydrateBrandSelections:value=>brandSelectionController.hydrate(value),renderBrandChoices,getPlatformButtons:()=>platformButtons,getSelectedPlatforms:()=>selectedPlatforms,setPlatformPreview,applyTimeline,connectStoryboardAssetsToEditor,fillScript,applyScript});
 const projectIndexController=Step01ProjectIndexController.create({getRoot:()=>document,projectsIndex:indexProjects,getCalendarEntries:()=>calendarEntries,calendarContentVersions,getRememberedProjectId:()=>localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY),getActiveProjectId:()=>activeProjectId,setActiveProjectId,request:(...args)=>api(...args),refreshBrandLibrary,escapeHtml,projectDate,automationStageLabel,setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),onPollError:error=>console.error('[ProjectIndex:poll]',error)});
 projectIndexController.startPolling();
 const authUIController=ThinkCastAuthUIController.create({getRoot:()=>document,request:(...args)=>api(...args),setDemoState:state=>{demoData.state=state},refreshProjectIndex,showStep,setActiveProjectId,setKeywordStageLocked});

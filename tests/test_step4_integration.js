@@ -35,6 +35,7 @@ const videoEditorPath = '01_app/assets/video-editor/index.js';
 const shellNavigationControllerPath = '01_app/assets/core/shell-navigation-controller.js';
 const sessionBootstrapControllerPath = '01_app/assets/core/session-bootstrap-controller.js';
 const authUIControllerPath = '01_app/assets/core/auth-ui-controller.js';
+const projectHydrationControllerPath = '01_app/assets/core/project-hydration-controller.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
@@ -65,10 +66,12 @@ assert.ok(fs.existsSync(videoEditorPath), 'video-editor/index.js must exist');
 assert.ok(fs.existsSync(shellNavigationControllerPath), 'shell-navigation-controller.js must exist');
 assert.ok(fs.existsSync(sessionBootstrapControllerPath), 'session-bootstrap-controller.js must exist');
 assert.ok(fs.existsSync(authUIControllerPath), 'auth-ui-controller.js must exist');
+assert.ok(fs.existsSync(projectHydrationControllerPath), 'project-hydration-controller.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
 const brandLibrarySource = fs.readFileSync(brandLibraryControllerPath, 'utf8');
+const projectHydrationSource = fs.readFileSync(projectHydrationControllerPath, 'utf8');
 assert.match(partialHtml, /id="step4"/, 'Partial HTML contains #step4');
 assert.match(partialHtml, /id="imageRegenerationModal"/, 'Partial HTML contains #imageRegenerationModal');
 assert.doesNotMatch(step04Source, /document\.addEventListener\('click',[\s\S]*\.ratio-btn/, 'ratio controls must not have a duplicate global click listener');
@@ -81,9 +84,11 @@ const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 assert.match(html, /src="\/01_app\/assets\/core\/shell-navigation-controller\.js\?v=20261009_v32"/, 'HTML cache-busts shell navigation controller');
 assert.match(html, /src="\/01_app\/assets\/core\/session-bootstrap-controller\.js\?v=20261009_v33"/, 'HTML cache-busts session bootstrap controller');
 assert.match(html, /src="\/01_app\/assets\/core\/auth-ui-controller\.js\?v=20261009_v34"/, 'HTML cache-busts auth UI controller');
+assert.match(html, /src="\/01_app\/assets\/core\/project-hydration-controller\.js\?v=20261009_v35"/, 'HTML cache-busts project hydration controller');
 assert.ok(html.indexOf('content-route.js') < html.indexOf('shell-navigation-controller.js'), 'content route helper loads before shell navigation');
 assert.ok(html.indexOf('shell-navigation-controller.js') < html.indexOf('session-bootstrap-controller.js'), 'shell navigation loads before session bootstrap');
 assert.ok(html.indexOf('session-bootstrap-controller.js') < html.indexOf('auth-ui-controller.js'), 'session bootstrap loads before auth UI controller');
+assert.ok(html.indexOf('auth-ui-controller.js') < html.indexOf('project-hydration-controller.js'), 'auth UI loads before project hydration controller');
 for (const contract of [
   /function readContentRoute\(\)\{\s*return shellNavigationController\.readRoute\(\);\s*\}/,
   /function writeContentRoute\(step,mode='push'\)\{\s*return shellNavigationController\.writeRoute\(step,mode\);\s*\}/,
@@ -101,6 +106,10 @@ assert.match(html, /const authUIController=ThinkCastAuthUIController\.create\(/,
 assert.match(html, /authUIController\.mount\(document\)/, 'P1 mounts auth UI after partial loading');
 assert.match(html, /isLoggedIn:\(\)=>authUIController\.isLoggedIn\(\)/, 'shell navigation reads auth state from the controller');
 assert.doesNotMatch(html, /document\.querySelector\('#loginForm'\)\.addEventListener|document\.querySelector\('#registerForm'\)\.addEventListener|document\.querySelector\('#logoutButton'\)\.addEventListener/, 'P1 removes inline auth event bodies');
+assert.match(html, /async function loadProjectContent\(projectId,token\)\{\s*return projectHydrationController\.loadContent\(projectId,token\);\s*\}/, 'P1 keeps a thin project content hydration wrapper');
+assert.match(html, /const projectHydrationController=ThinkCastProjectHydrationController\.create\(/, 'P1 wires the project hydration controller');
+assert.ok(html.indexOf('projectHydrationController=') < html.indexOf('shellNavigationController='), 'project hydration is wired before shell navigation');
+assert.doesNotMatch(html, /\/api\/project-content\?project_id=/, 'P1 removes the project content hydration body');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v31"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
@@ -207,7 +216,7 @@ assert.match(html, /function showBrandLibrary\(show\)\{return brandLibraryContro
 assert.match(html, /brandLibraryController\.mount\(document\)/, 'P1 mounts the brand library controller after partials load');
 assert.doesNotMatch(html, /document\.querySelector\('#brandUploadButton'\)\.addEventListener/, 'P1 does not retain the brand upload implementation');
 assert.doesNotMatch(html, /if\(path==='\/api\/brand-assets'&&Array\.isArray\(result\.selections\)\)/, 'generic API has no hidden brand selection mutation');
-assert.match(html, /brandSelectionController\.hydrate\(\{assets:result\.brand_assets\|\|\[\],selections:result\.brand_selections\|\|\[\]\}\)/, 'project content load hydrates brand data explicitly');
+assert.match(projectHydrationSource, /deps\.hydrateBrandSelections\(\{assets: result\.brand_assets \|\| \[\], selections: result\.brand_selections \|\| \[\]\}\)/, 'project content load hydrates brand data explicitly');
 assert.match(brandLibrarySource, /selectionController\.hydrate\(\{assets: result\.assets \|\| \[\], selections: result\.selections \|\| \[\]\}\)/, 'brand library refresh hydrates brand data explicitly');
 const brandStateDeclaration = "const brandOverlayState=Step04BrandState.create();";
 assert.ok(html.indexOf(brandStateDeclaration) > 0 && html.indexOf(brandStateDeclaration) < html.indexOf('function activeWatermarkProfile'), 'brand state is initialized before Step 4 settings restore');
@@ -338,6 +347,7 @@ function createPrePartialContext() {
     ThinkCastShellNavigationController: require('../01_app/assets/core/shell-navigation-controller.js'),
     ThinkCastSessionBootstrapController: require('../01_app/assets/core/session-bootstrap-controller.js'),
     ThinkCastAuthUIController: require('../01_app/assets/core/auth-ui-controller.js'),
+    ThinkCastProjectHydrationController: require('../01_app/assets/core/project-hydration-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),

@@ -8,6 +8,7 @@ const jsPath = '01_app/assets/steps/step05/step05-calendar.js';
 
 const html = fs.readFileSync(partialPath, 'utf8');
 const shell = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+const projectHydration = fs.readFileSync('01_app/assets/core/project-hydration-controller.js', 'utf8');
 [
   'step5', 'latestExport', 'latestExportList', 'calendarPrev', 'calendarMonthTitle',
   'calendarNext', 'calendarExport', 'calendarGrid', 'calendarHelp', 'calendarSettingsModal',
@@ -27,7 +28,9 @@ assert.equal((shell.match(/id="step5"/g) || []).length, 0, 'Step 5 markup is not
 assert.equal((shell.match(/id="calendarSettingsModal"/g) || []).length, 0, 'Step 5 modals are not duplicated inline');
 assert.match(shell, /ThinkCastApiClient\.createApiClient\(\)/, 'shell delegates JSON requests to the shared API client');
 assert.doesNotMatch(shell, /if\(path==='\/api\/brand-assets'&&Array\.isArray\(result\.selections\)\)/, 'shared API adapter has no hidden brand selection mutation');
-assert.match(shell, /brandSelectionController\.hydrate\(\{assets:result\.brand_assets\|\|\[\],selections:result\.brand_selections\|\|\[\]\}\);renderBrandChoices\(\)/, 'project content load explicitly hydrates brand selections');
+const brandHydrateIndex = projectHydration.indexOf('deps.hydrateBrandSelections({assets: result.brand_assets || [], selections: result.brand_selections || []})');
+const brandRenderIndex = projectHydration.indexOf('deps.renderBrandChoices()');
+assert.ok(brandHydrateIndex >= 0 && brandHydrateIndex < brandRenderIndex, 'project content load hydrates brand selections before rendering choices');
 assert.match(shell, /Step04BrandLibraryController\.create\(\{[\s\S]*?selectionController:brandSelectionController/, 'brand library refresh receives the explicit brand selection owner');
 assert.match(shell, /function refreshBrandLibrary\(\)\{return brandLibraryController\.refresh\(\)\}/, 'project index refresh delegates explicitly to the brand library controller');
 assert.match(shell, /assets\/core\/project-store\.js/, 'project store is available for staged migration without duplicate writes');
