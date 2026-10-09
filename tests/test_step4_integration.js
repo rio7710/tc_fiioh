@@ -10,6 +10,7 @@ const partialPath = '01_app/pages/steps/step04-video.html';
 const cssPath = '01_app/assets/steps/step04/step04-video.css';
 const jsPath = '01_app/assets/steps/step04/step04-video.js';
 const brandStatePath = '01_app/assets/steps/step04/step04-brand-state.js';
+const outroRatioAssetsPath = '01_app/assets/steps/step04/step04-outro-ratio-assets.js';
 const brandOverlayPath = '01_app/assets/steps/step04/step04-brand-overlay.js';
 const storePath = '01_app/assets/steps/step04/step04-store.js';
 const timelineBridgePath = '01_app/assets/steps/step04/step04-timeline-bridge.js';
@@ -31,6 +32,7 @@ assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
 assert.ok(fs.existsSync(jsPath), 'step04-video.js must exist');
 assert.ok(fs.existsSync(brandStatePath), 'step04-brand-state.js must exist');
+assert.ok(fs.existsSync(outroRatioAssetsPath), 'step04-outro-ratio-assets.js must exist');
 assert.ok(fs.existsSync(brandOverlayPath), 'step04-brand-overlay.js must exist');
 assert.ok(fs.existsSync(storePath), 'step04-store.js must exist');
 assert.ok(fs.existsSync(timelineBridgePath), 'step04-timeline-bridge.js must exist');
@@ -69,6 +71,7 @@ const brandSelectionScript = html.indexOf('/01_app/assets/video-editor/brand-sel
 const mobileSyncScript = html.indexOf('/01_app/assets/video-editor/mobile-sync.js');
 const videoEditorIndexScript = html.indexOf('/01_app/assets/video-editor/index.js');
 const step04BrandStateScript = html.indexOf('/01_app/assets/steps/step04/step04-brand-state.js');
+const step04OutroRatioAssetsScript = html.indexOf('/01_app/assets/steps/step04/step04-outro-ratio-assets.js');
 const step04BrandOverlayScript = html.indexOf('/01_app/assets/steps/step04/step04-brand-overlay.js');
 const step04StoreScript = html.indexOf('/01_app/assets/steps/step04/step04-store.js');
 const step04TimelineBridgeScript = html.indexOf('/01_app/assets/steps/step04/step04-timeline-bridge.js');
@@ -91,7 +94,7 @@ assert.ok(mobileSyncScript >= 0, 'HTML loads browser mobile sync dependency');
 assert.ok(Math.max(sceneNavigationScript, ratioProfilesScript, brandSelectionScript, mobileSyncScript) < videoEditorIndexScript, 'browser dependencies load before video-editor index.js');
 assert.ok(videoEditorIndexScript < step04BindingsScript, 'Step 4 UI bindings load after video editor dependencies');
 assert.ok(videoEditorIndexScript < step04BrandStateScript, 'Step 4 brand state loads after video editor dependencies');
-assert.ok(step04BrandStateScript < step04BrandOverlayScript, 'Step 4 brand state loads before overlay controller');
+assert.ok(step04BrandStateScript < step04OutroRatioAssetsScript && step04OutroRatioAssetsScript < step04BrandOverlayScript, 'Step 4 outro ratio policy loads between brand state and overlay controller');
 assert.ok(step04BrandOverlayScript < step04StoreScript, 'Step 4 overlay controller loads before related Step 4 scripts');
 assert.ok(step04StoreScript < step04NavigationScript, 'Step 4 navigation controller loads after state dependencies');
 assert.ok(step04StoreScript < step04TimelineBridgeScript && step04TimelineBridgeScript < step04NavigationScript, 'timeline bridge loads between Step 4 state and controllers');
@@ -112,7 +115,10 @@ assert.ok(step04BindingsScript < html.indexOf('/01_app/assets/steps/step04/step0
 assert.match(html, /src="\/01_app\/assets\/video-editor\/index\.js(?:\?v=[^"]+)?"/, 'HTML loads video-editor index.js');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js(?:\?v=[^"]+)?"/, 'HTML loads step04-video.js');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-brand-state\.js\?v=20261007_v5"/, 'HTML cache-busts step04-brand-state.js');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-outro-ratio-assets\.js\?v=20261009_v26"/, 'HTML cache-busts outro ratio policy');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-brand-overlay\.js\?v=20261008_v25"/, 'HTML cache-busts step04-brand-overlay.js');
+assert.match(html, /function ensureOutroRatioAssets\(item,options\)\{return outroRatioAssets\.ensure\(item,options\)\}/, 'P1 keeps only the compatible outro ratio policy wrapper');
+assert.doesNotMatch(html, /const force=options\.force===true/, 'P1 does not retain the outro ratio policy implementation');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-navigation-controller\.js\?v=20261007_v7"/, 'HTML cache-busts navigation controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-bindings\.js\?v=20261007_v7"/, 'HTML cache-busts UI bindings');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-bridge\.js\?v=20261007_v8"/, 'HTML cache-busts timeline bridge');
@@ -260,6 +266,7 @@ function createPrePartialContext() {
     console,
     URL,
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),
+    Step04OutroRatioAssets: require('../01_app/assets/steps/step04/step04-outro-ratio-assets.js'),
     BrandOverlayController: require('../01_app/assets/steps/step04/step04-brand-overlay.js'),
     Step04TimelineBridge: require('../01_app/assets/steps/step04/step04-timeline-bridge.js'),
     Step04RenderController: require('../01_app/assets/steps/step04/step04-render-controller.js'),

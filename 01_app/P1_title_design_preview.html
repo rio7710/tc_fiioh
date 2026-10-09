@@ -21,6 +21,7 @@
 <script src="/01_app/assets/video-editor/mobile-sync.js?v=20261007_v2"></script>
 <script src="/01_app/assets/video-editor/index.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step04/step04-brand-state.js?v=20261007_v5"></script>
+<script src="/01_app/assets/steps/step04/step04-outro-ratio-assets.js?v=20261009_v26"></script>
 <script src="/01_app/assets/steps/step04/step04-brand-overlay.js?v=20261008_v25"></script>
 <script src="/01_app/assets/steps/step04/step04-store.js?v=20261007_v4"></script>
 <script src="/01_app/assets/steps/step04/step04-timeline-bridge.js?v=20261007_v8"></script>
@@ -1749,26 +1750,9 @@ async function loadProjectContent(projectId,token){
   return result;
 }
 function brandRoleControls(role){const title=role[0].toUpperCase()+role.slice(1);return {enabled:document.querySelector(`#brand${title}Enabled`),select:document.querySelector(`#brand${title}Version`)}}
-function isOutroRatioCompanion(item){return item?.role==='outro'&&/^greenhill_outro_v4_(9x16|4x5|1x1)\.png$/.test(item.uri||'')}
-function ensureOutroRatioAssets(item,options={}){
-  if(!item)return;
-  const force=options.force===true;
-  const isGreenhillV4=item.uri==='greenhill_outro_v4_16x9.png'||/^greenhill_outro_v4_/.test(item.uri||'');
-  const nextState=brandOverlayState.snapshot();
-  ['16x9','9x16','4x5','1x1'].forEach(ratio=>{
-    if(!nextState.outroProfiles[ratio])nextState.outroProfiles[ratio]=brandOverlayState.activeOutroProfile(ratio);
-    const currentVersionId=nextState.outroProfiles[ratio].version_id;
-    const hasValidVersion=Boolean(currentVersionId&&brandAssets.some(asset=>asset.role==='outro'&&asset.version_id===currentVersionId&&asset.active!==false));
-    if(!force&&hasValidVersion)return;
-    if(isGreenhillV4){
-      const ratioAsset=brandAssets.find(asset=>asset.role==='outro'&&asset.uri===`greenhill_outro_v4_${ratio}.png`);
-      nextState.outroProfiles[ratio].version_id=ratioAsset?ratioAsset.version_id:item.version_id;
-    }else{
-      nextState.outroProfiles[ratio].version_id=item.version_id;
-    }
-  });
-  brandOverlayState.hydrate(nextState);
-}
+const outroRatioAssets=Step04OutroRatioAssets.create({state:brandOverlayState,getAssets:()=>brandAssets});
+function isOutroRatioCompanion(item){return outroRatioAssets.isCompanion(item)}
+function ensureOutroRatioAssets(item,options){return outroRatioAssets.ensure(item,options)}
 function renderBrandChoices(){
   ['intro','outro','watermark'].forEach(role=>{
     const controls=brandRoleControls(role);const items=brandAssets.filter(item=>item.role===role&&item.active&&!isOutroRatioCompanion(item));
