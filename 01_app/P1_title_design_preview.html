@@ -80,6 +80,7 @@
 <script src="/01_app/assets/steps/step05/step05-calendar-settings-controller.js?v=20261009_v68"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-preview-controller.js?v=20261009_v69"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-export-controller.js?v=20261009_v70"></script>
+<script src="/01_app/assets/steps/step05/step05-production-calendar-controller.js?v=20261009_v71"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css?v=20261007_v2">
@@ -1590,26 +1591,7 @@ function renderCalendar({preserveScroll=false}={}){
   saveCalendarUi();
 }
 function recordCurrentProduction(result){
-  const start=dateKey(new Date());
-  const title=document.querySelector('#projectTitle').textContent.trim()||'그린힐 콘텐츠';
-  const targets=selectedPlatforms.size?[...selectedPlatforms]:[currentPreviewPlatform];
-  targets.forEach(platform=>{
-    const matchedExport=(result?.exports||[]).find(item=>item.platform===platform||item.platforms?.includes(platform));
-    const contentUrl=matchedExport?.url||result?.url||null;
-    const filename=matchedExport?.filename||result?.filename||null;
-    const existing=calendarEntries.find(item=>item.start===start&&item.extendedProps?.projectId===activeProjectId&&item.extendedProps?.platform===platform);
-    const createdAt=new Date().toISOString();
-    if(existing){
-      const versions=calendarContentVersions(existing);
-      if(contentUrl&&!versions.some(item=>item.url===contentUrl))versions.push({url:contentUrl,filename,createdAt});
-      existing.extendedProps.createdAt=createdAt;existing.extendedProps.status='draft';existing.extendedProps.projectId=activeProjectId;existing.extendedProps.contentVersions=versions;
-      existing.extendedProps.contentUrl=contentUrl||existing.extendedProps.contentUrl||null;existing.extendedProps.filename=filename||existing.extendedProps.filename||null;
-    }
-    else calendarEntries.push({id:calendarId(),title,start,end:nextDateKey(start),allDay:true,extendedProps:{status:'draft',platform,projectId:activeProjectId,createdAt,distributedAt:null,contentUrl,filename,contentVersions:contentUrl?[{url:contentUrl,filename,createdAt}]:[]}});
-  });
-  saveCalendarEntries();
-  renderCalendar();
-  refreshProjectIndex();
+  return productionCalendarController.record(result);
 }
 function icsEscape(value){return Step05Calendar.icsEscape(value)}
 function moveCalendarPeriod(direction){
@@ -1890,6 +1872,7 @@ const calendarPreviewController=Step05CalendarPreviewController.create({previewM
 calendarPreviewController.mount();
 const calendarExportController=Step05CalendarExportController.create({button:document.querySelector('#calendarExport'),getEntries:()=>calendarEntries,contentIdentity:Step05Calendar.contentIdentity,collapseDuplicates:Step05Calendar.collapseDuplicates,nextDateKey:Step05Calendar.nextDateKey,dateKey:Step05Calendar.dateKey,icsEscape:Step05Calendar.icsEscape,statusLabels:calendarStatusLabels,now:()=>new Date(),createBlob:(parts,options)=>new Blob(parts,options),createObjectURL:blob=>URL.createObjectURL(blob),revokeObjectURL:url=>URL.revokeObjectURL(url),createLink:()=>document.createElement('a'),setTimer:(callback,delay)=>setTimeout(callback,delay),setHelp:text=>{calendarHelp.textContent=text}});
 calendarExportController.mount();
+const productionCalendarController=Step05ProductionCalendarController.create({getEntries:()=>calendarEntries,setEntries:entries=>{calendarEntries=entries},getActiveProjectId:()=>activeProjectId,getTitle:()=>document.querySelector('#projectTitle').textContent,getSelectedPlatforms:()=>selectedPlatforms,getPreviewPlatform:()=>currentPreviewPlatform,calendarContentVersions:Step05Calendar.calendarContentVersions,collapseDuplicates:Step05Calendar.collapseDuplicates,nextDateKey:Step05Calendar.nextDateKey,dateKey:Step05Calendar.dateKey,createId:calendarId,now:()=>new Date(),save:saveCalendarEntries,render:renderCalendar,refresh:refreshProjectIndex,onError:(feature,error)=>console.error(`[ProductionCalendar:${feature}]`,error)});
 loadCalendarUi();
 loadCalendarEntries();
 loadLatestExport();

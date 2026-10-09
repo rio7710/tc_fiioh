@@ -43,6 +43,7 @@ class PipelineContractTests(unittest.TestCase):
         step5_css = (ROOT / "01_app" / "assets" / "steps" / "step05" / "step05-calendar.css").read_text(encoding="utf-8")
         cls.calendar_helper = (ROOT / "01_app" / "assets" / "steps" / "step05" / "step05-calendar.js").read_text(encoding="utf-8")
         cls.calendar_store = (ROOT / "01_app" / "assets" / "steps" / "step05" / "step05-calendar-store.js").read_text(encoding="utf-8")
+        cls.production_calendar_controller = (ROOT / "01_app" / "assets" / "steps" / "step05" / "step05-production-calendar-controller.js").read_text(encoding="utf-8")
         cls.shell = HTML_PATH.read_text(encoding="utf-8")
         cls.html = "\n".join((cls.shell, step4_html, step4_js, step5_html, step5_css))
         cls.manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -106,7 +107,9 @@ class PipelineContractTests(unittest.TestCase):
         self.assertNotRegex(self.html, r"const scenes\s*=\s*\[")
         self.assertNotRegex(self.html, r"\{start:[0-9.]*,end:[0-9.]*,rate:")
         # Identity is project + local date + platform, never a mutable title.
-        self.assertIn("item.start===start&&item.extendedProps?.projectId===activeProjectId&&item.extendedProps?.platform===platform", self.html)
+        self.assertIn("item.start === start", self.production_calendar_controller)
+        self.assertIn("item.extendedProps?.projectId === projectId", self.production_calendar_controller)
+        self.assertIn("item.extendedProps?.platform === platform", self.production_calendar_controller)
         self.assertNotIn("item.start===start&&item.title===title&&item.extendedProps?.platform===platform", self.html)
         self.assertIn("const unique = new Map()", self.calendar_helper)
         self.assertIn("collapseDuplicates:Step05Calendar.collapseDuplicates", self.shell)
