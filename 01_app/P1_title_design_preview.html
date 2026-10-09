@@ -73,6 +73,7 @@
 <script src="/01_app/assets/steps/step04/step04-ui-bindings.js?v=20261007_v7"></script>
 <script src="/01_app/assets/steps/step04/step04-video.js?v=20261008_v22"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar.js?v=20261009_v63"></script>
+<script src="/01_app/assets/steps/step05/step05-calendar-store.js?v=20261009_v64"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css?v=20261007_v2">
@@ -1517,46 +1518,17 @@ function seedCalendarEntries(){
   }));
 }
 function loadCalendarEntries(){
-  try{
-    const saved=JSON.parse(localStorage.getItem(CALENDAR_STORAGE_KEY)||'null');
-    calendarEntries=Array.isArray(saved)?saved.filter(item=>!String(item?.id||'').startsWith('demo-')):[];
-  }catch(error){calendarEntries=[]}
-  const unique=new Map();
-  calendarEntries.forEach(item=>{
-    const platform=item.extendedProps?.platform||'youtube';
-    const key=`${item.start}\u0000${item.extendedProps?.projectId||item.title}\u0000${platform}`;
-    if(!unique.has(key))unique.set(key,item);
-  });
-  calendarEntries=[...unique.values()];
-  saveCalendarEntries();
+  calendarEntries=calendarStore.load().entries;
 }
 async function hydrateCalendarEntries(){
-  const result=await api('/api/calendar');
-  const serverEntries=Array.isArray(result.entries)?result.entries:[];
-  const serverLegacyKeys=new Set(serverEntries.map(item=>{
-    const props=item.extendedProps||{};
-    return `${item.start}\u0000${item.title}\u0000${props.platform||'youtube'}`;
-  }));
-  const retainedLocalEntries=calendarEntries.filter(item=>{
-    const props=item.extendedProps||{};
-    const legacyKey=`${item.start}\u0000${item.title}\u0000${props.platform||'youtube'}`;
-    return props.projectId||!serverLegacyKeys.has(legacyKey);
-  });
-  const merged=new Map();
-  [...retainedLocalEntries,...serverEntries].forEach(item=>{
-    const props=item.extendedProps||{};
-    const key=`${item.start}\u0000${props.projectId||item.title}\u0000${props.platform||'youtube'}`;
-    merged.set(key,item);
-  });
-  calendarEntries=[...merged.values()];
-  saveCalendarEntries();
+  calendarEntries=(await calendarStore.hydrate(calendarEntries)).entries;
   renderCalendar({preserveScroll:true});
 }
 function calendarContentVersions(entry){
   return Step05Calendar.calendarContentVersions(entry);
 }
 function saveCalendarEntries(){
-  try{localStorage.setItem(CALENDAR_STORAGE_KEY,JSON.stringify(calendarEntries))}catch(error){}
+  return calendarStore.save(calendarEntries);
 }
 function loadCalendarUi(){
   try{
@@ -2177,6 +2149,7 @@ document.querySelector('#calendarSettingsSave').addEventListener('click',()=>{
 calendarSettingsModal.addEventListener('pointerdown',event=>{if(event.target===calendarSettingsModal)closeCalendarSettings()});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!calendarSettingsModal.hidden)closeCalendarSettings()});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!platformGuideModal.hidden)closePlatformGuide()});
+const calendarStore=Step05CalendarStore.create({storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:(...args)=>api(...args),collapseDuplicates:Step05Calendar.collapseDuplicates,uniquenessKey:Step05Calendar.uniquenessKey});
 loadCalendarUi();
 loadCalendarEntries();
 loadLatestExport();
