@@ -5,7 +5,9 @@ const StoryboardProjectStateController = require('../01_app/assets/steps/step03/
 
 (async () => {
 
-const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+const shell = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+const bootstrap = fs.readFileSync('01_app/assets/core/app-bootstrap.js', 'utf8');
+const html = `${shell}\n${bootstrap}`;
 assert.match(html, /let demoData=\{state:\{\},timeline:\{scenes:\[\]\},keywords:\[\]\};/, 'project restore starts from a safe non-null demo state');
 assert.match(html, /function resetProjectScopedState\(\)\{\s*return storyboardProjectStateController\.reset\(\);\s*\}/, 'P1 reset is a thin controller wrapper');
 let scenes=[{id:'old'}],currentScene=4,timeline={scenes:[{id:'old'}]},crops={old:{x:1}};

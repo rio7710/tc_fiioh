@@ -18,7 +18,9 @@ const latestExportControllerPath = '01_app/assets/steps/step05/step05-latest-exp
 [partialPath, cssPath, jsPath, storePath, viewControllerPath, rendererPath, dragControllerPath, settingsControllerPath, previewControllerPath, exportControllerPath, productionCalendarControllerPath, presentationControllerPath, dataControllerPath, latestExportControllerPath].forEach(file => assert.ok(fs.existsSync(file), `${file} must exist`));
 
 const html = fs.readFileSync(partialPath, 'utf8');
-const shell = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+const shellMarkup = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+const appBootstrap = fs.readFileSync('01_app/assets/core/app-bootstrap.js', 'utf8');
+const shell = `${shellMarkup}\n${appBootstrap}`;
 const projectHydration = fs.readFileSync('01_app/assets/core/project-brand-platform-hydrator.js', 'utf8');
 const presentationController = fs.readFileSync(presentationControllerPath, 'utf8');
 [

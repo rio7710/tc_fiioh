@@ -14,7 +14,9 @@ const flowControllerPath = '01_app/assets/steps/step03/storyboard-flow-controlle
 
 const scriptHtml = fs.readFileSync(scriptPath, 'utf8');
 const storyboardHtml = fs.readFileSync(storyboardPath, 'utf8');
-const shellHtml = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+const shellMarkup = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+const appBootstrap = fs.readFileSync('01_app/assets/core/app-bootstrap.js', 'utf8');
+const shellHtml = `${shellMarkup}\n${appBootstrap}`;
 
 ['step3', 'scriptHeadline', 'scriptConcept', 'scriptLines', 'scriptSaveBar', 'scriptSaveBtn', 'voiceSampleAudio', 'scriptMessage', 'scriptNext'].forEach(id => {
   assert.match(scriptHtml, new RegExp(`id="${id}"`), `script fragment preserves #${id}`);

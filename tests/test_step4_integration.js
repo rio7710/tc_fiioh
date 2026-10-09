@@ -135,7 +135,9 @@ assert.doesNotMatch(step04Source, /function renderSceneList\(\)\s*\{[^}]*navigat
 console.log('✓ File integrity checks passed');
 
 // 2. Headless VM Execution Test: Pre-Partial Script Evaluation MUST NOT Throw (No Null Query Errors)
-const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+const shellHtml = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+const appBootstrapSource = fs.readFileSync('01_app/assets/core/app-bootstrap.js', 'utf8');
+const html = `${shellHtml}\n${appBootstrapSource}`;
 assert.match(html, /src="\/01_app\/assets\/core\/shell-navigation-controller\.js\?v=20261009_v32"/, 'HTML cache-busts shell navigation controller');
 assert.match(html, /src="\/01_app\/assets\/core\/session-bootstrap-controller\.js\?v=20261009_v33"/, 'HTML cache-busts session bootstrap controller');
 assert.match(html, /src="\/01_app\/assets\/core\/auth-ui-controller\.js\?v=20261009_v34"/, 'HTML cache-busts auth UI controller');
@@ -624,9 +626,8 @@ function createPrePartialContext() {
 }
 
 const prePartialEnv = createPrePartialContext();
-const scriptStart = html.indexOf('<script>') + '<script>'.length;
-const scriptEnd = html.indexOf('async function boot()');
-const scriptMatch = `${html.slice(scriptStart, scriptEnd > 0 ? scriptEnd : html.lastIndexOf('</script>'))}\n})();`;
+const scriptEnd = appBootstrapSource.indexOf('async function boot()');
+const scriptMatch = `${appBootstrapSource.slice(0, scriptEnd)}\n})();`;
 
 assert.doesNotThrow(() => {
   vm.runInContext(scriptMatch, prePartialEnv.context);

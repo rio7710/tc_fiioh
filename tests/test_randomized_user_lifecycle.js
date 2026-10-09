@@ -6,7 +6,9 @@ const ThinkCastProjectStore = require('../01_app/assets/core/project-store.js');
 const ThinkCastShellNavigationController = require('../01_app/assets/core/shell-navigation-controller.js');
 const Step03StoryboardProjectStateController = require('../01_app/assets/steps/step03/storyboard-project-state-controller.js');
 
-const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+const shell = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+const bootstrap = fs.readFileSync('01_app/assets/core/app-bootstrap.js', 'utf8');
+const html = `${shell}\n${bootstrap}`;
 
 function sourceBetween(start, end) {
   const from = html.indexOf(start);

@@ -12,6 +12,7 @@ from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 HTML_PATH = ROOT / "01_app" / "P1_title_design_preview.html"
+APP_BOOTSTRAP_PATH = ROOT / "01_app" / "assets" / "core" / "app-bootstrap.js"
 
 
 class LintFailure(RuntimeError):
@@ -69,6 +70,7 @@ def check_inline_javascript() -> None:
             path = Path(temp_dir) / f"inline-{index}.js"
             path.write_text(script, encoding="utf-8")
             run(f"inline JavaScript #{index + 1}", [node, "--check", str(path)])
+    run("app bootstrap JavaScript", [node, "--check", str(APP_BOOTSTRAP_PATH)])
 
 
 def main() -> int:
@@ -89,4 +91,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

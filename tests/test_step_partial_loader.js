@@ -5,6 +5,8 @@ const loaderPath = '01_app/assets/steps/step-partial-loader.js';
 const shellPath = '01_app/P1_title_design_preview.html';
 const StepPartialLoader = require(`../${loaderPath}`);
 const shell = fs.readFileSync(shellPath, 'utf8');
+const bootstrap = fs.readFileSync('01_app/assets/core/app-bootstrap.js', 'utf8');
+const appSource = `${shell}\n${bootstrap}`;
 
 const partials = [
   ['userSettingsContainer', '01_app/pages/components/user-settings.html'],
@@ -19,10 +21,10 @@ const partials = [
 
 partials.forEach(([container, path]) => {
   assert.match(shell, new RegExp(`id="${container}"`), `${container} is present`);
-  assert.match(shell, new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${path} is loaded`);
+  assert.match(appSource, new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${path} is loaded`);
 });
-assert.match(shell, /await ensureStepPartialsLoaded\(\);[\s\S]*await ensureStep4Loaded\(\);[\s\S]*await initDemo\(\);[\s\S]*await restoreLoginSession\(\)/, 'partials and demo initialize before session route restoration');
-assert.ok(shell.indexOf('await ensureStepPartialsLoaded();') < shell.indexOf('authUIController.mount(document)'), 'auth UI mounts after step partials load');
+assert.match(bootstrap, /await ensureStepPartialsLoaded\(\);[\s\S]*await ensureStep4Loaded\(\);[\s\S]*await initDemo\(\);[\s\S]*await restoreLoginSession\(\)/, 'partials and demo initialize before session route restoration');
+assert.ok(bootstrap.indexOf('await ensureStepPartialsLoaded();') < bootstrap.indexOf('authUIController.mount(document)'), 'auth UI mounts after step partials load');
 
 const nodes = Object.fromEntries(partials.map(([id]) => [id, { innerHTML: '' }]));
 const root = { querySelector: selector => nodes[selector.slice(1)] || null };
