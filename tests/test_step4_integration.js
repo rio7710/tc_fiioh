@@ -41,6 +41,7 @@ const providerSettingsControllerPath = '01_app/assets/core/provider-settings-con
 const scriptEditorControllerPath = '01_app/assets/steps/step03/step03-script-editor-controller.js';
 const trendKeywordControllerPath = '01_app/assets/steps/step02/trend-keyword-controller.js';
 const scriptGenerationControllerPath = '01_app/assets/steps/step02/script-generation-controller.js';
+const productionWorkflowControllerPath = '01_app/assets/steps/step03/production-workflow-controller.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
@@ -77,6 +78,7 @@ assert.ok(fs.existsSync(providerSettingsControllerPath), 'provider-settings-cont
 assert.ok(fs.existsSync(scriptEditorControllerPath), 'step03-script-editor-controller.js must exist');
 assert.ok(fs.existsSync(trendKeywordControllerPath), 'trend-keyword-controller.js must exist');
 assert.ok(fs.existsSync(scriptGenerationControllerPath), 'script-generation-controller.js must exist');
+assert.ok(fs.existsSync(productionWorkflowControllerPath), 'production-workflow-controller.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
@@ -100,8 +102,10 @@ assert.match(html, /src="\/01_app\/assets\/core\/provider-settings-controller\.j
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/trend-keyword-controller\.js\?v=20261009_v40"/, 'HTML cache-busts trend keyword controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/step02-keyword\.js\?v=20261009_v41"/, 'HTML cache-busts Step 2 keyword controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/script-generation-controller\.js\?v=20261009_v42"/, 'HTML cache-busts script generation controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step03\/production-workflow-controller\.js\?v=20261009_v43"/, 'HTML cache-busts production workflow controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('trend-keyword-controller.js'), 'base Step 2 module loads before trend keyword controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('script-generation-controller.js') && html.indexOf('script-generation-controller.js') < html.indexOf('trend-keyword-controller.js'), 'script generation loads between Step 2 keyword controllers');
+assert.ok(html.indexOf('step03-script-editor-controller.js') < html.indexOf('production-workflow-controller.js'), 'production workflow loads after Step 3 script editor');
 assert.ok(html.indexOf('content-route.js') < html.indexOf('shell-navigation-controller.js'), 'content route helper loads before shell navigation');
 assert.ok(html.indexOf('shell-navigation-controller.js') < html.indexOf('session-bootstrap-controller.js'), 'shell navigation loads before session bootstrap');
 assert.ok(html.indexOf('session-bootstrap-controller.js') < html.indexOf('auth-ui-controller.js'), 'session bootstrap loads before auth UI controller');
@@ -153,10 +157,15 @@ assert.match(html, /const scriptGenerationController=Step02ScriptGenerationContr
 assert.match(html, /scriptGenerationController\.mount\(document\)/, 'P1 mounts script generation workflow');
 assert.match(html, /async function runAiWorkflow\(\)\{\s*return scriptGenerationController\.run\(\);\s*\}/, 'P1 keeps a thin script generation wrapper');
 assert.doesNotMatch(html, /activePhase=|waitingTimer=|configureWorkflowModal\('storyboard'\)/, 'P1 removes the storyboard workflow implementation');
-assert.match(html, /production:\{[\s\S]*kicker:'AI IMAGE PRODUCTION TEAM'/, 'production workflow config remains in P1');
+assert.match(fs.readFileSync(productionWorkflowControllerPath,'utf8'), /kicker:'AI IMAGE PRODUCTION TEAM'/, 'production workflow config moves intact to its controller');
 assert.match(html, /export:\{[\s\S]*kicker:'AI VIDEO & FINAL EXPORT TEAM'/, 'export workflow config remains in P1');
-assert.match(html, /configureWorkflowModal\('production'\)/, 'production workflow keeps its modal configuration call');
+assert.match(fs.readFileSync(productionWorkflowControllerPath,'utf8'), /configureWorkflowModal\('production', productionConfig\)/, 'production controller keeps its modal configuration call');
 assert.match(fs.readFileSync(renderControllerPath,'utf8'), /configureWorkflowModal\('export'\)/, 'export controller keeps its modal configuration call');
+assert.match(html, /const productionWorkflowController=Step03ProductionWorkflowController\.create\(/, 'P1 wires the production workflow controller');
+assert.match(html, /productionWorkflowController\.mount\(document\)/, 'P1 mounts the production workflow controller');
+assert.match(html, /async function runProductionWorkflow\(\)\{\s*return productionWorkflowController\.run\(\);\s*\}/, 'P1 keeps a thin production workflow wrapper');
+assert.doesNotMatch(html, /configureWorkflowModal\('production'\)|\/api\/production\/prepare|const actions=\[\s*'내부 캐릭터/, 'P1 removes the production workflow implementation');
+assert.doesNotMatch(html, /production:\{/, 'P1 moves production workflow config to its controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v31"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
@@ -401,6 +410,7 @@ function createPrePartialContext() {
     Step03ScriptEditorController: require('../01_app/assets/steps/step03/step03-script-editor-controller.js'),
     Step02Keyword: require('../01_app/assets/steps/step02/step02-keyword.js'),
     Step02ScriptGenerationController: require('../01_app/assets/steps/step02/script-generation-controller.js'),
+    Step03ProductionWorkflowController: require('../01_app/assets/steps/step03/production-workflow-controller.js'),
     Step02TrendKeywordController: require('../01_app/assets/steps/step02/trend-keyword-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),

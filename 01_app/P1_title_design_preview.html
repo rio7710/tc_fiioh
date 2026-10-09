@@ -26,6 +26,7 @@
 <script src="/01_app/assets/steps/step02/trend-keyword-controller.js?v=20261009_v40"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
+<script src="/01_app/assets/steps/step03/production-workflow-controller.js?v=20261009_v43"></script>
 <script src="/01_app/assets/video-editor/scene-navigation.js?v=20261007_v2"></script>
 <script src="/01_app/assets/video-editor/ratio-profiles.js?v=20261008_v24"></script>
 <script src="/01_app/assets/video-editor/brand-selection.js?v=20261007_v2"></script>
@@ -2154,26 +2155,6 @@ function selectedKeywordLabels(){
   return (demoData?.keywords||[]).filter(item=>selectedKeywords.has(item.id)).map(item=>item.label);
 }
 const workflowConfigs={
-  production:{
-    kicker:'AI IMAGE PRODUCTION TEAM',
-    title:'장면 이미지 제작 중',
-    summary:'대본을 바탕으로 캐릭터·씬·음성을 구성하고 이미지 연결 상태를 검수합니다.',
-    engines:[
-      {mark:'IN',kind:'internal',name:'내부 캐릭터',status:'내부 자산'},
-      {mark:'GPT',kind:'gpt',name:'ChatGPT API',status:'연동 예정'},
-      {mark:'N',kind:'nano',name:'Nano Banana',status:'연동 예정'},
-      {mark:'VO',kind:'voice',name:'Voice API',status:'연동 예정'},
-      {mark:'C',kind:'claude',name:'Claude API',status:'연동 예정'}
-    ],
-    roles:[
-      {name:'캐릭터 구성',description:'내부 캐릭터 라이브러리 불러오기',engine:'내부 캐릭터'},
-      {name:'씬 이미지 구성',description:'대본 기반 구도 · 이미지 생성',engine:'GPT · Nano Banana'},
-      {name:'브릿지 이미지 추가',description:'씬 사이를 잇는 연결 이미지 생성',engine:'GPT · Nano Banana'},
-      {name:'음성 생성·추출',description:'확정 대본 기반 TTS 생성 · 장면별 음성 파일 및 싱크 구성',engine:'Voice API · 내부 STT'},
-      {name:'브릿지 검수',description:'씬 연결 · 전환 어색함 확인',engine:'GPT · Claude'},
-      {name:'이미지 오류 검토',description:'캐릭터 · 구도 · 장면 일관성 확인',engine:'GPT · Claude'}
-    ]
-  },
   export:{
     kicker:'AI VIDEO & FINAL EXPORT TEAM',
     title:'최종 영상 제작 중',
@@ -2260,74 +2241,7 @@ async function runAiWorkflow(){
   return scriptGenerationController.run();
 }
 async function runProductionWorkflow(){
-  await generateMissingSceneVideos();
-  const modal=configureWorkflowModal('production');
-  const roles=[...modal.querySelectorAll('.ai-role')];
-  const progress=document.querySelector('#aiProgressBar');
-  const foot=document.querySelector('#aiFootStatus');
-  const summary=document.querySelector('#aiWorkflowSummary');
-  const now=document.querySelector('#aiNow');
-  const preparationPromise=api('/api/production/prepare',{method:'POST',body:JSON.stringify({project_id:activeProjectId})}).then(value=>({value}),error=>({error}));
-  const actions=[
-    '내부 캐릭터 라이브러리에서 등장인물을 구성 중입니다',
-    'ChatGPT와 Nano Banana가 씬 이미지를 구성 중입니다',
-    'GPT와 Nano Banana로 브릿지 이미지가 추가되고 있습니다',
-    'Voice API가 확정 대본의 음성을 생성하고 장면별 파일을 추출 중입니다',
-    'GPT와 Claude가 씬 사이 브릿지를 확인 중입니다',
-    'GPT와 Claude가 캐릭터와 장면 이미지 오류를 검토 중입니다'
-  ];
-  modal.hidden=false;
-  modal.classList.remove('complete');
-  document.body.classList.add('modal-open');
-  progress.style.width='0%';
-  now.classList.add('processing');
-  now.textContent='이미지 제작 AI 팀을 호출하고 있습니다';
-  roles.forEach(role=>{role.className='ai-role';role.querySelector('.ai-role-state').textContent='대기'});
-  setupSceneProgressBadges(roles[1],'장면별 이미지 생성 상태');
-  try{
-    const stepSize=100/roles.length;
-    for(let i=0;i<roles.length;i++){
-      const role=roles[i];
-      role.classList.add('active');
-      role.querySelector('.ai-role-state').textContent='작업 중';
-      now.textContent=actions[i];
-      foot.textContent=`${i+1} / ${roles.length} 단계 처리 중`;
-      progress.style.width=`${i*stepSize+stepSize/2}%`;
-      if(i===1){
-        await runDemoSceneProgress(role,(completed,total)=>{
-          role.querySelector('.ai-role-state').textContent=`${completed} / ${total}`;
-          foot.textContent=`장면 이미지 생성 · ${String(completed).padStart(2,'0')} / ${String(total).padStart(2,'0')} 완료`;
-          progress.style.width=`${(i+completed/total)*stepSize}%`;
-        });
-      }else{
-        await sleep(1400+i*100);
-      }
-      role.classList.remove('active');
-      role.classList.add('done');
-      role.querySelector('.ai-role-state').textContent='완료';
-      progress.style.width=`${(i+1)*stepSize}%`;
-    }
-    const preparation=await preparationPromise;
-    if(preparation.error)throw preparation.error;
-    modal.classList.add('complete');
-    now.classList.remove('processing');
-    now.textContent='장면 이미지 구성이 완료되었습니다.';
-    summary.textContent='캐릭터, 씬 이미지, 브릿지와 음성 구성이 완료됐습니다. 영상 생성 전 장면별 이미지를 검수할 수 있습니다.';
-    foot.textContent='1초 후 이미지 검수·영상 디자인 화면으로 이동합니다.';
-    await sleep(1000);
-    modal.hidden=true;
-    document.body.classList.remove('modal-open');
-    showStep(4);
-  }catch(error){
-    now.classList.remove('processing');
-    now.textContent='이미지 구성을 완료하지 못했습니다.';
-    summary.textContent='장면 이미지 제작 중 문제가 발생했습니다.';
-    foot.textContent=error.message;
-    await sleep(1500);
-    modal.hidden=true;
-    document.body.classList.remove('modal-open');
-    throw error;
-  }
+  return productionWorkflowController.run();
 }
 const renderController=Step04RenderController.create({
   getRoot:()=>document,
@@ -2425,6 +2339,8 @@ const contentIndexController=Step01ContentIndexController.create({request:(...ar
 contentIndexController.mount(document);
 const scriptGenerationController=Step02ScriptGenerationController.create({getRoot:()=>document,configureWorkflowModal,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getSelectedKeywordLabels:selectedKeywordLabels,now:()=>Date.now(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),sleep,setGeneratedState:state=>{demoData.state=state},setGeneratedTimeline:timeline=>{demoData.timeline=timeline},setGeneratedDocument:value=>{activeStoryboardDocument=value},setKeywordLocked:setKeywordStageLocked,setVoiceProfile,applyTimeline,removeStoredScript:()=>localStorage.removeItem(SCRIPT_STORAGE_KEY),fillScript,applyScript,refreshProjectIndex,showStep});
 scriptGenerationController.mount(document);
+const productionWorkflowController=Step03ProductionWorkflowController.create({getRoot:()=>document,configureWorkflowModal,generateMissingSceneVideos,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,sleep,setupSceneProgressBadges,runDemoSceneProgress,showStep});
+productionWorkflowController.mount(document);
 const keywordController=Step02Keyword.create({getRoot:()=>document,getKeywords:()=>demoData.keywords,getVisibleKeywordIds:()=>visibleKeywordIds,setVisibleKeywordIds:value=>{visibleKeywordIds=value},getSelectedKeywords:()=>selectedKeywords,getActiveProjectId:()=>activeProjectId,beginNav,isStaleNav,loadProjectContent,showStep,ensureStepApiReady,request:(...args)=>api(...args),setDemoState:state=>{demoData.state=state},runAiWorkflow,random:()=>Math.random()});
 keywordController.mount(document);
 const trendKeywordController=Step02TrendKeywordController.create({getRoot:()=>document,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,isKeywordLocked:()=>keywordStageLocked,getSelectedKeywords:()=>selectedKeywords,getSeasonalKeywordIds:()=>seasonalKeywordIds,setSeasonalKeywordIds:value=>{seasonalKeywordIds=value},getVisibleKeywordIds:()=>visibleKeywordIds,setVisibleKeywordIds:value=>{visibleKeywordIds=value},getKeywords:()=>demoData.keywords,setKeywords:value=>{demoData.keywords=value},renderKeywords,showTokenUsage,escapeHtml});
