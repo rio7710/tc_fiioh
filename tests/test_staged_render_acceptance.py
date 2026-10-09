@@ -130,7 +130,7 @@ class StagedRendererUnitTests(unittest.TestCase):
             platform_formats=platform_formats,
             music={"none": None},
             narration_tracks=[],
-            render_defaults={"scene_dissolve_seconds": 0.3},
+            render_defaults={"scene_dissolve_seconds": 0.3, "still_image_pan_enabled": True, "still_image_pan_travel_ratio": 0.35},
             timeline_from_data=lambda _data: scenes,
             timed_script_scenes=lambda _data: title_scenes,
             storyboard_image_path=lambda uri: self.sources / Path(str(uri)).name,

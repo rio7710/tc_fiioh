@@ -8,6 +8,7 @@ without importing it back (and makes the FFmpeg command plan testable).
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import subprocess
@@ -137,6 +138,25 @@ def _artifact_for_scene(scene_id: str, artifacts: Any) -> dict | None:
     return None
 
 
+def _still_image_pan_bounds(
+    scene_id: str,
+    format_label: str,
+    anchor: float,
+    travel: float,
+) -> tuple[float, float]:
+    """Return deterministic, bounded crop positions for a still image.
+
+    Python's built-in hash is randomized per process, so a digest keeps the
+    chosen direction stable when the same project is rendered again.
+    """
+    anchor = min(1.0, max(0.0, anchor))
+    travel = min(1.0, max(0.0, travel))
+    lower = min(max(anchor - travel / 2, 0.0), 1.0 - travel)
+    upper = lower + travel
+    direction = hashlib.sha256(f"{scene_id}:{format_label}".encode("utf-8")).digest()[0] & 1
+    return (lower, upper) if direction == 0 else (upper, lower)
+
+
 def _resolve_brand_inputs(
     config: dict,
     format_label: str,
@@ -194,9 +214,19 @@ def _render_scene(
     pan_x = 0.5 if format_label == "16x9" else float(
         (crop_positions.get(scene_id) or {}).get(format_label, config["video_pan_x"])
     )
+    crop_x = f"(iw-ow)*{pan_x:.5f}"
+    is_still_image = not video_artifact and image_path is not None
+    pan_enabled = bool(dependencies.render_defaults.get("still_image_pan_enabled", True))
+    if is_still_image and format_label != "16x9" and pan_enabled:
+        travel = float(dependencies.render_defaults.get("still_image_pan_travel_ratio", 0.35))
+        pan_start, pan_end = _still_image_pan_bounds(scene_id, format_label, pan_x, travel)
+        crop_x = (
+            f"(iw-ow)*({pan_start:.6f}+({pan_end - pan_start:.6f})"
+            f"*t/{duration:.6f})"
+        )
     vf = (
         f"scale={width}:{height}:force_original_aspect_ratio=increase,"
-        f"crop={width}:{height}:x='(iw-ow)*{pan_x:.5f}':y='(ih-oh)/2',"
+        f"crop={width}:{height}:x='{crop_x}':y='(ih-oh)/2',"
         f"setsar=1,fps=30,format=yuv420p,setpts=PTS/{playback_rate:.6f},"
         f"tpad=stop_mode=clone:stop_duration={duration:.6f},trim=duration={duration:.6f},"
         "setpts=PTS-STARTPTS"

@@ -70,7 +70,7 @@ class StagedFfmpegRendererTests(unittest.TestCase):
             },
             music={"none": None, "satie": self.music},
             narration_tracks=[],
-            render_defaults={"scene_dissolve_seconds": 0.3, "music_start_offset_seconds": 3.0, "music_fade_in_seconds": 2.0, "music_fade_out_seconds": 2.0},
+            render_defaults={"scene_dissolve_seconds": 0.3, "music_start_offset_seconds": 3.0, "music_fade_in_seconds": 2.0, "music_fade_out_seconds": 2.0, "still_image_pan_enabled": True, "still_image_pan_travel_ratio": 0.35},
             timeline_from_data=self.timeline,
             timed_script_scenes=self.title_scenes,
             storyboard_image_path=lambda uri: self.image if uri else None,
@@ -159,6 +159,30 @@ class StagedFfmpegRendererTests(unittest.TestCase):
         graph = outro[outro.index("-filter_complex") + 1]
         self.assertIn("scale=756:-1", graph)
         self.assertIn("color=white@0.400", graph)
+
+    def test_cropped_still_images_pan_within_bounds_but_landscape_stays_fixed(self):
+        render_video_staged(self.config("instagram"), "still-pan", dependencies=self.dependencies())
+        vertical_filters = [
+            args[args.index("-vf") + 1]
+            for stage, args in self.runner.calls
+            if stage.startswith("scene-") and stage[-3:].isdigit()
+        ]
+        self.assertTrue(vertical_filters)
+        self.assertTrue(all("*t/1.000000" in graph for graph in vertical_filters))
+        self.assertTrue(all("crop=1080:1920" in graph for graph in vertical_filters))
+
+        landscape_runner = FakeRunner()
+        render_video_staged(
+            self.config("youtube"), "still-no-pan-16x9",
+            dependencies=self.dependencies(landscape_runner),
+        )
+        landscape_filters = [
+            args[args.index("-vf") + 1]
+            for stage, args in landscape_runner.calls
+            if stage.startswith("scene-") and stage[-3:].isdigit()
+        ]
+        self.assertTrue(landscape_filters)
+        self.assertTrue(all("*t/" not in graph for graph in landscape_filters))
 
     def test_music_skips_silent_head_and_keeps_fade_in(self):
         config = self.config()
