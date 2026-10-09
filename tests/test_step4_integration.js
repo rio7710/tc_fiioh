@@ -36,6 +36,7 @@ const shellNavigationControllerPath = '01_app/assets/core/shell-navigation-contr
 const sessionBootstrapControllerPath = '01_app/assets/core/session-bootstrap-controller.js';
 const authUIControllerPath = '01_app/assets/core/auth-ui-controller.js';
 const projectHydrationControllerPath = '01_app/assets/core/project-hydration-controller.js';
+const promptLabControllerPath = '01_app/assets/core/prompt-lab-controller.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
@@ -67,6 +68,7 @@ assert.ok(fs.existsSync(shellNavigationControllerPath), 'shell-navigation-contro
 assert.ok(fs.existsSync(sessionBootstrapControllerPath), 'session-bootstrap-controller.js must exist');
 assert.ok(fs.existsSync(authUIControllerPath), 'auth-ui-controller.js must exist');
 assert.ok(fs.existsSync(projectHydrationControllerPath), 'project-hydration-controller.js must exist');
+assert.ok(fs.existsSync(promptLabControllerPath), 'prompt-lab-controller.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
@@ -85,10 +87,12 @@ assert.match(html, /src="\/01_app\/assets\/core\/shell-navigation-controller\.js
 assert.match(html, /src="\/01_app\/assets\/core\/session-bootstrap-controller\.js\?v=20261009_v33"/, 'HTML cache-busts session bootstrap controller');
 assert.match(html, /src="\/01_app\/assets\/core\/auth-ui-controller\.js\?v=20261009_v34"/, 'HTML cache-busts auth UI controller');
 assert.match(html, /src="\/01_app\/assets\/core\/project-hydration-controller\.js\?v=20261009_v36"/, 'HTML cache-busts project hydration controller');
+assert.match(html, /src="\/01_app\/assets\/core\/prompt-lab-controller\.js\?v=20261009_v37"/, 'HTML cache-busts prompt lab controller');
 assert.ok(html.indexOf('content-route.js') < html.indexOf('shell-navigation-controller.js'), 'content route helper loads before shell navigation');
 assert.ok(html.indexOf('shell-navigation-controller.js') < html.indexOf('session-bootstrap-controller.js'), 'shell navigation loads before session bootstrap');
 assert.ok(html.indexOf('session-bootstrap-controller.js') < html.indexOf('auth-ui-controller.js'), 'session bootstrap loads before auth UI controller');
 assert.ok(html.indexOf('auth-ui-controller.js') < html.indexOf('project-hydration-controller.js'), 'auth UI loads before project hydration controller');
+assert.ok(html.indexOf('project-hydration-controller.js') < html.indexOf('prompt-lab-controller.js'), 'project hydration loads before prompt lab controller');
 for (const contract of [
   /function readContentRoute\(\)\{\s*return shellNavigationController\.readRoute\(\);\s*\}/,
   /function writeContentRoute\(step,mode='push'\)\{\s*return shellNavigationController\.writeRoute\(step,mode\);\s*\}/,
@@ -112,6 +116,9 @@ assert.match(html, /const projectHydrationController=ThinkCastProjectHydrationCo
 assert.ok(html.indexOf('projectHydrationController=') < html.indexOf('shellNavigationController='), 'project hydration is wired before shell navigation');
 assert.doesNotMatch(html, /\/api\/project-content\?project_id=/, 'P1 removes the project content hydration body');
 assert.doesNotMatch(html, /\/api\/project-state\?project_id=/, 'P1 removes the project state hydration body');
+assert.match(html, /const promptLabController=ThinkCastPromptLabController\.create\(/, 'P1 wires the prompt lab controller');
+assert.match(html, /promptLabController\.mount\(document\)/, 'P1 mounts prompt lab interactions');
+assert.doesNotMatch(html, /\/api\/prompt-harness\/(?:image|stream|test)|promptLabForm\.addEventListener|function closePromptLab\(/, 'P1 removes the prompt lab implementation');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v31"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
@@ -321,6 +328,7 @@ function createPrePartialContext() {
   elements.set('#step4Container', container);
 
   const documentStub = {
+    createElement(selector) { return createGenericStub(selector); },
     querySelector(selector) {
       if (elements.has(selector)) return elements.get(selector);
       if (step4OnlyIds.has(selector)) return null;
@@ -350,6 +358,7 @@ function createPrePartialContext() {
     ThinkCastSessionBootstrapController: require('../01_app/assets/core/session-bootstrap-controller.js'),
     ThinkCastAuthUIController: require('../01_app/assets/core/auth-ui-controller.js'),
     ThinkCastProjectHydrationController: require('../01_app/assets/core/project-hydration-controller.js'),
+    ThinkCastPromptLabController: require('../01_app/assets/core/prompt-lab-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),

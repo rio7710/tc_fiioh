@@ -15,6 +15,7 @@
 <script src="/01_app/assets/core/session-bootstrap-controller.js?v=20261009_v33"></script>
 <script src="/01_app/assets/core/auth-ui-controller.js?v=20261009_v34"></script>
 <script src="/01_app/assets/core/project-hydration-controller.js?v=20261009_v36"></script>
+<script src="/01_app/assets/core/prompt-lab-controller.js?v=20261009_v37"></script>
 <script src="/01_app/assets/core/project-store.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step-partial-loader.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step01/step01-project-index-controller.js?v=20261009_v31"></script>
@@ -1437,51 +1438,8 @@ async function ensureStepApiReady(step){
 }
 
 document.querySelector('#globalApiSettings').addEventListener('click',()=>openApiSettings(0));
-const promptLabModal=document.querySelector('#promptLabModal');
-const promptLabForm=document.querySelector('#promptLabForm');
-const promptLabKey=document.querySelector('#promptLabKey');
-const promptLabStreaming=document.querySelector('#promptLabStreaming');
-const promptLabInput=document.querySelector('#promptLabInput');
-const promptLabOutput=document.querySelector('#promptLabOutput');
-const promptLabMeta=document.querySelector('#promptLabMeta');
-const promptLabImage=document.querySelector('#promptLabImage');
-function promptLabMode(){return promptLabForm.elements.promptLabMode.value}
-function syncPromptLabMode(){const imageMode=promptLabMode()==='image';promptLabStreaming.closest('label').hidden=imageMode;promptLabOutput.hidden=imageMode;promptLabImage.hidden=!imageMode;promptLabInput.placeholder=imageMode?'예: 따뜻한 오후 햇살이 드는 요양원 정원, 어르신과 직원이 함께 걷는 자연스러운 사진, 16:9':'예: 생각담 서비스의 요양원 홍보 영상용 제목 3개를 JSON으로 작성해 주세요.'}
-function closePromptLab(){promptLabModal.hidden=true;document.body.classList.remove('modal-open');promptLabForm.reset();promptLabOutput.textContent='아직 실행하지 않았습니다.';promptLabImage.innerHTML='<span class="prompt-lab-image-empty">생성된 이미지가 여기에 표시됩니다.</span>';promptLabMeta.textContent='Google Gemini API 연결 후 테스트할 수 있습니다.';syncPromptLabMode()}
-promptLabForm.elements.promptLabMode.forEach(input=>input.addEventListener('change',syncPromptLabMode));
-document.querySelector('#promptLabOpen').addEventListener('click',()=>{promptLabModal.hidden=false;document.body.classList.add('modal-open');promptLabInput.focus()});
-document.querySelector('#promptLabClose').addEventListener('click',closePromptLab);
-promptLabModal.addEventListener('pointerdown',event=>{if(event.target===promptLabModal)closePromptLab()});
-promptLabForm.addEventListener('submit',async event=>{
-  event.preventDefault();const run=document.querySelector('#promptLabRun');const prompt=promptLabInput.value.trim();const apiKey=promptLabKey.value.trim();
-  if(!prompt){promptLabMeta.textContent='테스트할 프롬프트를 입력해 주세요.';promptLabInput.focus();return}
-  run.disabled=true;promptLabOutput.textContent='Gemini 응답을 기다리고 있습니다…';promptLabMeta.textContent='프로젝트와 격리된 테스트 요청을 전송했습니다.';
-  try{
-    if(promptLabMode()==='image'){
-      promptLabImage.innerHTML='<span class="prompt-lab-image-empty">Gemini가 이미지를 생성하고 있습니다…</span>';
-      const result=await api('/api/prompt-harness/image',{method:'POST',body:JSON.stringify({prompt,api_key:apiKey})});
-      const generated=document.createElement('img');generated.src=result.image_data_url;generated.alt=prompt;promptLabImage.replaceChildren(generated);
-      const usage=result.trace?.usage||{};promptLabMeta.textContent=`이미지 생성 · 모델 ${result.trace?.model||'-'} · 입력 ${usage.promptTokenCount??'-'} tokens · ${result.trace?.latency_ms??'-'}ms · 프로젝트 미반영`;
-    }else if(promptLabStreaming.checked){
-      const response=await fetch('/api/prompt-harness/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,api_key:apiKey})});
-      if(!response.ok){const failed=await response.json();throw new Error(failed.error||'스트리밍 요청을 처리하지 못했습니다.')}
-      promptLabOutput.textContent='';let buffer='';const reader=response.body.getReader();const decoder=new TextDecoder();
-      while(true){
-        const {value,done}=await reader.read();buffer+=decoder.decode(value||new Uint8Array(),{stream:!done});const events=buffer.split('\n\n');buffer=events.pop()||'';
-        for(const raw of events){
-          const line=raw.split('\n').find(item=>item.startsWith('data: '));if(!line)continue;const item=JSON.parse(line.slice(6));
-          if(item.type==='chunk'){promptLabOutput.textContent+=item.text;promptLabOutput.scrollTop=promptLabOutput.scrollHeight}
-          if(item.type==='done'){const usage=item.usage||{};promptLabMeta.textContent=`스트리밍 · 모델 ${item.model||'-'} · 입력 ${usage.promptTokenCount??'-'} tokens · 출력 ${usage.candidatesTokenCount??'-'} tokens · ${item.latency_ms??'-'}ms · 프로젝트 미반영`}
-          if(item.type==='error')throw new Error(item.error||'스트리밍이 중단됐습니다.');
-        }
-        if(done)break;
-      }
-    }else{
-      const result=await api('/api/prompt-harness/test',{method:'POST',body:JSON.stringify({prompt,api_key:apiKey})});promptLabOutput.textContent=result.output;
-      const usage=result.trace?.usage||{};promptLabMeta.textContent=`일괄 응답 · 모델 ${result.trace?.model||'-'} · 입력 ${usage.promptTokenCount??'-'} tokens · 출력 ${usage.candidatesTokenCount??'-'} tokens · ${result.trace?.latency_ms??'-'}ms · 프로젝트 미반영`;
-    }
-  }catch(error){promptLabOutput.textContent='출력 없음';if(promptLabMode()==='image')promptLabImage.innerHTML='<span class="prompt-lab-image-empty">이미지가 생성되지 않았습니다.</span>';promptLabMeta.textContent=error.message}finally{promptLabKey.value='';run.disabled=false}
-});
+const promptLabController=ThinkCastPromptLabController.create({getRoot:()=>document,request:(...args)=>api(...args),fetch:(...args)=>fetch(...args),createTextDecoder:()=>new TextDecoder(),createEmptyBytes:()=>new Uint8Array()});
+promptLabController.mount(document);
 const platformGuideModal=document.querySelector('#platformGuideModal');
 function closePlatformGuide(){platformGuideModal.hidden=true;document.body.classList.remove('modal-open')}
 document.querySelector('#platformGuideClose').addEventListener('click',closePlatformGuide);
