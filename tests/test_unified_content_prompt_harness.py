@@ -69,9 +69,40 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertEqual("함께 걷는 오늘", cue["narration"]["text"])
         self.assertEqual(cue["narration"], cue["caption"])
         self.assertEqual("estimated_speech_rate", cue["timing_source"])
-        self.assertEqual(30, cue["estimated_duration_seconds"])
+        self.assertEqual(1.5, cue["estimated_duration_seconds"])
         self.assertIsNone(cue["measured_duration_seconds"])
         self.assertIsNone(cue["audio_uri"])
+
+    def test_generated_timestamps_are_rebuilt_before_validation(self):
+        value = document(["안심"])
+        first = value["production"]["timeline"]["scenes"][0]
+        first["start"], first["end"] = 17, 4
+        second = json.loads(json.dumps(first, ensure_ascii=False))
+        second["id"] = "scene-02"
+        second["start"], second["end"] = 99, 99.1
+        second["sequence"]["continuity_from"] = "scene-01"
+        second["narration_cue_ids"] = ["narration-02"]
+        value["production"]["timeline"]["scenes"].append(second)
+        second_cue = json.loads(json.dumps(value["production"]["narration_cues"][0], ensure_ascii=False))
+        second_cue["id"] = "narration-02"
+        second_cue["start"], second_cue["end"] = 200, 100
+        second_cue["scene_ids"] = ["scene-02"]
+        value["production"]["narration_cues"].append(second_cue)
+
+        calls = []
+        result = run_generation_harness(
+            lambda _prompt: calls.append(True) or json.dumps(value, ensure_ascii=False),
+            ["안심"], "자료",
+        )
+
+        scenes = result["document"]["production"]["timeline"]["scenes"]
+        cues = result["document"]["production"]["narration_cues"]
+        self.assertEqual(1, len(calls))
+        self.assertEqual(0, result["repair_count"])
+        self.assertEqual(0.0, scenes[0]["start"])
+        self.assertEqual(scenes[0]["end"], scenes[1]["start"])
+        self.assertGreaterEqual(scenes[1]["end"] - scenes[1]["start"], 1.5)
+        self.assertEqual((scenes[1]["start"], scenes[1]["end"]), (cues[1]["start"], cues[1]["end"]))
 
     def test_narration_cue_text_shorthand_does_not_leak_source_to_cue(self):
         value = document(["안심"])

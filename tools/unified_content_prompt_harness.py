@@ -46,6 +46,69 @@ def _complete_missing_source(value: Any) -> None:
             _complete_missing_source(child)
 
 
+def normalize_provisional_timing(production: dict[str, Any]) -> None:
+    """Replace model-authored clocks with a deterministic pre-TTS estimate.
+
+    Generated timestamps are placeholders.  Their only job before narration is
+    recorded is to keep the storyboard preview ordered; measured WAV durations
+    replace them later in ``timeline_with_voice_durations``.
+    """
+    timeline = production.get("timeline")
+    scenes = timeline.get("scenes") if isinstance(timeline, dict) else None
+    cues = production.get("narration_cues")
+    if not isinstance(scenes, list) or not scenes or not isinstance(cues, list):
+        return
+    valid_scenes = [scene for scene in scenes if isinstance(scene, dict)]
+    scene_by_id = {
+        scene.get("id"): scene for scene in valid_scenes
+        if isinstance(scene.get("id"), str)
+    }
+    seconds_by_scene = {scene_id: 0.0 for scene_id in scene_by_id}
+    timing_policy = production.get("timing_policy")
+    characters_per_second = (
+        timing_policy.get("estimated_characters_per_second", 4.5)
+        if isinstance(timing_policy, dict) else 4.5
+    )
+    characters_per_second = float(characters_per_second)
+    for cue in cues:
+        if not isinstance(cue, dict):
+            continue
+        scene_ids = [
+            scene_id for scene_id in cue.get("scene_ids", [])
+            if scene_id in scene_by_id
+        ]
+        if not scene_ids:
+            continue
+        narration = cue.get("narration")
+        text = str(narration.get("text", "")) if isinstance(narration, dict) else ""
+        character_count = len("".join(text.split()))
+        cue_duration = max(1.5 * len(scene_ids), character_count / characters_per_second)
+        share = cue_duration / len(scene_ids)
+        for scene_id in scene_ids:
+            seconds_by_scene[scene_id] += share
+
+    cursor = 0.0
+    for scene in valid_scenes:
+        duration = max(1.5, seconds_by_scene.get(scene.get("id"), 0.0) or 3.0)
+        scene["start"] = round(cursor, 3)
+        cursor = round(cursor + duration, 3)
+        scene["end"] = cursor
+
+    for cue in cues:
+        if not isinstance(cue, dict):
+            continue
+        scene_ids = cue.get("scene_ids", [])
+        linked = [scene_by_id.get(scene_id) for scene_id in scene_ids]
+        if not linked or any(scene is None for scene in linked):
+            continue
+        cue["start"] = linked[0]["start"]
+        cue["end"] = linked[-1]["end"]
+        cue["timing_source"] = "estimated_speech_rate"
+        cue["estimated_duration_seconds"] = round(cue["end"] - cue["start"], 3)
+        cue["measured_duration_seconds"] = None
+        cue["audio_uri"] = None
+
+
 def normalize_document_shape(document: dict[str, Any]) -> dict[str, Any]:
     """Repair a common provider error without changing generated content.
 
@@ -340,6 +403,7 @@ def normalize_document_shape(document: dict[str, Any]) -> dict[str, Any]:
             cue["start"], cue["end"] = start, end
             if cue.get("timing_source") == "estimated_speech_rate":
                 cue["estimated_duration_seconds"] = round(end - start, 3)
+    normalize_provisional_timing(production)
     return document
 
 
