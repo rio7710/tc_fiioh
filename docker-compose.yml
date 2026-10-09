@@ -24,6 +24,7 @@ services:
       PORT: "10000"
       DATA_DIR: "/data"
       SQLITE_PATH: "/data/tc.sqlite"
+      FINAL_EXPORT_QUEUE_PATH: "/data/tc.sqlite"
       EXPORTS_DIR: "/data/exports"
       DEMO_DATA_PATH: "/data/demo_data.json"
       CAPTION_REGISTRY_PATH: "/data/caption_artifacts.json"
@@ -60,6 +61,34 @@ services:
       - tc_temp_data:/data
     networks:
       - tc_temp_internal
+    security_opt:
+      - no-new-privileges:true
+
+  final_export_worker:
+    container_name: tc_temp_final_export_worker
+    build:
+      context: .
+      dockerfile: Dockerfile.final-export
+    environment:
+      DATA_DIR: "/data"
+      SQLITE_PATH: "/data/tc.sqlite"
+      FINAL_EXPORT_QUEUE_PATH: "/data/tc.sqlite"
+      FINAL_EXPORT_LEASE_SECONDS: "300"
+      FINAL_EXPORT_HEARTBEAT_SECONDS: "30"
+      FINAL_EXPORT_POLL_SECONDS: "2"
+      EXPORTS_DIR: "/data/exports"
+      DEMO_DATA_PATH: "/data/demo_data.json"
+      CAPTION_REGISTRY_PATH: "/data/caption_artifacts.json"
+      KLING_ARTIFACT_DIR: "/data/generated/kling"
+      VOICE_ARTIFACT_DIR: "/data/generated/voice"
+      STORYBOARD_IMAGE_DIR: "/data/generated/storyboard"
+      BRAND_ASSET_DIR: "/data/generated/brand"
+    volumes:
+      - tc_temp_data:/data
+    networks:
+      - tc_temp_internal
+    mem_limit: 1536m
+    restart: unless-stopped
     security_opt:
       - no-new-privileges:true
 

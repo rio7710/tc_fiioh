@@ -1,0 +1,41 @@
+{
+  "schema_version": "staged-render-acceptance.v1",
+  "fps": 30,
+  "duration_tolerance_frames": 1,
+  "max_ffmpeg_peak_rss_mib": 768,
+  "max_scene_inputs_per_process": 2,
+  "max_visual_inputs_per_process": 3,
+  "outputs": {
+    "16x9": {
+      "platform": "youtube",
+      "width": 1280,
+      "height": 720
+    },
+    "9x16": {
+      "platform": "instagram",
+      "width": 720,
+      "height": 1280
+    },
+    "4x5": {
+      "platform": "facebook",
+      "width": 720,
+      "height": 900
+    },
+    "1x1": {
+      "platform": "square",
+      "width": 1080,
+      "height": 1080
+    }
+  },
+  "video": {
+    "codec_name": "h264",
+    "pix_fmt": "yuv420p"
+  },
+  "audio": {
+    "codec_name": "aac"
+  },
+  "container": {
+    "format_name_contains": "mp4",
+    "faststart": true
+  }
+}

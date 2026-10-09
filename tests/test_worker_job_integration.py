@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "01_app"))
 
 from auth_store import AuthStore
-from automation_runner import AutomationRunner, _render_settings
+from automation_runner import AdapterFailure, AutomationRunner, _FinalExportAdapter, _render_settings
 from automation_store import AutomationStore
 from worker_core import ConfigurationError, JobStore, WorkerRuntimeSettings
 from worker import create_job_store
@@ -188,6 +188,37 @@ class WorkerJobIntegrationTests(unittest.TestCase):
         self.assertEqual(first["job_id"], second["job_id"])
         self.assertEqual(first["input_hash"], second["input_hash"])
         self.assertEqual(calls, [first["idempotency_key"]])
+
+    def test_final_export_recovers_dropped_response_without_duplicate_submit(self):
+        submits = []
+        statuses = [
+            {"ok": True},
+            {"ok": True, "status": "running"},
+            {"ok": True, "status": "succeeded", "response": {"ok": True, "url": "memory://final.mp4"}},
+        ]
+
+        def submit():
+            submits.append("render")
+            raise AdapterFailure("connection dropped")
+
+        adapter = _FinalExportAdapter(
+            submit, lambda: statuses.pop(0), poll_interval_seconds=0.001, recovery_timeout_seconds=1,
+        )
+        job = {"attempt": 1}
+
+        self.assertEqual(adapter.run(job)["value"]["url"], "memory://final.mp4")
+        self.assertEqual(submits, ["render"])
+
+    def test_final_export_retry_never_resubmits_when_status_is_missing(self):
+        submits = []
+        adapter = _FinalExportAdapter(
+            lambda: submits.append("render"), lambda: {"ok": True},
+            poll_interval_seconds=0.001, recovery_timeout_seconds=0.001,
+        )
+
+        with self.assertRaises(AdapterFailure):
+            adapter.run({"attempt": 2})
+        self.assertEqual(submits, [])
 
     def test_worker_startup_recovers_expired_job_to_stale(self):
         path = self.root / "worker_jobs.json"

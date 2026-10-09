@@ -24,6 +24,15 @@ SENSITIVE_HEADERS = {
 }
 
 
+def api_timeout_for_path(path: str) -> int:
+    route = path.split("?", 1)[0]
+    if route == "/render":
+        return 7200
+    if route == "/api/script/generate":
+        return 660
+    return 120
+
+
 class WebGatewayHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
@@ -60,7 +69,7 @@ class WebGatewayHandler(http.server.SimpleHTTPRequestHandler):
                 headers=req_headers,
                 method=self.command,
             )
-            timeout = 660 if self.path == "/api/script/generate" else 120
+            timeout = api_timeout_for_path(self.path)
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 self.send_response(resp.status)
                 for key, val in resp.headers.items():

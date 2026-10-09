@@ -355,14 +355,19 @@ class JobStore:
         trace_id: str | None = None,
         lease_seconds: float = 300,
         cancellation_check: Callable[[], bool] | None = None,
+        max_attempts: int | None = None,
     ) -> dict[str, Any]:
         """Create or resume one logical job, then execute it at most once per claim.
 
         A failed or recovered-stale job is retried with the same idempotency key.
         An already-running job is never claimed by a second dispatcher.
         """
+        if max_attempts is not None and max_attempts < 1:
+            raise JobValidationError("max_attempts must be positive")
         job = self.create(project_id, stage, input, trace_id=trace_id)
         if job["status"] in RETRYABLE_STATUSES:
+            if max_attempts is not None and job["attempt"] >= max_attempts:
+                return job
             job = self.retry(job["job_id"])
         if job["status"] == "succeeded":
             return job

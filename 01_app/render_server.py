@@ -32,6 +32,8 @@ from prompt_harness import open_gemini_stream, test_gemini_image, test_gemini_pr
 from auth_store import AuthStore
 from automation_store import AutomationStore, VersionConflict, validate_config, STAGES
 from visual_decisions import VisualDecisions, DecisionConflict
+from staged_ffmpeg_renderer import StagedRenderDependencies, render_video_staged
+from final_export_queue import FinalExportConflict, FinalExportNotFound, FinalExportQueue
 kling_submission_lock = threading.Lock()
 from keyword_pool import load_month_pool
 from tools.unified_content_prompt_harness import run_generation_harness
@@ -53,6 +55,8 @@ data_lock = threading.Lock()
 caption_registry_lock = threading.Lock()
 render_progress_lock = threading.Lock()
 render_jobs = {}
+final_export_queue_lock = threading.Lock()
+final_export_queue_instance = None
 script_generation_lock = threading.Lock()
 active_script_generation_projects = set()
 provider_credentials_lock = threading.Lock()
@@ -172,6 +176,15 @@ def get_auth_store():
         if _auth_store is None:
             _auth_store = AuthStore(SQLITE_PATH)
         return _auth_store
+
+
+def get_final_export_queue():
+    global final_export_queue_instance
+    with final_export_queue_lock:
+        if final_export_queue_instance is None:
+            queue_path = Path(os.environ.get("FINAL_EXPORT_QUEUE_PATH", str(SQLITE_PATH)))
+            final_export_queue_instance = FinalExportQueue(queue_path)
+        return final_export_queue_instance
 
 
 def sync_default_group_resources(user_id):
@@ -1601,10 +1614,22 @@ def find_browser_renderer():
     raise FileNotFoundError("투명 자막 PNG를 만들 Edge 브라우저를 찾을 수 없습니다.")
 
 
+def caption_stylesheet_text():
+    """Load the extracted preview styles without depending on inline HTML CSS."""
+    paths = (
+        APP_DIR / "assets" / "steps" / "step04" / "step04-video.css",
+        APP_DIR / "assets" / "core" / "app-shell.css",
+    )
+    missing = [str(path.relative_to(APP_DIR)) for path in paths if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "자막 렌더링 스타일 파일을 찾을 수 없습니다: " + ", ".join(missing)
+        )
+    return "\n".join(path.read_text(encoding="utf-8") for path in paths)
+
+
 def create_caption_overlays(style_name, title_lines, title_scenes, width, height, caption_size, destination, progress_callback=None):
-    source = (APP_DIR / "P1_title_design_preview.html").read_text(encoding="utf-8")
-    css_start, css_end = source.index("<style>") + len("<style>"), source.index("</style>")
-    css = source[css_start:css_end]
+    css = caption_stylesheet_text()
     browser = find_browser_renderer()
     overlays = [None] * len(title_scenes)
     destination.mkdir(parents=True, exist_ok=True)
@@ -2022,14 +2047,21 @@ def prepare_caption_overlays(config, job_id, output_width, output_height, demo_d
     overlay_signature = json.dumps({"style": config["type"], "lines": script_lines, "width": output_width, "height": output_height, "caption_size": config["caption_size"], "preview_hash": preview_hash}, ensure_ascii=False, sort_keys=True)
     overlay_key = hashlib.sha256(overlay_signature.encode("utf-8")).hexdigest()[:20]
     overlay_root = EXPORTS / ".caption_cache" / overlay_key
+    def report(completed, total):
+        changes = {
+            "status": "running", "phase": "captions",
+            "completed_captions": config.get("caption_progress_offset", 0) + completed,
+            "caption_total": config.get("caption_progress_total", total),
+            "detail": f"자막 PNG {config.get('caption_progress_offset', 0) + completed:02d} / {config.get('caption_progress_total', total):02d} 생성 중",
+        }
+        update_render_progress(job_id, **changes)
+        callback = config.get("_progress_callback")
+        if callback:
+            callback(dict(changes))
+
     return create_caption_overlays(
-        config["type"], script_lines, title_scenes, output_width, output_height, config["caption_size"], overlay_root,
-        lambda completed, total: update_render_progress(
-            job_id, status="running", phase="captions",
-            completed_captions=config.get("caption_progress_offset", 0) + completed,
-            caption_total=config.get("caption_progress_total", total),
-            detail=f"자막 PNG {config.get('caption_progress_offset', 0) + completed:02d} / {config.get('caption_progress_total', total):02d} 생성 중",
-        ),
+        config["type"], script_lines, title_scenes, output_width, output_height,
+        config["caption_size"], overlay_root, report,
     )
 
 
@@ -2041,312 +2073,269 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
-def render_video(config, job_id=None):
-    ffmpeg = find_ffmpeg()
-    style = config["type"]
-    music = config["music"]
-    volume = config["volume"]
-    use_narration = config["narration"]
-    platform = config["preview_platform"]
-    output_width, output_height, format_label = PLATFORM_FORMATS[platform]
-    video_pan_x = config["video_pan_x"]
-    scene_crop_positions = config.get("scene_crop_positions") or {}
-    caption_size = config["caption_size"]
-    EXPORTS.mkdir(exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_name = f"P1_final_{style}_{platform}_{format_label}_{music}_{stamp}.mp4"
-    output_path = EXPORTS / output_name
-    demo_data = config.get("content_data") or load_demo_data()
-    timeline_scenes = timeline_from_data(demo_data)
-    title_scenes = timed_script_scenes(demo_data)
-    scene_end_times = tuple(scene["end"] for scene in timeline_scenes)
-    scene_count = len(timeline_scenes)
-    video_duration = scene_end_times[-1]
-    caption_overlays = config.get("prepared_caption_overlays") or prepare_caption_overlays(config, job_id, output_width, output_height, demo_data)
-
+def staged_render_dependencies(progress_callback=None):
+    """Bind server-owned asset resolution to the isolated FFmpeg compositor."""
     hosted_mode = os.environ.get("PORT", "8765") != "8765"
-    ffmpeg_threads = 1 if hosted_mode else RUNTIME_CONFIG["ffmpeg_threads"]
-    render_preset = "ultrafast" if hosted_mode else RUNTIME_CONFIG["render_preset"]
-    args = [
-        ffmpeg, "-y",
-        "-filter_threads", str(ffmpeg_threads),
-        "-filter_complex_threads", str(ffmpeg_threads),
-    ]
-    scene_videos = config.get("scene_videos")
-    scene_images = config.get("scene_images") or {}
-    for index, scene in enumerate(timeline_scenes):
-        video_artifact = next((item for item in scene_videos if isinstance(item, dict) and
-                               item.get("scene_id") == scene.get("id")), None) if isinstance(scene_videos, list) else None
-        image_artifact = scene_images.get(str(scene.get("id", ""))) if isinstance(scene_images, dict) else None
-        image_path = storyboard_image_path((image_artifact or {}).get("uri"))
-        if not video_artifact and image_path:
-            args += ["-loop", "1", "-i", str(image_path)]
-            continue
-        source_path = scene_video_path(scene, index, scene_videos)
-        if source_path == MERGED_DEMO_VIDEO.resolve():
-            args += ["-ss", f"{scene['start']:.3f}", "-i", str(source_path)]
-        else:
-            args += ["-i", str(source_path)]
-    input_index = scene_count
-    bgm_index = None
-    if MUSIC[music] is not None:
-        bgm_index = input_index
-        args += ["-stream_loop", "-1", "-i", str(MUSIC[music])]
-        input_index += 1
 
-    narration_indexes = []
-    if use_narration:
-        voice_clips = {str(item.get("scene_id")): item for item in config.get("voice_clips") or []}
-        if voice_clips:
-            narration_sources = []
-            for scene in title_scenes:
-                clip = voice_clips.get(str(scene.get("id")))
-                path = voice_audio_path((clip or {}).get("uri"))
-                if not path:
-                    raise ValueError(f"{scene.get('name', scene.get('id'))} 장면의 나레이션 파일을 찾을 수 없습니다.")
-                narration_sources.append((1, path))
-        else:
-            if len(NARRATION_TRACKS) != len(title_scenes):
-                raise ValueError("음성 파일과 대본 타임라인의 개수가 일치하지 않습니다.")
-            narration_sources = [(rate, ROOT / "02_media" / "narration" / filename)
-                                 for rate, filename in NARRATION_TRACKS]
-        for scene, (rate, narration_path) in zip(title_scenes, narration_sources):
-            start = float(scene["cue_start"])
-            narration_indexes.append((input_index, start, rate))
-            args += ["-i", str(narration_path)]
-            input_index += 1
+    def report(job_id, **changes):
+        update_render_progress(job_id, **changes)
+        if progress_callback:
+            progress_callback(dict(changes))
 
-    caption_indexes = []
-    for png_path, start, end in caption_overlays:
-        caption_indexes.append((input_index, start, end))
-        args += ["-loop", "1", "-i", str(png_path)]
-        input_index += 1
-
-    brand_inputs = {}
-    for item in config.get("brand_selections") or []:
-        if not item.get("enabled") or not item.get("uri"):
-            continue
-        if item.get("role") == "outro":
-            settings = item.get("settings") or {}
-            profiles = settings.get("profiles") if isinstance(settings.get("profiles"), dict) else {}
-            format_profile = profiles.get(format_label) if isinstance(profiles.get(format_label), dict) else {}
-            if format_profile.get("uri"):
-                item = {**item, "uri": format_profile["uri"],
-                        "media_type": format_profile.get("media_type", item.get("media_type")),
-                        "mime_type": format_profile.get("mime_type", item.get("mime_type"))}
-        path = brand_asset_path(item["uri"])
-        if not path:
-            raise ValueError(f"{item.get('role')} 브랜드 파일을 찾을 수 없습니다.")
-        duration = 2.0 if item.get("media_type") == "image" else media_duration(path)
-        brand_inputs[item["role"]] = {**item, "path": path, "index": input_index, "duration": duration}
-        if item.get("media_type") == "image":
-            args += ["-loop", "1", "-i", str(path)]
-        else:
-            args += ["-an", "-i", str(path)]
-        input_index += 1
-    intro_duration = brand_inputs.get("intro", {}).get("duration", 0.0)
-    outro_duration = brand_inputs.get("outro", {}).get("duration", 0.0)
-    output_duration = intro_duration + video_duration + outro_duration
-
-    filters = []
-    video_labels = []
-    dissolve_duration = max(
-        0.0,
-        min(5.0, float(config.get("scene_dissolve_seconds", RENDER_DEFAULTS["scene_dissolve_seconds"]))),
+    return StagedRenderDependencies(
+        ffmpeg=find_ffmpeg(),
+        root=ROOT,
+        exports_dir=EXPORTS,
+        platform_formats=PLATFORM_FORMATS,
+        music=MUSIC,
+        narration_tracks=NARRATION_TRACKS,
+        render_defaults=RENDER_DEFAULTS,
+        timeline_from_data=timeline_from_data,
+        timed_script_scenes=timed_script_scenes,
+        storyboard_image_path=storyboard_image_path,
+        scene_video_path=scene_video_path,
+        voice_audio_path=voice_audio_path,
+        brand_asset_path=brand_asset_path,
+        media_duration=media_duration,
+        prepare_caption_overlays=prepare_caption_overlays,
+        update_progress=report,
+        merged_demo_video=MERGED_DEMO_VIDEO,
+        ffmpeg_threads=RUNTIME_CONFIG["ffmpeg_threads"],
+        render_preset=RUNTIME_CONFIG["render_preset"],
+        hosted_mode=hosted_mode,
     )
-    for index, scene in enumerate(timeline_scenes):
-        duration = scene["end"] - scene["start"]
-        video_artifact = None
-        if isinstance(scene_videos, dict):
-            video_artifact = scene_videos.get(str(scene.get("id", "")))
-        elif isinstance(scene_videos, list):
-            video_artifact = next((item for item in scene_videos if isinstance(item, dict) and item.get("scene_id") == scene.get("id")), None)
-        playback_rate = max(0.1, float((video_artifact or {}).get("playback_rate", 1)))
-        scene_pan_x = 0.5 if format_label == "16x9" else float(
-            (scene_crop_positions.get(str(scene.get("id"))) or {}).get(format_label, video_pan_x)
-        )
-        filters.append(
-            f"[{index}:v:0]scale={output_width}:{output_height}:force_original_aspect_ratio=increase,"
-            f"crop={output_width}:{output_height}:x='(iw-ow)*{scene_pan_x:.5f}':y='(ih-oh)/2',"
-            f"setsar=1,fps=30,format=yuv420p,setpts=PTS/{playback_rate:.6f},tpad=stop_mode=clone:stop_duration={duration:.3f},"
-            f"trim=duration={duration:.3f},setpts=PTS-STARTPTS[v{index}]"
-        )
-        if index < scene_count - 1 and dissolve_duration > 0:
-            last_frame = max(0, math.ceil(duration * 30 - 1e-6) - 1)
-            filters.append(f"[v{index}]split=2[v{index}base][v{index}tail]")
-            filters.append(
-                f"[v{index}tail]trim=start_frame={last_frame}:end_frame={last_frame + 1},"
-                f"setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration={dissolve_duration:.3f},"
-                f"trim=duration={dissolve_duration:.3f},format=yuva420p,"
-                f"fade=t=out:st=0:d={dissolve_duration:.3f}:alpha=1,"
-                f"setpts=PTS+{float(scene['end']):.3f}/TB[dissolve{index}]"
-            )
-            video_labels.append(f"[v{index}base]")
-        elif index < scene_count - 1:
-            video_labels.append(f"[v{index}]")
-        else:
-            video_labels.append(f"[v{index}]")
-    filters.append("".join(video_labels) + f"concat=n={scene_count}:v=1:a=0[sequence_base]")
-    video_output = "sequence_base"
-    for index, scene in enumerate(timeline_scenes[:-1]):
-        if dissolve_duration <= 0:
-            continue
-        next_output = "sequence" if index == scene_count - 2 else f"dissolved{index}"
-        filters.append(
-            f"[{video_output}][dissolve{index}]overlay=0:0:eof_action=pass[{next_output}]"
-        )
-        video_output = next_output
-    if scene_count == 1:
-        filters.append("[sequence_base]null[sequence]")
-        video_output = "sequence"
-    for number, (index, start, end) in enumerate(caption_indexes):
-        next_output = f"captioned{number}"
-        filters.append(f"[{index}:v:0]format=rgba[caption{number}]")
-        filters.append(f"[{video_output}][caption{number}]overlay=0:0:enable='between(t,{start:.3f},{end:.3f})'[{next_output}]")
-        video_output = next_output
-    watermark = brand_inputs.get("watermark")
-    if watermark:
-        settings = watermark.get("settings") or {}
-        format_profiles = settings.get("profiles") if isinstance(settings.get("profiles"), dict) else {}
-        format_settings = format_profiles.get(format_label) if isinstance(format_profiles.get(format_label), dict) else {}
-        opacity = max(.1, min(1.0, float(settings.get("opacity", .8))))
-        width_ratio = float(format_settings.get("width_ratio", settings.get("width_ratio", .15)))
-        width = max(48, round(output_width * max(.06, min(1.0, width_ratio))))
-        position = str(format_settings.get("position", settings.get("position", "top-right")))
-        vertical, _, horizontal = position.partition("-")
-        margin_x, margin_y = round(output_width * .035), round(output_height * .035)
-        overlay_x = str(margin_x) if horizontal == "left" else "(W-w)/2" if horizontal == "center" else f"W-w-{margin_x}"
-        overlay_y = str(margin_y) if vertical == "top" else "(H-h)/2" if vertical == "center" else f"H-h-{margin_y}"
-        filters.append(f"[{watermark['index']}:v]scale={width}:-1,format=rgba,colorchannelmixer=aa={opacity:.3f}[watermark]")
-        filters.append(f"[{video_output}][watermark]overlay={overlay_x}:{overlay_y}[branded_body]")
-        video_output = "branded_body"
-    segments = []
-    intro = brand_inputs.get("intro")
-    if intro:
-        filters.append(f"[{intro['index']}:v]scale={output_width}:{output_height}:force_original_aspect_ratio=decrease,pad={output_width}:{output_height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p,trim=duration={intro['duration']:.3f},setpts=PTS-STARTPTS[brand_intro]")
-        segments.append("[brand_intro]")
-    outro = brand_inputs.get("outro")
-    if outro:
-        settings = outro.get("settings") or {}
-        profiles = settings.get("profiles") if isinstance(settings.get("profiles"), dict) else {}
-        format_settings = profiles.get(format_label) if isinstance(profiles.get(format_label), dict) else {}
-        width_ratio = max(.06, min(1.0, float(format_settings.get("width_ratio", settings.get("width_ratio", 1.0)))))
-        position = str(format_settings.get("position", settings.get("position", "center-center")))
-        background = str(format_settings.get("background", settings.get("background", "none")))
-        if background not in {"none", "white", "black"}:
-            background = "none"
-        background_opacity = max(0.0, min(1.0, float(format_settings.get(
-            "background_opacity", settings.get("background_opacity", .8)
-        ))))
-        vertical, _, horizontal = position.partition("-")
-        margin_x, margin_y = round(output_width * .035), round(output_height * .035)
-        overlay_x = str(margin_x) if horizontal == "left" else "(W-w)/2" if horizontal == "center" else f"W-w-{margin_x}"
-        overlay_y = str(margin_y) if vertical == "top" else "(H-h)/2" if vertical == "center" else f"H-h-{margin_y}"
-        outro_width = max(48, round(output_width * width_ratio))
-        freeze_start = max(0.0, video_duration - (1 / 30))
-        filters.append(f"[{video_output}]split=2[body_main][outro_source]")
-        background_filter = f",drawbox=color={background}@{background_opacity:.3f}:t=fill" if background != "none" and background_opacity > 0 else ""
-        filters.append(f"[outro_source]trim=start={freeze_start:.3f},setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration={outro['duration']:.3f},trim=duration={outro['duration']:.3f}{background_filter}[outro_bg]")
-        filters.append(f"[{outro['index']}:v]scale={outro_width}:-1,format=rgba,fps=30,trim=duration={outro['duration']:.3f},setpts=PTS-STARTPTS[outro_layer]")
-        filters.append(f"[outro_bg][outro_layer]overlay={overlay_x}:{overlay_y}:shortest=1,format=yuv420p[brand_outro]")
-        video_output = "body_main"
-    segments.append(f"[{video_output}]")
-    if outro:
-        segments.append("[brand_outro]")
-    if len(segments) > 1:
-        filters.append("".join(segments) + f"concat=n={len(segments)}:v=1:a=0[vout]")
-    else:
-        filters.append(f"[{video_output}]null[vout]")
-    audio_labels = []
-    if bgm_index is not None:
-        fadeout_start = max(0.0, output_duration - 2.0)
-        filters.append(
-            f"[{bgm_index}:a:0]atrim=start=2:duration={output_duration},asetpts=PTS-STARTPTS,"
-            f"volume={volume:.3f},afade=t=in:st=0:d=2,afade=t=out:st={fadeout_start:.3f}:d=2[bg]"
-        )
-        audio_labels.append("[bg]")
-    for number, (index, start, rate) in enumerate(narration_indexes):
-        delay = round((start + intro_duration) * 1000)
-        filters.append(f"[{index}:a:0]atempo={rate:.3f},volume=0.95,adelay={delay}|{delay}[n{number}]")
-        audio_labels.append(f"[n{number}]")
 
-    if len(audio_labels) > 1:
-        filters.append("".join(audio_labels) + f"amix=inputs={len(audio_labels)}:duration=longest:dropout_transition=0,atrim=duration={output_duration},apad=whole_dur={output_duration},alimiter=limit=0.95[aout]")
-    elif len(audio_labels) == 1:
-        filters.append(audio_labels[0] + f"atrim=duration={output_duration},apad=whole_dur={output_duration}[aout]")
-    else:
-        filters.append(f"anullsrc=r=44100:cl=stereo,atrim=duration={output_duration}[aout]")
 
-    args += [
-        "-filter_complex", ";".join(filters),
-        "-map", "[vout]", "-map", "[aout]",
-        "-t", str(output_duration),
-        "-c:v", "libx264", "-preset", render_preset, "-r", "30",
-        "-threads", str(ffmpeg_threads), "-crf", "18", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
-        "-progress", "pipe:1", "-nostats",
-        str(output_path),
-    ]
+def render_video(config, job_id=None, progress_callback=None):
+    """Render one output ratio through bounded, restart-safe FFmpeg stages."""
+    return render_video_staged(
+        config, job_id, dependencies=staged_render_dependencies(progress_callback)
+    )
+
+
+def execute_render_request(user_id: str, payload: dict, progress_callback=None) -> dict:
+    """Execute one durable final-export job outside the HTTP API process."""
+    if not isinstance(payload, dict):
+        raise ValueError("렌더 요청 형식이 올바르지 않습니다.")
+    if not render_lock.acquire(blocking=False):
+        raise RuntimeError("이미 변환 작업이 진행 중입니다.")
+    job_id = str(payload.get("job_id", "")).strip()[:100] or f"render-{time.time_ns()}"
+    temporary_caption_roots = set()
+
+    def report(**changes):
+        update_render_progress(job_id, **changes)
+        if progress_callback:
+            progress_callback(dict(changes))
+
     try:
-        update_render_progress(
-            job_id, status="running", phase="composite", progress=0.01,
-            rendered_seconds=0.0, completed_scenes=0, scene_total=scene_count,
-            format_id=config.get("format_id"), format_index=config.get("format_index", 1),
-            format_total=config.get("format_total", 1), detail="FFmpeg 합성을 시작했습니다.",
+        project_id = str(payload.get("project_id", "")).strip()
+        latest = get_auth_store().latest_stage_data(user_id, project_id, 3)
+        document = (latest or {}).get("data", {}).get("document")
+        if not isinstance(document, dict):
+            raise ValueError("최종 출력할 콘텐츠 대본을 찾을 수 없습니다.")
+        script, project_timeline = unified_document_view(document)
+        voice_clips = get_auth_store().list_scene_voice_clips(
+            user_id, project_id, latest["revision_id"]
         )
-        process = subprocess.Popen(
-            args,
-            cwd=ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            bufsize=1,
+        project_timeline = timeline_with_voice_durations(project_timeline, voice_clips)
+        content_data = {"state": {"script": script}, "timeline": project_timeline}
+        selected_images = get_auth_store().list_scene_images(
+            user_id, project_id, latest["revision_id"]
         )
-        output_tail = deque(maxlen=16)
-        for raw_line in process.stdout or []:
-            line = raw_line.strip()
-            output_tail.append(line)
-            if line.startswith("out_time_ms="):
-                try:
-                    rendered_seconds = int(line.split("=", 1)[1]) / 1_000_000
-                    fraction = max(0.01, min(0.98, rendered_seconds / output_duration))
-                    completed_scenes = sum(rendered_seconds >= end_time + intro_duration for end_time in scene_end_times)
-                    update_render_progress(
-                        job_id,
-                        status="running",
-                        progress=fraction,
-                        rendered_seconds=round(rendered_seconds, 1),
-                        completed_scenes=completed_scenes,
-                        scene_total=scene_count,
-                        format_id=config.get("format_id"),
-                        format_index=config.get("format_index", 1),
-                        format_total=config.get("format_total", 1),
-                        detail=f"장면 {completed_scenes:02d} / {scene_count:02d} 완료 · {rendered_seconds:.1f}초 / {output_duration:.1f}초 합성 중",
+        selected_videos = get_auth_store().list_scene_videos(
+            user_id, project_id, latest["revision_id"]
+        )
+        brand_selections = get_auth_store().content_brand_selections(user_id, project_id)
+        scene_total = len(timeline_from_data(content_data))
+        report(
+            status="queued", progress=0.0, rendered_seconds=0.0,
+            completed_scenes=0, scene_total=scene_total,
+            detail="변환 작업을 준비하고 있습니다.",
+        )
+        explicit = {key: payload[key] for key in RENDER_SETTING_KEYS if key in payload}
+        settings = resolve_render_settings(user_id, explicit)
+        raw_crop_positions = (
+            payload.get("scene_crop_positions")
+            or get_auth_store().scene_crop_positions(user_id, project_id)
+        )
+        scene_crop_positions = {}
+        if isinstance(raw_crop_positions, dict):
+            for scene_id, formats in list(raw_crop_positions.items())[:200]:
+                if not isinstance(formats, dict):
+                    continue
+                scene_crop_positions[str(scene_id)[:100]] = {
+                    output_format: max(
+                        0.0, min(1.0, float(formats.get(output_format, 50)) / 100)
                     )
-                except (TypeError, ValueError):
-                    pass
-        return_code = process.wait()
-        if return_code != 0:
-            detail = "\n".join(output_tail)
-            raise RuntimeError(detail or "FFmpeg 변환에 실패했습니다.")
-        if not output_path.exists() or output_path.stat().st_size < 1_000_000:
-            raise RuntimeError("출력 MP4가 정상적으로 생성되지 않았습니다.")
-        update_render_progress(job_id, status="succeeded", progress=1.0, rendered_seconds=output_duration, completed_scenes=scene_count, scene_total=scene_count, detail=f"장면 {scene_count:02d} / {scene_count:02d} 완료 · 최종 MP4 합성이 완료됐습니다.")
-        return {
-            "filename": output_name,
-            "path": output_path,
-            "duration": output_duration,
-            "width": output_width,
-            "height": output_height,
-            "scene_count": scene_count,
+                    for output_format in ("9x16", "4x5")
+                }
+        config = {
+            "type": settings["type"],
+            "music": settings["music"],
+            "volume": settings["volume"],
+            "narration": settings["narration"],
+            "caption_size": settings["caption_size"],
+            "video_pan_x": settings["video_pan_x"],
+            "scene_crop_positions": scene_crop_positions,
+            "preview_platform": settings["preview_platform"],
+            "platforms": settings["platforms"],
+            "scene_dissolve_seconds": settings["scene_dissolve_seconds"],
+            "scene_videos": selected_videos,
+            "scene_images": {item["scene_id"]: item for item in selected_images},
+            "voice_clips": voice_clips,
+            "content_data": content_data,
+            "brand_selections": brand_selections,
         }
+        if config["preview_platform"] not in PLATFORM_FORMATS:
+            raise ValueError("미리보기 플랫폼 설정이 올바르지 않습니다.")
+        requested_platforms = payload.get("platforms")
+        if requested_platforms is None:
+            requested_platforms = config["platforms"]
+        if not isinstance(requested_platforms, list):
+            raise ValueError("플랫폼 선택 정보가 올바르지 않습니다.")
+        platforms = list(dict.fromkeys(str(item) for item in requested_platforms))
+        if not platforms or any(item not in PLATFORM_FORMATS for item in platforms):
+            raise ValueError("출력할 플랫폼을 한 개 이상 선택해 주세요.")
+        format_groups = group_platform_formats(platforms)
+        caption_count = len(timed_script_scenes(content_data))
+        prepared_overlays = {}
+        started_at = time.monotonic()
+        for format_index, format_group in enumerate(format_groups):
+            platform = format_group["render_platform"]
+            platform_config = {
+                **config,
+                "preview_platform": platform,
+                "caption_progress_offset": format_index * caption_count,
+                "caption_progress_total": len(format_groups) * caption_count,
+                "_progress_callback": progress_callback,
+            }
+            width, height, _ = PLATFORM_FORMATS[platform]
+            prepared_overlays[platform] = prepare_caption_overlays(
+                platform_config, job_id, width, height, content_data
+            )
+            temporary_caption_roots.update(
+                path.parent for path, _, _ in prepared_overlays[platform]
+            )
+        expected_caption_total = len(format_groups) * caption_count
+        validate_caption_overlays(prepared_overlays, expected_caption_total)
+        report(
+            status="running", phase="caption_ready",
+            completed_captions=expected_caption_total,
+            caption_total=expected_caption_total,
+            detail=f"자막 PNG {expected_caption_total:02d}개 검증 완료 · FFmpeg 합성을 준비합니다.",
+        )
+        rendered_outputs = []
+        artifacts = []
+        for format_index, format_group in enumerate(format_groups):
+            platform = format_group["render_platform"]
+            _, _, format_label = PLATFORM_FORMATS[platform]
+            platform_config = {
+                **config,
+                "preview_platform": platform,
+                "prepared_caption_overlays": prepared_overlays[platform],
+                "format_id": format_label.replace("x", ":"),
+                "format_index": format_index + 1,
+                "format_total": len(format_groups),
+            }
+            rendered = render_video(platform_config, job_id, progress_callback)
+            artifact_uri = "/" + quote(f"04_exports/{rendered['filename']}")
+            created_at = datetime.fromtimestamp(
+                rendered["path"].stat().st_mtime, timezone.utc
+            ).isoformat()
+            rendered_outputs.append({
+                "platform": platform,
+                "platforms": format_group["platforms"],
+                "filename": rendered["filename"],
+                "url": artifact_uri,
+                "width": rendered["width"],
+                "height": rendered["height"],
+                "aspect_ratio": format_label.replace("x", ":"),
+                "created_at": created_at,
+            })
+            artifacts.append({
+                "name": rendered["filename"],
+                "uri": artifact_uri,
+                "media_type": "video/mp4",
+                "checksum": f"sha256:{sha256_file(rendered['path'])}",
+                "metadata": {
+                    "platforms": format_group["platforms"],
+                    "duration": rendered["duration"],
+                    "width": rendered["width"],
+                    "height": rendered["height"],
+                    "scene_count": rendered["scene_count"],
+                    "video_codec": "h264",
+                    "audio_codec": "aac",
+                    "brand_assets": [
+                        {
+                            "role": item["role"],
+                            "version_id": item.get("version_id"),
+                            "settings": item.get("settings") or {},
+                        }
+                        for item in brand_selections if item.get("enabled")
+                    ],
+                },
+            })
+        for output, artifact in zip(rendered_outputs, artifacts):
+            completed_at = datetime.fromisoformat(output["created_at"])
+            local_date = completed_at.astimezone(
+                timezone(timedelta(hours=9))
+            ).date().isoformat()
+            registered = get_auth_store().register_final_export(
+                user_id, project_id, latest["revision_id"], artifact["uri"],
+                artifact["checksum"], {
+                    **artifact["metadata"],
+                    "filename": artifact["name"],
+                    "job_id": job_id,
+                    "aspect_ratio": output["aspect_ratio"],
+                }, local_date, output["platforms"], output["created_at"],
+            )
+            output["artifact_id"] = registered["artifact_id"]
+            artifact["artifact_id"] = registered["artifact_id"]
+            get_auth_store().snapshot_final_export_brand_assets(
+                registered["artifact_id"], brand_selections
+            )
+        latest_completed_at = max(output["created_at"] for output in rendered_outputs)
+        latest_local_date = datetime.fromisoformat(latest_completed_at).astimezone(
+            timezone(timedelta(hours=9))
+        ).date().isoformat()
+        get_auth_store().consolidate_production_calendar(
+            user_id, project_id, latest_local_date, latest_completed_at
+        )
+        primary = rendered_outputs[0]
+        result = {
+            "schema_version": "1.0.0",
+            "job_id": job_id,
+            "stage": "format_optimize",
+            "status": "succeeded",
+            "artifacts": artifacts,
+            "metrics": {
+                "provider": "ffmpeg",
+                "latency_ms": round((time.monotonic() - started_at) * 1000),
+                "cost_usd": 0,
+            },
+            "error": None,
+        }
+        response = {
+            "ok": True,
+            "job_id": job_id,
+            "filename": primary["filename"],
+            "url": primary["url"],
+            "exports": rendered_outputs,
+            "result": result,
+        }
+        report(
+            status="succeeded", progress=1.0, response=response,
+            detail="모든 출력 규격의 최종 MP4 합성이 완료됐습니다.",
+        )
+        return response
     except Exception as exc:
-        update_render_progress(job_id, status="failed", detail=str(exc))
+        report(status="failed", detail=str(exc))
         raise
     finally:
-        pass
+        try:
+            clean_caption_artifacts(temporary_caption_roots)
+        finally:
+            render_lock.release()
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -2861,6 +2850,26 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/render/status":
             job_id = str(parse_qs(parsed.query).get("job_id", [""])[0])[:100]
+            user = self.current_user()
+            if not user:
+                self.send_json(401, {"error": "로그인 후 이용해 주세요."})
+                return
+            try:
+                queued = get_final_export_queue().get(job_id, user_id=user["user_id"])
+                progress = queued.get("progress") or {}
+                self.send_json(200, {
+                    "ok": True,
+                    "job_id": job_id,
+                    **progress,
+                    "status": queued["status"],
+                    "response": queued.get("result"),
+                    "error": queued.get("error"),
+                    "attempt": queued["attempt"],
+                    "max_attempts": queued["max_attempts"],
+                })
+                return
+            except FinalExportNotFound:
+                pass
             with render_progress_lock:
                 job = dict(render_jobs.get(job_id, {}))
             if not job:
@@ -4022,197 +4031,52 @@ class Handler(SimpleHTTPRequestHandler):
         if IS_RENDER_HOSTED:
             self.send_json(503, {"error": "Render 공개 미리보기에서는 FFmpeg 출력을 실행하지 않습니다. 로컬 변환 주소를 이용해 주세요."})
             return
-        if not render_lock.acquire(blocking=False):
-            self.send_json(409, {"error": "이미 변환 작업이 진행 중입니다."})
-            return
-        job_id = ""
-        temporary_caption_roots = set()
         try:
             data = self.read_json()
+            if not isinstance(data, dict):
+                raise ValueError("렌더 요청 형식이 올바르지 않습니다.")
             project_id = str(data.get("project_id", "")).strip()
-            latest = get_auth_store().latest_stage_data(user["user_id"], project_id, 3)
-            document = (latest or {}).get("data", {}).get("document")
-            if not isinstance(document, dict):
-                raise ValueError("최종 출력할 콘텐츠 대본을 찾을 수 없습니다.")
-            script, project_timeline = unified_document_view(document)
-            voice_clips = get_auth_store().list_scene_voice_clips(
-                user["user_id"], project_id, latest["revision_id"]
-            )
-            project_timeline = timeline_with_voice_durations(project_timeline, voice_clips)
-            content_data = {"state": {"script": script}, "timeline": project_timeline}
-            selected_images = get_auth_store().list_scene_images(
-                user["user_id"], project_id, latest["revision_id"]
-            )
-            selected_videos = get_auth_store().list_scene_videos(
-                user["user_id"], project_id, latest["revision_id"]
-            )
-            brand_selections = get_auth_store().content_brand_selections(user["user_id"], project_id)
+            if not project_id:
+                raise ValueError("최종 출력할 콘텐츠를 선택해 주세요.")
             job_id = str(data.get("job_id", "")).strip()[:100]
             if not job_id:
                 job_id = f"render-{time.time_ns()}"
-            scene_total = len(timeline_from_data(content_data))
-            update_render_progress(job_id, status="queued", progress=0.0, rendered_seconds=0.0, completed_scenes=0, scene_total=scene_total, detail="변환 작업을 준비하고 있습니다.")
-            explicit_render_settings = {
-                key: data[key] for key in RENDER_SETTING_KEYS if key in data
-            }
-            render_settings = resolve_render_settings(user["user_id"], explicit_render_settings)
-            style = render_settings["type"]
-            music = render_settings["music"]
-            raw_crop_positions = data.get("scene_crop_positions") or get_auth_store().scene_crop_positions(user['user_id'], project_id)
-            scene_crop_positions = {}
-            if isinstance(raw_crop_positions, dict):
-                for scene_id, formats in list(raw_crop_positions.items())[:200]:
-                    if not isinstance(formats, dict):
-                        continue
-                    scene_crop_positions[str(scene_id)[:100]] = {
-                        output_format: max(0.0, min(1.0, float(formats.get(output_format, 50)) / 100))
-                        for output_format in ("9x16", "4x5")
-                    }
-            config = {
-                "type": style,
-                "music": music,
-                "volume": render_settings["volume"],
-                "narration": render_settings["narration"],
-                "caption_size": render_settings["caption_size"],
-                "video_pan_x": render_settings["video_pan_x"],
-                "scene_crop_positions": scene_crop_positions,
-                "preview_platform": render_settings["preview_platform"],
-                "platforms": render_settings["platforms"],
-                "scene_dissolve_seconds": render_settings["scene_dissolve_seconds"],
-                "scene_videos": selected_videos,
-                "scene_images": {item["scene_id"]: item for item in selected_images},
-                "voice_clips": voice_clips,
-                "content_data": content_data,
-                "brand_selections": brand_selections,
-            }
-            if config["preview_platform"] not in PLATFORM_FORMATS:
-                raise ValueError("미리보기 플랫폼 설정이 올바르지 않습니다.")
-            started_at = time.monotonic()
-            requested_platforms = data.get("platforms")
-            if requested_platforms is None:
-                requested_platforms = config["platforms"]
-            if not isinstance(requested_platforms, list):
-                raise ValueError("플랫폼 선택 정보가 올바르지 않습니다.")
-            platforms = list(dict.fromkeys(str(item) for item in requested_platforms))
-            if not platforms or any(item not in PLATFORM_FORMATS for item in platforms):
-                raise ValueError("출력할 플랫폼을 한 개 이상 선택해 주세요.")
-            format_groups = group_platform_formats(platforms)
-            current_demo_data = content_data
-            caption_count = len(timed_script_scenes(current_demo_data))
-            prepared_overlays = {}
-            for format_index, format_group in enumerate(format_groups):
-                platform = format_group["render_platform"]
-                platform_config = {
-                    **config,
-                    "preview_platform": platform,
-                    "caption_progress_offset": format_index * caption_count,
-                    "caption_progress_total": len(format_groups) * caption_count,
-                }
-                width, height, _ = PLATFORM_FORMATS[platform]
-                prepared_overlays[platform] = prepare_caption_overlays(platform_config, job_id, width, height, current_demo_data)
-                temporary_caption_roots.update(path.parent for path, _, _ in prepared_overlays[platform])
-            expected_caption_total = len(format_groups) * caption_count
-            validate_caption_overlays(prepared_overlays, expected_caption_total)
-            update_render_progress(
-                job_id, status="running", phase="caption_ready",
-                completed_captions=expected_caption_total, caption_total=expected_caption_total,
-                detail=f"자막 PNG {expected_caption_total:02d}개 검증 완료 · FFmpeg 합성을 준비합니다.",
+                data = {**data, "job_id": job_id}
+            queue = get_final_export_queue()
+            queue.enqueue(
+                job_id, user["user_id"], data, project_id=project_id,
+                max_attempts=max(1, safe_env_int("FINAL_EXPORT_MAX_ATTEMPTS", 3, 1, 10)),
             )
-            rendered_outputs = []
-            artifacts = []
-            for format_index, format_group in enumerate(format_groups):
-                platform = format_group["render_platform"]
-                width, height, format_label = PLATFORM_FORMATS[platform]
-                platform_config = {
-                    **config,
-                    "preview_platform": platform,
-                    "prepared_caption_overlays": prepared_overlays[platform],
-                    "format_id": format_label.replace("x", ":"),
-                    "format_index": format_index + 1,
-                    "format_total": len(format_groups),
-                }
-                rendered = render_video(platform_config, job_id)
-                artifact_uri = "/" + quote(f"04_exports/{rendered['filename']}")
-                rendered_outputs.append({
-                    "platform": platform,
-                    "platforms": format_group["platforms"],
-                    "filename": rendered["filename"],
-                    "url": artifact_uri,
-                    "width": rendered["width"],
-                    "height": rendered["height"],
-                    "aspect_ratio": format_label.replace("x", ":"),
-                    "created_at": datetime.fromtimestamp(
-                        rendered["path"].stat().st_mtime, timezone.utc
-                    ).isoformat(),
-                })
-                artifacts.append({
-                    "name": rendered["filename"],
-                    "uri": artifact_uri,
-                    "media_type": "video/mp4",
-                    "checksum": f"sha256:{sha256_file(rendered['path'])}",
-                    "metadata": {
-                        "platforms": format_group["platforms"],
-                        "duration": rendered["duration"],
-                        "width": rendered["width"],
-                        "height": rendered["height"],
-                        "scene_count": rendered["scene_count"],
-                        "video_codec": "h264",
-                        "audio_codec": "aac",
-                        "brand_assets": [
-                            {"role": item["role"], "version_id": item.get("version_id"),
-                             "settings": item.get("settings") or {}}
-                            for item in brand_selections if item.get("enabled")
-                        ],
-                    },
-                })
-            for output, artifact in zip(rendered_outputs, artifacts):
-                completed_at = datetime.fromisoformat(output["created_at"])
-                local_date = completed_at.astimezone(timezone(timedelta(hours=9))).date().isoformat()
-                registered = get_auth_store().register_final_export(
-                    user["user_id"], project_id, latest["revision_id"],
-                    artifact["uri"], artifact["checksum"], {
-                        **artifact["metadata"],
-                        "filename": artifact["name"],
+            deadline = time.monotonic() + safe_env_int(
+                "FINAL_EXPORT_HTTP_WAIT_SECONDS", 7200, 30, 21600
+            )
+            while time.monotonic() < deadline:
+                queued = queue.get(job_id, user_id=user["user_id"])
+                if queued["status"] == "succeeded":
+                    try:
+                        self.send_json(200, queued["result"])
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
+                    return
+                if queued["status"] in {"failed", "cancelled"}:
+                    error = queued.get("error") or {}
+                    self.send_json(500, {
+                        "error": error.get("message") or "최종 영상 제작에 실패했습니다.",
                         "job_id": job_id,
-                        "aspect_ratio": output["aspect_ratio"],
-                    }, local_date, output["platforms"], output["created_at"],
-                )
-                output["artifact_id"] = registered["artifact_id"]
-                artifact["artifact_id"] = registered["artifact_id"]
-                get_auth_store().snapshot_final_export_brand_assets(
-                    registered["artifact_id"], brand_selections
-                )
-            latest_completed_at = max(output["created_at"] for output in rendered_outputs)
-            latest_local_date = datetime.fromisoformat(latest_completed_at).astimezone(
-                timezone(timedelta(hours=9))
-            ).date().isoformat()
-            get_auth_store().consolidate_production_calendar(
-                user["user_id"], project_id, latest_local_date, latest_completed_at
-            )
-            primary = rendered_outputs[0]
-            result = {
-                "schema_version": "1.0.0",
+                    })
+                    return
+                time.sleep(0.25)
+            self.send_json(504, {
+                "error": "최종 영상 워커 응답 대기 시간이 초과되었습니다. 저장된 작업 상태를 다시 확인해 주세요.",
                 "job_id": job_id,
-                "stage": "format_optimize",
-                "status": "succeeded",
-                "artifacts": artifacts,
-                "metrics": {"provider": "ffmpeg", "latency_ms": round((time.monotonic() - started_at) * 1000), "cost_usd": 0},
-                "error": None,
-            }
-            response_payload = {"ok": True, "job_id": job_id, "filename": primary["filename"], "url": primary["url"], "exports": rendered_outputs, "result": result}
-            update_render_progress(job_id, status="succeeded", progress=1.0, response=response_payload, detail="모든 출력 규격의 최종 MP4 합성이 완료됐습니다.")
-            try:
-                self.send_json(200, response_payload)
-            except (BrokenPipeError, ConnectionResetError):
-                pass
-        except Exception as exc:
-            update_render_progress(job_id, status="failed", detail=str(exc))
-            self.send_json(500, {"error": str(exc)})
-        finally:
-            try:
-                clean_caption_artifacts(temporary_caption_roots)
-            finally:
-                render_lock.release()
+            })
+        except FinalExportConflict as exc:
+            self.send_json(409, {"error": str(exc)})
+        except ValueError as exc:
+            self.send_json(400, {"error": str(exc)})
+        except Exception:
+            self.send_json(500, {"error": "최종 영상 작업을 등록하지 못했습니다."})
+        return
 
 
 if __name__ == "__main__":

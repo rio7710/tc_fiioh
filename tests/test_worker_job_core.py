@@ -86,6 +86,27 @@ class WorkerJobCoreTests(unittest.TestCase):
         self.assertEqual(retried["idempotency_key"], failed["idempotency_key"])
         self.assertEqual(retried["input_hash"], failed["input_hash"])
 
+    def test_dispatch_stops_at_bounded_attempt_limit_without_adapter_replay(self):
+        adapter = FixtureAdapter(failure=RuntimeError("retryable failure"))
+        first = self.store.dispatch(
+            "project-1", "final_composite", {"render_job_id": "render-1"}, adapter,
+            worker_id="worker-a", max_attempts=2,
+        )
+        second = self.store.dispatch(
+            "project-1", "final_composite", {"render_job_id": "render-1"}, adapter,
+            worker_id="worker-b", max_attempts=2,
+        )
+        exhausted = self.store.dispatch(
+            "project-1", "final_composite", {"render_job_id": "render-1"}, adapter,
+            worker_id="worker-c", max_attempts=2,
+        )
+
+        self.assertEqual(first["attempt"], 1)
+        self.assertEqual(second["attempt"], 2)
+        self.assertEqual(exhausted["attempt"], 2)
+        self.assertEqual(exhausted["status"], "failed")
+        self.assertEqual(len(adapter.calls), 2)
+
     def test_expired_running_job_becomes_stale_and_can_restart(self):
         job = self.create()
         self.store.claim(job["job_id"], "dead-worker", now=NOW, lease_seconds=30)
