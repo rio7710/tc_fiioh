@@ -168,10 +168,13 @@
           ui.prompt.focus();
           deps.onError('request', error);
         } finally {
-          if (current()) {
+          if (token === invocation) {
             ui.create.disabled = false;
             ui.regenerate.disabled = false;
-            if (ui.modal.hidden) updateVariantCount();
+            ui.stage.classList.remove('is-image-generating');
+            ui.mosaic.hidden = true;
+            ui.status.hidden = true;
+            if (current() && ui.modal.hidden) updateVariantCount();
           }
           inFlight.delete(key);
         }

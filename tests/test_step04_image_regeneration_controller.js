@@ -131,6 +131,30 @@ function harness(overrides = {}) {
   late.resolve({state: {stale: true}}); await lateTask;
   assert.deepEqual(h.states, []);
   assert.equal(h.elements.imageGenerationStatusText.textContent, '생성 중입니다.');
+  assert.equal(h.elements.imageRegenerationCreate.disabled, false);
+  assert.equal(h.elements.imageRegenerateBtn.disabled, false);
+  assert.equal(h.elements.stage.classList.contains('is-image-generating'), false);
+  assert.equal(h.elements.imageGenerationMosaic.hidden, true);
+  assert.equal(h.elements.imageGenerationStatus.hidden, true);
+  assert.equal(h.elements.imageVariantCount.textContent, '새 후보 생성 중…');
+
+  const oldRequest = deferred(), newRequest = deferred(); let requestNumber = 0;
+  h = harness({request: () => (++requestNumber === 1 ? oldRequest.promise : newRequest.promise), sleep: async () => {}});
+  h.elements.imageRegenerationModal.dataset.sceneIndex = '0'; h.elements.imageAdditionalPrompt.value = 'A 요청';
+  const oldTask = h.controller.request();
+  h.setProject('p2'); h.setScenes([{id: 'b', name: 'B', image: '/b.png'}]);
+  h.elements.imageRegenerationModal.dataset.sceneIndex = '0'; h.elements.imageAdditionalPrompt.value = 'B 요청';
+  const newTask = h.controller.request();
+  oldRequest.resolve({state: {old: true}}); await oldTask;
+  assert.equal(h.elements.imageRegenerationCreate.disabled, true);
+  assert.equal(h.elements.imageRegenerateBtn.disabled, true);
+  assert.equal(h.elements.stage.classList.contains('is-image-generating'), true);
+  assert.equal(h.elements.imageGenerationMosaic.hidden, false);
+  assert.equal(h.elements.imageGenerationStatus.hidden, false);
+  assert.deepEqual(h.states, []);
+  newRequest.resolve({state: {new: true}}); await newTask;
+  assert.deepEqual(h.states, [{new: true}]);
+  assert.equal(h.elements.imageRegenerationCreate.disabled, false);
 
   console.log('Step04 image regeneration controller tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });
