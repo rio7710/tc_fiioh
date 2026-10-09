@@ -33,18 +33,18 @@ const calls=[];
 let active='old-project';
 let request=async path=>path==='/api/projects'?{project:{project_id:'new-project'}}:{};
 const controller=ContentIndexController.create({
+  view:{mount(){},unmount(){},renderDetail(){},applyFilter(){},setNote(){},setBusy(){}},
   request:(...args)=>{calls.push(['api',args[0]]);return request(...args)},getProjects:()=>({'old-project':{title:'Old'}}),getActiveProjectId:()=>active,
   beginNav(){},setActiveProjectId(id){active=id;calls.push(['active',id])},showStep(step){calls.push(['show',step])},showBrandLibrary(){},navigateProjectStep:async()=>{},
   resetProjectScopedState(){calls.push(['reset'])},setKeywordStageLocked(){calls.push(['unlock'])},setVoiceProfile(){calls.push(['voice'])},getKeywords:()=>[],
   setVisibleKeywordIds(){calls.push(['keywords'])},renderKeywords(){calls.push(['render'])},refreshProjectIndex:async()=>calls.push(['refresh']),confirm:()=>true,alert(){calls.push(['alert'])},
-  escapeHtml:String,projectCreatedDate:String
 });
 const eventNode={dataset:{},textContent:'',addEventListener(){},removeEventListener(){}};
 controller.mount({querySelector:selector=>selector==='#projectDetailNote'?{textContent:''}:eventNode,querySelectorAll:()=>[]});
-await controller.deleteProject({disabled:false});
+await controller.deleteProject();
 assert.deepEqual(calls.map(item=>item[0]),['api','reset','active','unlock','refresh','show'],'delete resets once and only after API success');
 calls.length=0;active='old-project';request=async()=>{throw new Error('failed')};
-await controller.deleteProject({disabled:false});
+await controller.deleteProject();
 assert.equal(calls.some(item=>item[0]==='reset'),false,'failed delete preserves project state');
 calls.length=0;request=async()=>({project:{project_id:'new-project'}});
 await controller.createProject({disabled:false});

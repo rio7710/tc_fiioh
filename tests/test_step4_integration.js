@@ -10,6 +10,7 @@ const partialPath = '01_app/pages/steps/step04-video.html';
 const cssPath = '01_app/assets/steps/step04/step04-video.css';
 const jsPath = '01_app/assets/steps/step04/step04-video.js';
 const contentIndexControllerPath = '01_app/assets/steps/step01/step01-content-index-controller.js';
+const contentIndexViewPath = '01_app/assets/steps/step01/step01-content-index-view.js';
 const projectIndexControllerPath = '01_app/assets/steps/step01/step01-project-index-controller.js';
 const projectIndexViewPath = '01_app/assets/steps/step01/step01-project-index-view.js';
 const brandStatePath = '01_app/assets/steps/step04/step04-brand-state.js';
@@ -59,6 +60,7 @@ assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
 assert.ok(fs.existsSync(jsPath), 'step04-video.js must exist');
 assert.ok(fs.existsSync(contentIndexControllerPath), 'step01-content-index-controller.js must exist');
+assert.ok(fs.existsSync(contentIndexViewPath), 'step01-content-index-view.js must exist');
 assert.ok(fs.existsSync(projectIndexControllerPath), 'step01-project-index-controller.js must exist');
 assert.ok(fs.existsSync(projectIndexViewPath), 'step01-project-index-view.js must exist');
 assert.ok(fs.existsSync(brandStatePath), 'step04-brand-state.js must exist');
@@ -254,7 +256,9 @@ assert.match(html,/function connectStoryboardAssetsToEditor\(\)\{\s*return story
 assert.match(html,/function resetProjectScopedState\(\)\{\s*return storyboardProjectStateController\.reset\(\);\s*\}/,'P1 keeps thin project reset wrapper');
 assert.match(html,/resetProjectStore:\(\)=>\{if\(projectStore\)projectStore\.resetProjectState\(\)\}/,'P1 keeps project store reset optional while controller invokes its adapter once');
 assert.doesNotMatch(html,/storedStoryboardImageCandidates=new Map\(\);\s*\(items\|\|\[\]\)\.forEach|scenes=timelineBridge\.connectStoryboardAssetsToEditor\(scenes\)\.scenes/,'P1 removes inline storyboard project state bodies');
-assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-view\.js\?v=20261009_v56"/, 'HTML cache-busts content index view');
+assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v56"/, 'HTML cache-busts content index controller');
+assert.ok(html.indexOf('step01-content-index-view.js') < html.indexOf('step01-content-index-controller.js'), 'content index view loads before controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-view\.js\?v=20261009_v55"/, 'HTML cache-busts project index view');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v55"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-view.js') < html.indexOf('step01-project-index-controller.js'), 'project index view loads before controller');
@@ -266,6 +270,7 @@ assert.match(html, /view:projectIndexView/, 'P1 explicitly injects project index
 assert.doesNotMatch(html, /projectStatusPollBusy|setInterval\(async\(\)=>\{const holder=document\.querySelector\('#contentIndex'\)/, 'P1 does not retain raw project polling');
 assert.match(html, /function openIndexProject\(projectId,historyMode='push'\)\{\s*return contentIndexController\.openProject\(projectId,historyMode\);\s*\}/, 'P1 keeps a thin project-open wrapper');
 assert.match(html, /contentIndexController\.mount\(document\)/, 'P1 mounts content index interactions after partial loading');
+assert.match(html, /view:contentIndexView/, 'P1 explicitly injects content index view');
 assert.doesNotMatch(html, /document\.querySelector\('#projectDeleteButton'\)\.addEventListener|document\.querySelector\('#createProjectButton'\)\.addEventListener/, 'P1 does not retain create/delete event bodies');
 
 assert.match(html, /href="\/01_app\/assets\/video-editor\/video-editor\.css(?:\?v=[^"]+)?"/, 'HTML links video-editor.css');
@@ -520,6 +525,7 @@ function createPrePartialContext() {
     Step03StoryboardProjectStateController: require('../01_app/assets/steps/step03/storyboard-project-state-controller.js'),
     Step02TrendKeywordController: require('../01_app/assets/steps/step02/trend-keyword-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
+    Step01ContentIndexView: require('../01_app/assets/steps/step01/step01-content-index-view.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),
     Step01ProjectIndexView: require('../01_app/assets/steps/step01/step01-project-index-view.js'),
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),

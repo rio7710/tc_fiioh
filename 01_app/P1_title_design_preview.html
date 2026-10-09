@@ -21,7 +21,8 @@
 <script src="/01_app/assets/steps/step-partial-loader.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step01/step01-project-index-view.js?v=20261009_v55"></script>
 <script src="/01_app/assets/steps/step01/step01-project-index-controller.js?v=20261009_v55"></script>
-<script src="/01_app/assets/steps/step01/step01-content-index-controller.js?v=20261009_v30"></script>
+<script src="/01_app/assets/steps/step01/step01-content-index-view.js?v=20261009_v56"></script>
+<script src="/01_app/assets/steps/step01/step01-content-index-controller.js?v=20261009_v56"></script>
 <script src="/01_app/assets/steps/step02/step02-keyword.js?v=20261009_v41"></script>
 <script src="/01_app/assets/steps/step02/script-generation-controller.js?v=20261009_v42"></script>
 <script src="/01_app/assets/steps/step02/trend-keyword-controller.js?v=20261009_v40"></script>
@@ -2035,7 +2036,8 @@ authUIController.mount(document);
 const shellNavigationController=ThinkCastShellNavigationController.create({contentRoute:ThinkCastContentRoute,getLocation:()=>location,getHistory:()=>history,getWindow:()=>window,isLoggedIn:()=>authUIController.isLoggedIn(),getActiveProjectId:()=>activeProjectId,setActiveProjectId,getProjects:()=>indexProjects,refreshProjectIndex,loadProjectState,loadProjectContent,openIndexProject,updateContentUuidLabels,getPreviewVideo:()=>typeof video!=='undefined'&&video?video:document.querySelector('#video'),scrollTo:options=>window.scrollTo(options),renderStoryboardGrid,connectStoryboardAssetsToEditor,setContentIndexError,onError:(feature,error)=>console.error(`[ShellNavigation:${feature}]`,error)});
 shellNavigationController.mount(document);
 const sessionBootstrapController=ThinkCastSessionBootstrapController.create({request:(...args)=>api(...args),navigation:shellNavigationController,setLoginAccess,refreshProjectIndex,hydrateCalendarEntries,getActiveProjectId:()=>activeProjectId,openIndexProject,loadProjectState,loadProjectContent,setContentIndexError});
-const contentIndexController=Step01ContentIndexController.create({request:(...args)=>api(...args),getProjects:()=>indexProjects,getActiveProjectId:()=>activeProjectId,beginNav,setActiveProjectId,showStep,showBrandLibrary,navigateProjectStep,resetProjectScopedState,setKeywordStageLocked,setVoiceProfile,getKeywords:()=>demoData.keywords,setVisibleKeywordIds:ids=>{visibleKeywordIds=ids},renderKeywords,refreshProjectIndex,confirm:message=>confirm(message),alert:message=>alert(message),escapeHtml,projectCreatedDate});
+const contentIndexView=Step01ContentIndexView.create({escapeHtml,projectCreatedDate});
+const contentIndexController=Step01ContentIndexController.create({view:contentIndexView,request:(...args)=>api(...args),getProjects:()=>indexProjects,getActiveProjectId:()=>activeProjectId,beginNav,setActiveProjectId,showStep,showBrandLibrary,navigateProjectStep,resetProjectScopedState,setKeywordStageLocked,setVoiceProfile,getKeywords:()=>demoData.keywords,setVisibleKeywordIds:ids=>{visibleKeywordIds=ids},renderKeywords,refreshProjectIndex,confirm:message=>confirm(message),alert:message=>alert(message)});
 contentIndexController.mount(document);
 const scriptGenerationController=Step02ScriptGenerationController.create({getRoot:()=>document,configureWorkflowModal,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getSelectedKeywordLabels:selectedKeywordLabels,now:()=>Date.now(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),sleep,setGeneratedState:state=>{demoData.state=state},setGeneratedTimeline:timeline=>{demoData.timeline=timeline},setGeneratedDocument:value=>{activeStoryboardDocument=value},setKeywordLocked:setKeywordStageLocked,setVoiceProfile,applyTimeline,removeStoredScript:()=>localStorage.removeItem(SCRIPT_STORAGE_KEY),fillScript,applyScript,refreshProjectIndex,showStep});
 scriptGenerationController.mount(document);
