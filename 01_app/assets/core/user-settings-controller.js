@@ -91,12 +91,24 @@
           }catch(error){saveStatus.textContent='저장된 설정을 불러오지 못했습니다. 기본값으로 표시합니다.';}
         }
         let serverVersion=0,serverEnabled=false,automationBusy=false,automationLoaded=false,automationPoll=null,openGeneration=0,loadedConfig='';
+        let availableBrandRoles=new Set();
+        function syncAvailableBrandOptions(){
+          const inputs={intro:'#userUseIntro',outro:'#userUseOutro',watermark:'#userUseWatermark'};
+          Object.entries(inputs).forEach(([role,selector])=>{
+            const input=document.querySelector(selector),available=availableBrandRoles.has(role);
+            if(!available)input.checked=false;
+            input.disabled=!available;
+            input.closest?.('label')?.classList?.toggle?.('unavailable',!available);
+            input.title=available?'':'등록된 활성 리소스가 없어 자동화에서 제외됩니다.';
+          });
+        }
         function collectAutomationConfig(){return {schema_version:'1.0.0',endpoint:stages[Number(slider.value)-1]?.key||'manual',repeat:repeatSettings(),keywords:{count:Number(document.querySelector('#userKeywordCount').value),ai:document.querySelector('#userAiKeywords').checked,month:document.querySelector('#userKeywordMonth').value},video:{scene_count:Number(document.querySelector('#userVideoSceneCount').value),crop:document.querySelector('#userCropMode').value},voice:{profile_id:document.querySelector('#userVoiceProfile').value},brand:{intro:document.querySelector('#userUseIntro').checked,outro:document.querySelector('#userUseOutro').checked,watermark:document.querySelector('#userUseWatermark').checked},channels:[...optionsForm.querySelectorAll('[data-output-channel]:checked')].map(input=>input.dataset.outputChannel)};}
         function applyServerSettings(data){
           serverVersion=data.settings?.version||0;serverEnabled=!!data.settings?.enabled;
           const c=data.settings?.config;
           if(c)restoreAutomationSettings({version:1,endpoint:c.endpoint,repeat:c.repeat,channels:c.channels,options:{userKeywordCount:String(c.keywords.count),userAiKeywords:c.keywords.ai,userKeywordMonth:c.keywords.month,userVideoSceneCount:String(c.video.scene_count),userCropMode:c.video.crop,userVoiceProfile:c.voice?.profile_id||'warm_female',userUseIntro:c.brand.intro,userUseOutro:c.brand.outro,userUseWatermark:c.brand.watermark}});
           else restoreAutomationSettings();
+          syncAvailableBrandOptions();
           loadedConfig=JSON.stringify(collectAutomationConfig());renderAutomationStatus(data);render();
         }
         function renderAutomationStatus(data){
@@ -252,7 +264,8 @@
           render();previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';dialog.showModal();
           setAutomationBusy(true);saveStatus.textContent='서버 설정을 불러오는 중…';
           try{
-            const data=await api('/api/automation');if(generation!==openGeneration||!dialog.open)return;
+            const [data,brandData]=await Promise.all([api('/api/automation'),api('/api/brand-assets')]);if(generation!==openGeneration||!dialog.open)return;
+            availableBrandRoles=new Set((brandData.assets||[]).filter(asset=>asset&&asset.active).map(asset=>asset.role));
             automationLoaded=true;applyServerSettings(data);
             clearInterval(automationPoll);automationPoll=setInterval(async()=>{if(!dialog.open||automationBusy)return;try{const current=await api('/api/automation');if(dialog.open&&generation===openGeneration)renderAutomationStatus(current)}catch(error){deps.onError('poll',error)}},5000);
           }catch(error){saveStatus.textContent='서버 설정을 불러오지 못했습니다. 닫은 뒤 다시 열어 주세요.';}
