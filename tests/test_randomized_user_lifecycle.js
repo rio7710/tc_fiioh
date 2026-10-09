@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const ThinkCastContentRoute = require('../01_app/assets/core/content-route.js');
 const ThinkCastProjectStore = require('../01_app/assets/core/project-store.js');
+const ThinkCastShellNavigationController = require('../01_app/assets/core/shell-navigation-controller.js');
 
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 
@@ -14,7 +15,6 @@ function sourceBetween(start, end) {
 }
 
 const resetSource = sourceBetween('function resetProjectScopedState()', '\nconst keywordTilts=');
-const routeSource = sourceBetween('function readContentRoute()', '\nlet selectedVoiceProfile=');
 
 function mulberry32(seed) {
   return function random() {
@@ -47,12 +47,14 @@ function lifecycle(seed) {
     window: {
       scrollTo() {},
       addEventListener() {},
+      removeEventListener() {},
       Step04VideoEditor: {setSceneCropPositions(value) { cropCalls.push(value); }}
     },
     document: {
+      addEventListener() {}, removeEventListener() {},
       querySelectorAll() { return views; },
       querySelector(selector) {
-        if (selector === 'thinkcast-top-nav') return {setActive() {}};
+        if (selector === 'thinkcast-top-nav') return {setActive() {},addEventListener() {},removeEventListener() {}};
         return elements[selector] ||= {textContent: '', hidden: true};
       }
     },
@@ -86,12 +88,35 @@ function lifecycle(seed) {
     let storedStoryboardVideoCandidates=new Map();
     let selectedKeywords=new Set();
     ${resetSource}
-    ${routeSource}
+    const ACTIVE_PROJECT_STORAGE_KEY='thinkcast-active-project-v1';
+    let activeProjectId=null;
+    const projectStore=ThinkCastProjectStore.createProjectStore({activeProjectId:null});
+    function setActiveProjectId(id){activeProjectId=id;if(id)localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY,id);else localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);projectStore.setActiveProject(id)}
+    const indexProjects={};
+    function readContentRoute(){return shellNavigationController.readRoute()}
+    function writeContentRoute(step,mode='push'){return shellNavigationController.writeRoute(step,mode)}
+    function selectRouteProject(route){return shellNavigationController.selectRouteProject(route)}
+    function restoreContentRoute(){return shellNavigationController.restoreRoute()}
+    function showStep(step,mode='push'){return shellNavigationController.showStep(step,mode)}
+    function prepareRestoredStep(step){return shellNavigationController.prepareStep(step)}
+    function navigateProjectStep(step,options){return shellNavigationController.navigate(step,options)}
+    function beginNav(){return shellNavigationController.begin()}
+    function isStaleNav(token){return shellNavigationController.isStale(token)}
   `, context);
   vm.runInContext(`function openIndexProject(id,mode='push'){
     if(!indexProjects[id])return;beginNav();activeProjectId=id;
     localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY,id);showStep('project',mode);
   }`, context);
+  context.shellNavigationController=ThinkCastShellNavigationController.create({
+    contentRoute:ThinkCastContentRoute,getLocation:()=>context.location,getHistory:()=>context.history,getWindow:()=>context.window,
+    isLoggedIn:()=>context.isLoggedIn,getActiveProjectId:()=>vm.runInContext('activeProjectId',context),setActiveProjectId:id=>context.setActiveProjectId(id),
+    getProjects:()=>vm.runInContext('indexProjects',context),refreshProjectIndex:context.refreshProjectIndex,
+    loadProjectState:(...args)=>context.loadProjectState(...args),loadProjectContent:(...args)=>context.loadProjectContent(...args),openIndexProject:(...args)=>context.openIndexProject(...args),
+    updateContentUuidLabels:context.updateContentUuidLabels,getPreviewVideo:()=>context.video,scrollTo:options=>context.window.scrollTo(options),
+    renderStoryboardGrid:context.renderStoryboardGrid,connectStoryboardAssetsToEditor:context.connectStoryboardAssetsToEditor,
+    setContentIndexError:(_key,message)=>{context.document.querySelector('#contentIndexMessage').textContent=message},onError(){}
+  });
+  context.shellNavigationController.mount(context.document);
 
   let nextId = seed * 1000;
   const random = mulberry32(seed);

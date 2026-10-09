@@ -11,6 +11,7 @@
 <script src="/01_app/assets/components/thinkcast-top-nav.js?v=20261007_v2"></script>
 <script src="/01_app/assets/core/api-client.js?v=20261007_v2"></script>
 <script src="/01_app/assets/core/content-route.js?v=20261007_v2"></script>
+<script src="/01_app/assets/core/shell-navigation-controller.js?v=20261009_v32"></script>
 <script src="/01_app/assets/core/project-store.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step-partial-loader.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step01/step01-project-index-controller.js?v=20261009_v31"></script>
@@ -1511,22 +1512,10 @@ document.querySelector('#apiSettingsForm').addEventListener('submit',async event
   }catch(error){message.textContent=error.message}finally{save.disabled=false}
 });
 function readContentRoute(){
-  if(typeof ThinkCastContentRoute!=='undefined'&&ThinkCastContentRoute.readContentRoute){
-    return ThinkCastContentRoute.readContentRoute(location);
-  }
-  const url=new URL(location.href);
-  const hash=url.hash;
-  const step=hash==='#index'?'index':hash==='#project'?'project':hash.match(/^#step(3-1|[1-5])$/)?.[1]||'index';
-  return {step,projectId:url.searchParams.get('project_id'),explicitProject:url.searchParams.has('project_id')};
+  return shellNavigationController.readRoute();
 }
 function writeContentRoute(step,mode='push'){
-  if(typeof ThinkCastContentRoute!=='undefined'&&ThinkCastContentRoute.writeContentRoute){
-    return ThinkCastContentRoute.writeContentRoute({location,history,mode,step,projectId:activeProjectId});
-  }
-  const url=new URL(location.href);
-  url.hash=step==='index'?'index':step==='project'?'project':`step${step}`;
-  if(activeProjectId)url.searchParams.set('project_id',activeProjectId);else url.searchParams.delete('project_id');
-  if(url.href!==location.href)history[mode==='replace'?'replaceState':'pushState'](null,'',url.href);
+  return shellNavigationController.writeRoute(step,mode);
 }
 const ACTIVE_PROJECT_STORAGE_KEY='thinkcast-active-project-v1';
 let activeProjectId=null;
@@ -1538,41 +1527,16 @@ function setActiveProjectId(projectId){
   if(projectStore)projectStore.setActiveProject(projectId);
 }
 function selectRouteProject(route){
-  if(!route.explicitProject)return true;
-  const project=indexProjects[route.projectId];
-  setActiveProjectId(project?route.projectId:null);
-  if(!project)setContentIndexError('content','요청한 콘텐츠를 찾을 수 없습니다. 목록에서 다시 선택해 주세요.');
-  return Boolean(project);
+  return shellNavigationController.selectRouteProject(route);
 }
-let restoredRouteUrl='';
 async function restoreContentRoute(){
-  if(restoredRouteUrl===location.href)return;
-  restoredRouteUrl=location.href;
-  if(!isLoggedIn)return;
-  const route=readContentRoute();
-  const valid=selectRouteProject(route);
-  try{await navigateProjectStep(valid?route.step:'index',{historyMode:'replace'})}
-  catch(error){setContentIndexError('content','콘텐츠를 불러오지 못했습니다. 목록에서 다시 시도해 주세요.');showStep('index','replace')}
+  return shellNavigationController.restoreRoute();
 }
-const contentRouteSubscription=typeof ThinkCastContentRoute!=='undefined'&&ThinkCastContentRoute.listenContentRoutes?ThinkCastContentRoute.listenContentRoutes(function(){
-  return restoreContentRoute();
-},{window,location}):null;
 function showStep(step,historyMode='push'){
-  step=String(step);if(!isLoggedIn&&step!=='1')step='1';
-  updateContentUuidLabels();
-  const mainVideo=typeof video!=='undefined'&&video?video:document.querySelector('#video');
-  if(mainVideo&&typeof mainVideo.pause==='function'){try{mainVideo.pause()}catch(e){}}
-  const viewId=step==='index'?'stepIndex':step==='project'?'stepProject':step==='3-1'?'step31':`step${step}`;
-  document.querySelectorAll('.step-view').forEach(view=>{view.hidden=view.id!==viewId});
-  document.querySelector('thinkcast-top-nav')?.setActive(step==='project'?'index':step==='3-1'?'3':step);
-  window.scrollTo({top:0,behavior:'smooth'});
-  writeContentRoute(step,historyMode);
-  restoredRouteUrl=location.href;
+  return shellNavigationController.showStep(step,historyMode);
 }
 function prepareRestoredStep(target){
-  const step=String(target);
-  if(step==='3-1')renderStoryboardGrid();
-  if(step==='4')connectStoryboardAssetsToEditor();
+  return shellNavigationController.prepareStep(target);
 }
 function showContentIndexMessage(text){
   const el=document.querySelector('#contentIndexMessage');
@@ -1586,58 +1550,12 @@ function setContentIndexError(key,message){
   showContentIndexMessage(Object.values(contentIndexErrors).join(' · '));
 }
 async function navigateProjectStep(requestedTarget,{historyMode='push'}={}){
-  const token=beginNav();
-  let target=String(requestedTarget);
-  if(target==='project'){
-    if(!activeProjectId){showStep('index',historyMode);return 'index'}
-    if(!indexProjects[activeProjectId]){
-      try{await refreshProjectIndex()}catch(error){if(!isStaleNav(token))throw error;return}
-    }
-    if(isStaleNav(token))return;
-    openIndexProject(activeProjectId,historyMode);
-    return 'project';
-  }
-  const numericTarget=target==='3-1'?3:Number(target);
-  let loadedContent=false;
-  if(isLoggedIn&&Number.isFinite(numericTarget)&&numericTarget>=2){
-    if(!activeProjectId){showStep('index',historyMode);return 'index'}
-    let restored;
-    try{
-      restored=await loadProjectState(activeProjectId,token);
-    }catch(error){
-      if(!isStaleNav(token))throw error;
-      return;
-    }
-    if(isStaleNav(token))return;
-    if(numericTarget>=3&&!restored.content){
-      target='2';
-      document.querySelector('#keywordMessage').textContent='저장된 키워드를 확인한 뒤 대본 구성을 시작해 주세요.';
-    }else if(numericTarget>=3){
-      try{
-        await loadProjectContent(activeProjectId,token);
-      }catch(error){
-        if(!isStaleNav(token))throw error;
-        return;
-      }
-      if(isStaleNav(token))return;
-    }
-    loadedContent=true;
-  }
-  showStep(target,historyMode);
-  try{
-    prepareRestoredStep(target);
-  }catch(error){
-    if(target==='3-1')document.querySelector('#storyboardMessage').textContent=`콘티를 불러오지 못했습니다: ${error.message}`;
-    throw error;
-  }
-  if(loadedContent)setContentIndexError('content','');
-  return target;
+  return shellNavigationController.navigate(requestedTarget,{historyMode});
 }
 
 const indexProjects={};
-let navToken=0;
-function beginNav(){return ++navToken}
-function isStaleNav(token){return token!==navToken}
+function beginNav(){return shellNavigationController.begin()}
+function isStaleNav(token){return shellNavigationController.isStale(token)}
 let selectedVoiceProfile='warm_female';
 let seasonalKeywordIds=new Set();
 let trendKeywordChoices=[];
@@ -2879,12 +2797,6 @@ async function restoreLoginSession(){
   }
 }
 
-document.addEventListener('click',async event=>{
-  const button=event.target.closest('[data-go]');
-  if(!button)return;
-  try{await navigateProjectStep(button.dataset.go)}
-  catch(error){const note=document.querySelector('#projectDetailNote')||document.querySelector('#contentIndexMessage');if(note)note.textContent=error.message}
-});
 const brandOverlayController=BrandOverlayController.create({state:brandOverlayState,getBrandAssets:()=>brandSelectionController.getAssets(),prepareOutroPreview:item=>ensureOutroRatioAssets(item,{force:true}),saveSelection:saveBrandSelections,applyPosition:applyWatermarkPosition,backgroundColor:outroBackgroundColor,updateWatermarkPreview,updateOutroPreview:updateCommonOutroPreview,onError:(feature,error)=>console.error(`[BrandOverlay:${feature}]`,error)});
 function openWatermarkPreview(versionId){return brandOverlayController.openWatermarkPreview(versionId)}
 function openOutroPreview(versionId){return brandOverlayController.openOutroPreview(versionId)}
@@ -2895,6 +2807,8 @@ brandLibraryController.mount(document);
 const brandOverlayMount=brandOverlayController.mount(document);if(!brandOverlayMount.watermark.ok)console.error('[BrandOverlay:watermark]',brandOverlayMount.watermark.error);if(!brandOverlayMount.outro.ok)console.error('[BrandOverlay:outro]',brandOverlayMount.outro.error);
 const projectIndexController=Step01ProjectIndexController.create({getRoot:()=>document,projectsIndex:indexProjects,getCalendarEntries:()=>calendarEntries,calendarContentVersions,getRememberedProjectId:()=>localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY),getActiveProjectId:()=>activeProjectId,setActiveProjectId,request:(...args)=>api(...args),refreshBrandLibrary,escapeHtml,projectDate,automationStageLabel,setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),onPollError:error=>console.error('[ProjectIndex:poll]',error)});
 projectIndexController.startPolling();
+const shellNavigationController=ThinkCastShellNavigationController.create({contentRoute:ThinkCastContentRoute,getLocation:()=>location,getHistory:()=>history,getWindow:()=>window,isLoggedIn:()=>isLoggedIn,getActiveProjectId:()=>activeProjectId,setActiveProjectId,getProjects:()=>indexProjects,refreshProjectIndex,loadProjectState,loadProjectContent,openIndexProject,updateContentUuidLabels,getPreviewVideo:()=>typeof video!=='undefined'&&video?video:document.querySelector('#video'),scrollTo:options=>window.scrollTo(options),renderStoryboardGrid,connectStoryboardAssetsToEditor,setContentIndexError,onError:(feature,error)=>console.error(`[ShellNavigation:${feature}]`,error)});
+shellNavigationController.mount(document);
 const contentIndexController=Step01ContentIndexController.create({request:(...args)=>api(...args),getProjects:()=>indexProjects,getActiveProjectId:()=>activeProjectId,beginNav,setActiveProjectId,showStep,showBrandLibrary,navigateProjectStep,resetProjectScopedState,setKeywordStageLocked,setVoiceProfile,getKeywords:()=>demoData.keywords,setVisibleKeywordIds:ids=>{visibleKeywordIds=ids},renderKeywords,refreshProjectIndex,confirm:message=>confirm(message),alert:message=>alert(message),escapeHtml,projectCreatedDate});
 contentIndexController.mount(document);
 let trendRequestVersion=0;
@@ -2928,7 +2842,6 @@ document.querySelector('#trendKeywordGrid').addEventListener('click',event=>{con
 document.querySelector('#trendKeywordClose').addEventListener('click',()=>{document.querySelector('#trendKeywordModal').hidden=true;setTrendKeywordLoading(false);document.body.classList.remove('modal-open')});
 document.querySelector('#trendKeywordLimitClose')?.addEventListener('click',()=>{document.querySelector('#trendKeywordLimitModal').hidden=true;document.body.classList.remove('modal-open')});
 document.querySelector('#trendKeywordApply').addEventListener('click',()=>{const applied=trendKeywordChoices.filter(item=>trendKeywordSelection.has(item.id));seasonalKeywordIds.forEach(id=>selectedKeywords.delete(id));seasonalKeywordIds=new Set(applied.map(item=>item.id));demoData.keywords=[...demoData.keywords.filter(item=>!item.seasonal),...applied];const baseIds=visibleKeywordIds.filter(id=>!demoData.keywords.find(item=>item.id===id)?.seasonal).slice(0,8);const refill=demoData.keywords.filter(item=>!item.seasonal&&!baseIds.includes(item.id)).map(item=>item.id);while(baseIds.length<8&&refill.length)baseIds.push(refill.shift());const targetCount=8-applied.length;for(let index=baseIds.length-1;baseIds.length>targetCount&&index>=0;index--){if(!selectedKeywords.has(baseIds[index]))baseIds.splice(index,1)}applied.forEach(item=>selectedKeywords.add(item.id));visibleKeywordIds=[...baseIds.slice(0,targetCount),...applied.map(item=>item.id)];document.querySelector('#trendKeywordModal').hidden=true;document.body.classList.remove('modal-open');document.querySelector('#keywordMessage').textContent=`AI 추천 ${applied.length}개를 뒤쪽 카드에 반영했습니다.`;renderKeywords()});
-document.querySelector('thinkcast-top-nav').addEventListener('thinkcast-step-change',async event=>{try{await navigateProjectStep(event.detail.step)}catch(error){document.querySelector('#projectDetailNote').textContent=error.message;showStep('index')}});
 function setAuthMode(mode){
   if(isLoggedIn)return;
   const registering=mode==='register';

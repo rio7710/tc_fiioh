@@ -32,6 +32,7 @@ const renderControllerPath = '01_app/assets/steps/step04/step04-render-controlle
 const navigationControllerPath = '01_app/assets/steps/step04/step04-navigation-controller.js';
 const bindingsPath = '01_app/assets/steps/step04/step04-ui-bindings.js';
 const videoEditorPath = '01_app/assets/video-editor/index.js';
+const shellNavigationControllerPath = '01_app/assets/core/shell-navigation-controller.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
@@ -59,6 +60,7 @@ assert.ok(fs.existsSync(renderControllerPath), 'step04-render-controller.js must
 assert.ok(fs.existsSync(navigationControllerPath), 'step04-navigation-controller.js must exist');
 assert.ok(fs.existsSync(bindingsPath), 'step04-ui-bindings.js must exist');
 assert.ok(fs.existsSync(videoEditorPath), 'video-editor/index.js must exist');
+assert.ok(fs.existsSync(shellNavigationControllerPath), 'shell-navigation-controller.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
@@ -72,6 +74,15 @@ console.log('✓ File integrity checks passed');
 
 // 2. Headless VM Execution Test: Pre-Partial Script Evaluation MUST NOT Throw (No Null Query Errors)
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+assert.match(html, /src="\/01_app\/assets\/core\/shell-navigation-controller\.js\?v=20261009_v32"/, 'HTML cache-busts shell navigation controller');
+assert.ok(html.indexOf('content-route.js') < html.indexOf('shell-navigation-controller.js'), 'content route helper loads before shell navigation');
+for (const contract of [
+  /function readContentRoute\(\)\{\s*return shellNavigationController\.readRoute\(\);\s*\}/,
+  /function writeContentRoute\(step,mode='push'\)\{\s*return shellNavigationController\.writeRoute\(step,mode\);\s*\}/,
+  /function navigateProjectStep\(requestedTarget,\{historyMode='push'\}=\{\}\)\{\s*return shellNavigationController\.navigate\(requestedTarget,\{historyMode\}\);\s*\}/
+]) assert.match(html, contract, 'P1 keeps thin shell navigation wrappers');
+assert.match(html, /shellNavigationController\.mount\(document\)/, 'P1 mounts shell navigation after partial loading');
+assert.doesNotMatch(html, /contentRouteSubscription|let navToken=|let restoredRouteUrl=|document\.addEventListener\('click',async event=>\{\s*const button=event\.target\.closest\('\[data-go\]'/, 'P1 removes duplicate shell navigation state and handlers');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v31"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
@@ -303,6 +314,8 @@ function createPrePartialContext() {
   const context = vm.createContext({
     console,
     URL,
+    ThinkCastContentRoute: require('../01_app/assets/core/content-route.js'),
+    ThinkCastShellNavigationController: require('../01_app/assets/core/shell-navigation-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),
