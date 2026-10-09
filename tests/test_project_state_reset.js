@@ -1,57 +1,33 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const vm = require('node:vm');
 const ContentIndexController = require('../01_app/assets/steps/step01/step01-content-index-controller.js');
+const StoryboardProjectStateController = require('../01_app/assets/steps/step03/storyboard-project-state-controller.js');
 
 (async () => {
 
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 assert.match(html, /let demoData=\{state:\{\},timeline:\{scenes:\[\]\},keywords:\[\]\};/, 'project restore starts from a safe non-null demo state');
-function extractFunction(source, signature) {
-  const start = source.indexOf(signature);
-  assert.ok(start >= 0, `${signature} must exist`);
-  const bodyStart = source.indexOf('{', start);
-  let depth = 0;
-  for (let index = bodyStart; index < source.length; index += 1) {
-    if (source[index] === '{') depth += 1;
-    if (source[index] === '}' && --depth === 0) return source.slice(start, index + 1);
-  }
-  assert.fail(`${signature} must have a complete body`);
-}
-const resetSource = extractFunction(html, 'function resetProjectScopedState()');
-
-const context = vm.createContext({
-  timelineBridge: { reset() { context.timelineBridgeResetCount += 1; } },
-  timelineBridgeResetCount: 0,
-  window: { Step04VideoEditor: { setSceneCropPositions(value) { context.editorCropPositions = value; } } }
+assert.match(html, /function resetProjectScopedState\(\)\{\s*return storyboardProjectStateController\.reset\(\);\s*\}/, 'P1 reset is a thin controller wrapper');
+let scenes=[{id:'old'}],currentScene=4,timeline={scenes:[{id:'old'}]},crops={old:{x:1}};
+let images=new Map([['old',{}]]),imageCandidates=new Map([['old',[{}]]]);
+let voices=new Map([['old',{}]]),videos=new Map([['old',{}]]),videoCandidates=new Map([['old',[{}]]]);
+let keywords=new Set(['old']),documentState={old:true};
+let timelineBridgeResetCount=0,editorCropResetCount=0,projectStoreResetCount=0;
+const projectIdentity='old-project';
+const stateController=StoryboardProjectStateController.create({
+  getRoot:()=>({querySelector:()=>null}),getScenes:()=>scenes,setScenes:value=>{scenes=value},setCurrentScene:value=>{currentScene=value},
+  connectTimeline:value=>({scenes:value}),resetTimeline:()=>{timelineBridgeResetCount+=1},setDemoTimeline:value=>{timeline=value},setCropPositions:value=>{crops=value},
+  setImages:value=>{images=value},setImageCandidates:value=>{imageCandidates=value},setVoiceClips:value=>{voices=value},setVideos:value=>{videos=value},setVideoCandidates:value=>{videoCandidates=value},
+  clearKeywords:()=>keywords.clear(),setActiveStoryboardDocument:value=>{documentState=value},resetEditorCrops:value=>{editorCropResetCount+=1;assert.deepEqual(value,{})},
+  getStep04VideoEditor:()=>null,getFallbackSync:()=>null,resetProjectStore:()=>{projectStoreResetCount+=1}
 });
-vm.runInContext(`
-  let scenes=[{id:'old'}];
-  let sceneCropPositions={old:{x:1}};
-  let storedStoryboardImages=new Map([['old',{}]]);
-  let storedStoryboardImageCandidates=new Map([['old',[{}]]]);
-  let storedStoryboardVoiceClips=new Map([['old',{}]]);
-  let storedStoryboardVideos=new Map([['old',{}]]);
-  let storedStoryboardVideoCandidates=new Map([['old',[{}]]]);
-  let selectedKeywords=new Set(['old']);
-  let activeProjectId='old-project';
-  ${resetSource}
-  resetProjectScopedState();
-`, context);
-
-for (const expression of [
-  'scenes.length',
-  'Object.keys(sceneCropPositions).length',
-  'storedStoryboardImages.size',
-  'storedStoryboardImageCandidates.size',
-  'storedStoryboardVoiceClips.size',
-  'storedStoryboardVideos.size',
-  'storedStoryboardVideoCandidates.size',
-  'selectedKeywords.size'
-]) assert.equal(vm.runInContext(expression,context),0,`${expression} must be cleared`);
-assert.equal(vm.runInContext('activeProjectId',context),'old-project','helper must not clear project identity');
-assert.equal(Object.keys(context.editorCropPositions).length,0,'Step 4 crop state must be cleared');
-assert.equal(context.timelineBridgeResetCount,1,'Step 4 timeline bridge state must be reset exactly once');
+stateController.reset();
+assert.equal(scenes.length,0);assert.equal(currentScene,-1);assert.deepEqual(timeline,{scenes:[]});assert.deepEqual(crops,{});
+for(const state of [images,imageCandidates,voices,videos,videoCandidates])assert.equal(state.size,0);
+assert.equal(keywords.size,0);assert.equal(documentState,null);assert.equal(projectIdentity,'old-project','helper must not clear project identity');
+assert.equal(editorCropResetCount,1,'Step 4 crop state must be reset exactly once');
+assert.equal(timelineBridgeResetCount,1,'Step 4 timeline bridge state must be reset exactly once');
+assert.equal(projectStoreResetCount,1,'project store state must be reset exactly once');
 
 const calls=[];
 let active='old-project';

@@ -4,6 +4,7 @@ const vm = require('node:vm');
 const ThinkCastContentRoute = require('../01_app/assets/core/content-route.js');
 const ThinkCastProjectStore = require('../01_app/assets/core/project-store.js');
 const ThinkCastShellNavigationController = require('../01_app/assets/core/shell-navigation-controller.js');
+const Step03StoryboardProjectStateController = require('../01_app/assets/steps/step03/storyboard-project-state-controller.js');
 
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 
@@ -50,7 +51,7 @@ function lifecycle(seed) {
   let timelineResetCalls = 0;
   let expectedProjectResets = 0;
   const context = vm.createContext({
-    ThinkCastContentRoute, ThinkCastProjectStore,
+    ThinkCastContentRoute, ThinkCastProjectStore, Step03StoryboardProjectStateController,
     timelineBridge: {reset() { timelineResetCalls += 1; }},
     URL,
     console,
@@ -92,6 +93,9 @@ function lifecycle(seed) {
   Object.defineProperty(context, 'location', {get: () => current});
   vm.runInContext(`
     let scenes=[];
+    let currentScene=-1;
+    let demoData={timeline:{scenes:[]}};
+    let activeStoryboardDocument=null;
     let sceneCropPositions={};
     let storedStoryboardImages=new Map();
     let storedStoryboardImageCandidates=new Map();
@@ -99,10 +103,18 @@ function lifecycle(seed) {
     let storedStoryboardVideos=new Map();
     let storedStoryboardVideoCandidates=new Map();
     let selectedKeywords=new Set();
-    ${resetSource}
     const ACTIVE_PROJECT_STORAGE_KEY='thinkcast-active-project-v1';
     let activeProjectId=null;
     const projectStore=ThinkCastProjectStore.createProjectStore({activeProjectId:null});
+    const storyboardProjectStateController=Step03StoryboardProjectStateController.create({
+      getRoot:()=>document,getScenes:()=>scenes,setScenes:value=>{scenes=value},setCurrentScene:value=>{currentScene=value},
+      connectTimeline:value=>({scenes:value}),resetTimeline:()=>timelineBridge.reset(),setDemoTimeline:value=>{demoData.timeline=value},setCropPositions:value=>{sceneCropPositions=value},
+      setImages:value=>{storedStoryboardImages=value},setImageCandidates:value=>{storedStoryboardImageCandidates=value},setVoiceClips:value=>{storedStoryboardVoiceClips=value},
+      setVideos:value=>{storedStoryboardVideos=value},setVideoCandidates:value=>{storedStoryboardVideoCandidates=value},clearKeywords:()=>selectedKeywords.clear(),
+      setActiveStoryboardDocument:value=>{activeStoryboardDocument=value},resetEditorCrops:value=>window.Step04VideoEditor.setSceneCropPositions(value),
+      getStep04VideoEditor:()=>window.Step04VideoEditor,getFallbackSync:()=>null,resetProjectStore:()=>projectStore.resetProjectState()
+    });
+    ${resetSource}
     function setActiveProjectId(id){activeProjectId=id;if(id)localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY,id);else localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);projectStore.setActiveProject(id)}
     const indexProjects={};
     function readContentRoute(){return shellNavigationController.readRoute()}
@@ -136,13 +148,14 @@ function lifecycle(seed) {
     scenes:scenes.length,crops:Object.keys(sceneCropPositions).length,images:storedStoryboardImages.size,
     imageCandidates:storedStoryboardImageCandidates.size,voices:storedStoryboardVoiceClips.size,
     videos:storedStoryboardVideos.size,videoCandidates:storedStoryboardVideoCandidates.size,
-    keywords:selectedKeywords.size
+    keywords:selectedKeywords.size,currentScene,document:activeStoryboardDocument===null?0:1,timeline:demoData.timeline.scenes.length
   })`, context)});
   const dirtyScoped = () => vm.runInContext(`
     scenes=[{id:'dirty'}];sceneCropPositions={dirty:{x:1}};
     storedStoryboardImages=new Map([['dirty',{}]]);storedStoryboardImageCandidates=new Map([['dirty',[{}]]]);
     storedStoryboardVoiceClips=new Map([['dirty',{}]]);storedStoryboardVideos=new Map([['dirty',{}]]);
     storedStoryboardVideoCandidates=new Map([['dirty',[{}]]]);selectedKeywords=new Set(['dirty']);
+    currentScene=3;activeStoryboardDocument={project:'dirty'};demoData.timeline={scenes:[{id:'dirty'}]};
   `, context);
   const syncProjects = () => {
     vm.runInContext('Object.keys(indexProjects).forEach(key=>delete indexProjects[key])', context);
@@ -151,7 +164,8 @@ function lifecycle(seed) {
   const active = () => vm.runInContext('activeProjectId', context);
   const route = () => ({href: current.href, active: active(), visible: views.find(view => !view.hidden)?.id});
   const resetWasComplete = () => assert.deepEqual(scopedSizes(), {
-    scenes: 0, crops: 0, images: 0, imageCandidates: 0, voices: 0, videos: 0, videoCandidates: 0, keywords: 0
+    scenes: 0, crops: 0, images: 0, imageCandidates: 0, voices: 0, videos: 0, videoCandidates: 0, keywords: 0,
+    currentScene: -1, document: 0, timeline: 0
   });
   const assertResetCount = () => assert.equal(timelineResetCalls, expectedProjectResets, 'timeline reset count follows successful create/delete resets');
 

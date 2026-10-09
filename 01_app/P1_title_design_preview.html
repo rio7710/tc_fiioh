@@ -27,6 +27,7 @@
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
 <script src="/01_app/assets/steps/step03/storyboard-grid-renderer.js?v=20261009_v49"></script>
+<script src="/01_app/assets/steps/step03/storyboard-project-state-controller.js?v=20261009_v51"></script>
 <script src="/01_app/assets/steps/step03/voice-profile-controller.js?v=20261009_v48"></script>
 <script src="/01_app/assets/steps/step03/scene-voice-controller.js?v=20261009_v47"></script>
 <script src="/01_app/assets/steps/step03/candidate-selection-controller.js?v=20261009_v46"></script>
@@ -1251,43 +1252,17 @@ function applyStoryboardLook(look){
   if(activeProjectId)localStorage.setItem(`thinkcast-storyboard-look-${activeProjectId}`,storyboardLook);
 }
 function setStoryboardImageCandidates(items){
-  storedStoryboardImageCandidates=new Map();
-  (items||[]).forEach(item=>{
-    const group=storedStoryboardImageCandidates.get(item.scene_id)||[];
-    group.push(item);storedStoryboardImageCandidates.set(item.scene_id,group);
-  });
+  return storyboardProjectStateController.setImageCandidates(items||[]);
 }
 function setStoryboardVideoCandidates(items){
-  storedStoryboardVideoCandidates=new Map();
-  (items||[]).forEach(item=>{
-    const group=storedStoryboardVideoCandidates.get(item.scene_id)||[];
-    group.push(item);storedStoryboardVideoCandidates.set(item.scene_id,group);
-  });
+  return storyboardProjectStateController.setVideoCandidates(items||[]);
 }
 function connectStoryboardAssetsToEditor(){
-  scenes=timelineBridge.connectStoryboardAssetsToEditor(scenes).scenes;
-  currentScene=-1;
-  const targetVideo=document.querySelector('#video');
-  if(targetVideo)targetVideo.currentTime=0;
-  if(window.Step04VideoEditor?.sync){
-    window.Step04VideoEditor.sync();
-  }else if(typeof sync==='function'){
-    sync();
-  }
+  return storyboardProjectStateController.connect();
 }
 let selectedKeywords=new Set();
 function resetProjectScopedState(){
-  scenes=[];
-  timelineBridge.reset();
-  sceneCropPositions={};
-  storedStoryboardImages=new Map();
-  storedStoryboardImageCandidates=new Map();
-  storedStoryboardVoiceClips=new Map();
-  storedStoryboardVideos=new Map();
-  storedStoryboardVideoCandidates=new Map();
-  selectedKeywords.clear();
-  if(window.Step04VideoEditor?.setSceneCropPositions)window.Step04VideoEditor.setSceneCropPositions({});
-  if(typeof projectStore!=='undefined'&&projectStore)projectStore.resetProjectState();
+  return storyboardProjectStateController.reset();
 }
 let visibleKeywordIds=[];
 let settingsReady=false;
@@ -2048,6 +2023,7 @@ brandLibraryController.mount(document);
 const brandOverlayMount=brandOverlayController.mount(document);if(!brandOverlayMount.watermark.ok)console.error('[BrandOverlay:watermark]',brandOverlayMount.watermark.error);if(!brandOverlayMount.outro.ok)console.error('[BrandOverlay:outro]',brandOverlayMount.outro.error);
 const scriptEditorController=Step03ScriptEditorController.create({getRoot:()=>document,storage:localStorage,storageKey:SCRIPT_STORAGE_KEY,request:(...args)=>api(...args),getScenes:()=>scenes,escapeHtml,getActiveProjectId:()=>activeProjectId,setDemoTimeline:timeline=>{demoData.timeline=timeline},applyTimeline,getActiveStoryboardDocument:()=>activeStoryboardDocument,setActiveStoryboardDocument:value=>{activeStoryboardDocument=value},setDemoState:state=>{demoData.state=state},applyScript,refreshProjectIndex});
 scriptEditorController.mount(document);
+const storyboardProjectStateController=Step03StoryboardProjectStateController.create({getRoot:()=>document,getScenes:()=>scenes,setScenes:value=>{scenes=value},setCurrentScene:value=>{currentScene=value},connectTimeline:value=>timelineBridge.connectStoryboardAssetsToEditor(value),resetTimeline:()=>timelineBridge.reset(),setDemoTimeline:value=>{demoData.timeline=value},setCropPositions:value=>{sceneCropPositions=value},setImages:value=>{storedStoryboardImages=value},setImageCandidates:value=>{storedStoryboardImageCandidates=value},setVoiceClips:value=>{storedStoryboardVoiceClips=value},setVideos:value=>{storedStoryboardVideos=value},setVideoCandidates:value=>{storedStoryboardVideoCandidates=value},clearKeywords:()=>selectedKeywords.clear(),setActiveStoryboardDocument:value=>{activeStoryboardDocument=value},resetEditorCrops:value=>{if(window.Step04VideoEditor?.setSceneCropPositions)window.Step04VideoEditor.setSceneCropPositions(value)},getStep04VideoEditor:()=>window.Step04VideoEditor,getFallbackSync:()=>typeof sync==='function'?sync:null,resetProjectStore:()=>{if(projectStore)projectStore.resetProjectState()}});
 const projectHydrationController=ThinkCastProjectHydrationController.create({request:(...args)=>api(...args),isStale:isStaleNav,getActiveProjectId:()=>activeProjectId,setSceneCropPositions:positions=>{sceneCropPositions=positions;if(window.Step04VideoEditor?.setSceneCropPositions)window.Step04VideoEditor.setSceneCropPositions(positions)},setDemoTimeline:timeline=>{demoData.timeline=timeline},mergeDemoState:values=>{demoData.state={...(demoData.state||{}),...values}},setSelectedKeywords:value=>{selectedKeywords=value},setActiveStoryboardDocument:value=>{activeStoryboardDocument=value},setKeywordStageLocked,setStoryboardImages:value=>{storedStoryboardImages=value},setStoryboardImageCandidates,setStoryboardVoiceClips:value=>{storedStoryboardVoiceClips=value},setStoryboardVideos:value=>{storedStoryboardVideos=value},setStoryboardVideoCandidates,setVoiceProfile,hydrateBrandSelections:value=>brandSelectionController.hydrate(value),renderBrandChoices,getPlatformButtons:()=>platformButtons,getSelectedPlatforms:()=>selectedPlatforms,setPlatformPreview,applyTimeline,connectStoryboardAssetsToEditor,fillScript,applyScript,getDemoKeywords:()=>demoData.keywords,setDemoKeywords:value=>{demoData.keywords=value},setSeasonalKeywordIds:value=>{seasonalKeywordIds=value},setVisibleKeywordIds:value=>{visibleKeywordIds=value},renderKeywords});
 const projectIndexController=Step01ProjectIndexController.create({getRoot:()=>document,projectsIndex:indexProjects,getCalendarEntries:()=>calendarEntries,calendarContentVersions,getRememberedProjectId:()=>localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY),getActiveProjectId:()=>activeProjectId,setActiveProjectId,request:(...args)=>api(...args),refreshBrandLibrary,escapeHtml,projectDate,automationStageLabel,setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),onPollError:error=>console.error('[ProjectIndex:poll]',error)});
 projectIndexController.startPolling();

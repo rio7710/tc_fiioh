@@ -48,6 +48,7 @@ const candidateSelectionControllerPath = '01_app/assets/steps/step03/candidate-s
 const sceneVoiceControllerPath = '01_app/assets/steps/step03/scene-voice-controller.js';
 const voiceProfileControllerPath = '01_app/assets/steps/step03/voice-profile-controller.js';
 const storyboardGridRendererPath = '01_app/assets/steps/step03/storyboard-grid-renderer.js';
+const storyboardProjectStateControllerPath = '01_app/assets/steps/step03/storyboard-project-state-controller.js';
 const imageRegenerationControllerPath = '01_app/assets/steps/step04/step04-image-regeneration-controller.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
@@ -92,6 +93,7 @@ assert.ok(fs.existsSync(candidateSelectionControllerPath), 'candidate-selection-
 assert.ok(fs.existsSync(sceneVoiceControllerPath), 'scene-voice-controller.js must exist');
 assert.ok(fs.existsSync(voiceProfileControllerPath), 'voice-profile-controller.js must exist');
 assert.ok(fs.existsSync(storyboardGridRendererPath), 'storyboard-grid-renderer.js must exist');
+assert.ok(fs.existsSync(storyboardProjectStateControllerPath), 'storyboard-project-state-controller.js must exist');
 assert.ok(fs.existsSync(imageRegenerationControllerPath), 'step04-image-regeneration-controller.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
@@ -123,6 +125,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step03\/candidate-selection-co
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-voice-controller\.js\?v=20261009_v47"/, 'HTML cache-busts scene voice controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/voice-profile-controller\.js\?v=20261009_v48"/, 'HTML cache-busts voice profile controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-grid-renderer\.js\?v=20261009_v49"/, 'HTML cache-busts storyboard grid renderer');
+assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-project-state-controller\.js\?v=20261009_v51"/, 'HTML cache-busts storyboard project state controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('trend-keyword-controller.js'), 'base Step 2 module loads before trend keyword controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('script-generation-controller.js') && html.indexOf('script-generation-controller.js') < html.indexOf('trend-keyword-controller.js'), 'script generation loads between Step 2 keyword controllers');
 assert.ok(html.indexOf('step03-script-editor-controller.js') < html.indexOf('production-workflow-controller.js'), 'production workflow loads after Step 3 script editor');
@@ -132,6 +135,7 @@ assert.ok(html.indexOf('candidate-selection-controller.js') < html.indexOf('scen
 assert.ok(html.indexOf('scene-voice-controller.js') < html.indexOf('candidate-selection-controller.js'), 'scene voice controller loads before candidate selection controller');
 assert.ok(html.indexOf('voice-profile-controller.js') < html.indexOf('scene-voice-controller.js'), 'voice profile controller loads before scene voice controller');
 assert.ok(html.indexOf('storyboard-grid-renderer.js') < html.indexOf('voice-profile-controller.js'), 'storyboard grid renderer loads before voice profile controller');
+assert.ok(html.indexOf('storyboard-project-state-controller.js') < html.indexOf('voice-profile-controller.js'), 'storyboard project state controller loads before voice profile controller');
 assert.ok(html.indexOf('content-route.js') < html.indexOf('shell-navigation-controller.js'), 'content route helper loads before shell navigation');
 assert.ok(html.indexOf('shell-navigation-controller.js') < html.indexOf('session-bootstrap-controller.js'), 'shell navigation loads before session bootstrap');
 assert.ok(html.indexOf('session-bootstrap-controller.js') < html.indexOf('auth-ui-controller.js'), 'session bootstrap loads before auth UI controller');
@@ -223,6 +227,13 @@ assert.match(html,/document\.querySelector\('#userVoicePreview'\)\.addEventListe
 assert.match(html,/const storyboardGridRenderer=Step03StoryboardGridRenderer\.create\(/,'P1 wires storyboard grid renderer');
 assert.match(html,/function renderStoryboardGrid\(\)\{\s*return storyboardGridRenderer\.render\(\);\s*\}/,'P1 keeps thin storyboard grid wrapper');
 assert.doesNotMatch(html,/function renderStoryboardGrid\(\)\{\s*applyStoryboardLook|const storyboardScenes=production\.timeline/,'P1 removes inline storyboard grid implementation');
+assert.match(html,/const storyboardProjectStateController=Step03StoryboardProjectStateController\.create\(/,'P1 wires storyboard project state controller');
+assert.match(html,/function setStoryboardImageCandidates\(items\)\{\s*return storyboardProjectStateController\.setImageCandidates\(items\|\|\[\]\);\s*\}/,'P1 keeps thin image candidates wrapper');
+assert.match(html,/function setStoryboardVideoCandidates\(items\)\{\s*return storyboardProjectStateController\.setVideoCandidates\(items\|\|\[\]\);\s*\}/,'P1 keeps thin video candidates wrapper');
+assert.match(html,/function connectStoryboardAssetsToEditor\(\)\{\s*return storyboardProjectStateController\.connect\(\);\s*\}/,'P1 keeps thin storyboard editor bridge wrapper');
+assert.match(html,/function resetProjectScopedState\(\)\{\s*return storyboardProjectStateController\.reset\(\);\s*\}/,'P1 keeps thin project reset wrapper');
+assert.match(html,/resetProjectStore:\(\)=>\{if\(projectStore\)projectStore\.resetProjectState\(\)\}/,'P1 keeps project store reset optional while controller invokes its adapter once');
+assert.doesNotMatch(html,/storedStoryboardImageCandidates=new Map\(\);\s*\(items\|\|\[\]\)\.forEach|scenes=timelineBridge\.connectStoryboardAssetsToEditor\(scenes\)\.scenes/,'P1 removes inline storyboard project state bodies');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v31"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
@@ -478,6 +489,7 @@ function createPrePartialContext() {
     Step03SceneVoiceController: require('../01_app/assets/steps/step03/scene-voice-controller.js'),
     Step03VoiceProfileController: require('../01_app/assets/steps/step03/voice-profile-controller.js'),
     Step03StoryboardGridRenderer: require('../01_app/assets/steps/step03/storyboard-grid-renderer.js'),
+    Step03StoryboardProjectStateController: require('../01_app/assets/steps/step03/storyboard-project-state-controller.js'),
     Step02TrendKeywordController: require('../01_app/assets/steps/step02/trend-keyword-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),
