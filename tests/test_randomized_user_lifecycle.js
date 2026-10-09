@@ -14,7 +14,19 @@ function sourceBetween(start, end) {
   return html.slice(from, to);
 }
 
-const resetSource = sourceBetween('function resetProjectScopedState()', '\nconst keywordTilts=');
+function functionSource(signature) {
+  const start = html.indexOf(signature);
+  assert.ok(start >= 0, `missing function: ${signature}`);
+  const bodyStart = html.indexOf('{', start);
+  let depth = 0;
+  for (let index = bodyStart; index < html.length; index += 1) {
+    if (html[index] === '{') depth += 1;
+    if (html[index] === '}' && --depth === 0) return html.slice(start, index + 1);
+  }
+  assert.fail(`incomplete function: ${signature}`);
+}
+
+const resetSource = functionSource('function resetProjectScopedState()');
 
 function mulberry32(seed) {
   return function random() {

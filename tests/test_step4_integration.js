@@ -96,6 +96,7 @@ assert.match(html, /src="\/01_app\/assets\/core\/project-hydration-controller\.j
 assert.match(html, /src="\/01_app\/assets\/core\/prompt-lab-controller\.js\?v=20261009_v37"/, 'HTML cache-busts prompt lab controller');
 assert.match(html, /src="\/01_app\/assets\/core\/provider-settings-controller\.js\?v=20261009_v39"/, 'HTML cache-busts provider settings controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/trend-keyword-controller\.js\?v=20261009_v40"/, 'HTML cache-busts trend keyword controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step02\/step02-keyword\.js\?v=20261009_v41"/, 'HTML cache-busts Step 2 keyword controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('trend-keyword-controller.js'), 'base Step 2 module loads before trend keyword controller');
 assert.ok(html.indexOf('content-route.js') < html.indexOf('shell-navigation-controller.js'), 'content route helper loads before shell navigation');
 assert.ok(html.indexOf('shell-navigation-controller.js') < html.indexOf('session-bootstrap-controller.js'), 'shell navigation loads before session bootstrap');
@@ -139,6 +140,11 @@ assert.doesNotMatch(html, /let apiConnectionConfig=|let activeApiStep=|const api
 assert.match(html, /const trendKeywordController=Step02TrendKeywordController\.create\(/, 'P1 wires the trend keyword controller');
 assert.match(html, /trendKeywordController\.mount\(document\)/, 'P1 mounts trend keyword interactions');
 assert.doesNotMatch(html, /let trendKeywordChoices=|let trendKeywordSelection=|let trendRequestVersion=|function setTrendKeywordLoading\(|function renderTrendKeywords\(|document\.querySelector\('#trendKeywordOpen'\)\.addEventListener/, 'P1 removes trend keyword state and inline event implementation');
+assert.match(html, /const keywordController=Step02Keyword\.create\(/, 'P1 wires the Step 2 keyword controller');
+assert.match(html, /keywordController\.mount\(document\)/, 'P1 mounts Step 2 keyword interactions');
+assert.match(html, /function renderKeywords\(\)\{\s*return keywordController\.render\(\);\s*\}/, 'P1 keeps a thin keyword render wrapper');
+assert.match(html, /function refreshKeywordBatch\(\)\{\s*return keywordController\.refresh\(\);\s*\}/, 'P1 keeps a thin keyword refresh wrapper');
+assert.doesNotMatch(html, /keywordTilts|document\.querySelector\('#keywordGrid'\)\.addEventListener|document\.querySelector\('#keywordRefresh'\)\.addEventListener|document\.querySelector\('#keywordNext'\)\.addEventListener/, 'P1 removes duplicate Step 2 state and listeners');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v31"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
@@ -381,6 +387,7 @@ function createPrePartialContext() {
     ThinkCastPromptLabController: require('../01_app/assets/core/prompt-lab-controller.js'),
     ThinkCastProviderSettingsController: require('../01_app/assets/core/provider-settings-controller.js'),
     Step03ScriptEditorController: require('../01_app/assets/steps/step03/step03-script-editor-controller.js'),
+    Step02Keyword: require('../01_app/assets/steps/step02/step02-keyword.js'),
     Step02TrendKeywordController: require('../01_app/assets/steps/step02/trend-keyword-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),

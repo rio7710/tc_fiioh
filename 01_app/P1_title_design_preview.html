@@ -21,7 +21,7 @@
 <script src="/01_app/assets/steps/step-partial-loader.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step01/step01-project-index-controller.js?v=20261009_v31"></script>
 <script src="/01_app/assets/steps/step01/step01-content-index-controller.js?v=20261009_v30"></script>
-<script src="/01_app/assets/steps/step02/step02-keyword.js?v=20261007_v2"></script>
+<script src="/01_app/assets/steps/step02/step02-keyword.js?v=20261009_v41"></script>
 <script src="/01_app/assets/steps/step02/trend-keyword-controller.js?v=20261009_v40"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
@@ -1282,7 +1282,6 @@ function resetProjectScopedState(){
   if(window.Step04VideoEditor?.setSceneCropPositions)window.Step04VideoEditor.setSceneCropPositions({});
   if(typeof projectStore!=='undefined'&&projectStore)projectStore.resetProjectState();
 }
-const keywordTilts=new Map();
 let visibleKeywordIds=[];
 let settingsReady=false;
 function setLoginAccess(enabled,account=null){
@@ -1441,10 +1440,7 @@ let keywordStageLocked=false;
 function setKeywordStageLocked(locked){
   keywordStageLocked=Boolean(locked);
   document.querySelector('#trendKeywordOpen').disabled=keywordStageLocked;
-  document.querySelector('#keywordRefresh').disabled=keywordStageLocked;
-  document.querySelector('#keywordNext').textContent=keywordStageLocked?'저장된 대본 보기':'다음 · 대본 구성';
-  renderKeywords();
-  if(keywordStageLocked)document.querySelector('#keywordMessage').textContent='이 콘텐츠는 대본이 확정되어 키워드가 잠겨 있습니다.';
+  return keywordController.setLocked(keywordStageLocked);
 }
 function updateContentUuidLabels(){
   document.querySelectorAll('.step-view').forEach(view=>{
@@ -1761,26 +1757,10 @@ async function previewVoiceProfile(button){
   }finally{button.classList.remove('loading')}
 }
 function renderKeywords(){
-  const grid=document.querySelector('#keywordGrid');
-  const keywordMap=new Map(demoData.keywords.map(item=>[item.id,item]));
-  const visible=(visibleKeywordIds.length?visibleKeywordIds:demoData.keywords.slice(0,8).map(item=>item.id)).map(id=>keywordMap.get(id)).filter(Boolean);
-  grid.innerHTML=visible.map(item=>{
-    const selected=selectedKeywords.has(item.id);
-    if(selected&&!keywordTilts.has(item.id)){const angle=(.35+Math.random()*.85)*(Math.random()<.5?-1:1);keywordTilts.set(item.id,`${angle.toFixed(2)}deg`)}
-    const tilt=keywordTilts.get(item.id)||'0deg';
-    return `<label class="keyword-card ${selected?'selected':''} ${keywordStageLocked?'locked':''}" data-keyword="${item.id}" style="--keyword-bg:url('/01_app/assets/keywords/${encodeURIComponent(item.image||item.id)}.webp');--selected-tilt:${tilt}"><input type="checkbox" ${selected?'checked':''} ${keywordStageLocked?'disabled':''}>${item.seasonal?'<span class="keyword-ai-badge">AI 추천</span>':''}<span class="keyword-label">${item.label}</span><span class="keyword-description">${item.description}</span></label>`;
-  }).join('');
-  document.querySelector('#selectionCount').textContent=`${selectedKeywords.size} / 5 선택 · 전체 ${demoData.keywords.length}개`;
+  return keywordController.render();
 }
 function refreshKeywordBatch(){
-  const currentIds=visibleKeywordIds.slice(0,8);
-  const currentSet=new Set(currentIds);
-  const replacements=demoData.keywords
-    .filter(item=>!item.seasonal&&!selectedKeywords.has(item.id)&&!currentSet.has(item.id))
-    .map(item=>item.id)
-    .sort(()=>Math.random()-.5);
-  visibleKeywordIds=currentIds.map(id=>selectedKeywords.has(id)?id:(replacements.shift()||id));
-  renderKeywords();
+  return keywordController.refresh();
 }
 function fillScript(script){
   return scriptEditorController.fill(script);
@@ -2538,49 +2518,13 @@ shellNavigationController.mount(document);
 const sessionBootstrapController=ThinkCastSessionBootstrapController.create({request:(...args)=>api(...args),navigation:shellNavigationController,setLoginAccess,refreshProjectIndex,hydrateCalendarEntries,getActiveProjectId:()=>activeProjectId,openIndexProject,loadProjectState,loadProjectContent,setContentIndexError});
 const contentIndexController=Step01ContentIndexController.create({request:(...args)=>api(...args),getProjects:()=>indexProjects,getActiveProjectId:()=>activeProjectId,beginNav,setActiveProjectId,showStep,showBrandLibrary,navigateProjectStep,resetProjectScopedState,setKeywordStageLocked,setVoiceProfile,getKeywords:()=>demoData.keywords,setVisibleKeywordIds:ids=>{visibleKeywordIds=ids},renderKeywords,refreshProjectIndex,confirm:message=>confirm(message),alert:message=>alert(message),escapeHtml,projectCreatedDate});
 contentIndexController.mount(document);
+const keywordController=Step02Keyword.create({getRoot:()=>document,getKeywords:()=>demoData.keywords,getVisibleKeywordIds:()=>visibleKeywordIds,setVisibleKeywordIds:value=>{visibleKeywordIds=value},getSelectedKeywords:()=>selectedKeywords,getActiveProjectId:()=>activeProjectId,beginNav,isStaleNav,loadProjectContent,showStep,ensureStepApiReady,request:(...args)=>api(...args),setDemoState:state=>{demoData.state=state},runAiWorkflow,random:()=>Math.random()});
+keywordController.mount(document);
 const trendKeywordController=Step02TrendKeywordController.create({getRoot:()=>document,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,isKeywordLocked:()=>keywordStageLocked,getSelectedKeywords:()=>selectedKeywords,getSeasonalKeywordIds:()=>seasonalKeywordIds,setSeasonalKeywordIds:value=>{seasonalKeywordIds=value},getVisibleKeywordIds:()=>visibleKeywordIds,setVisibleKeywordIds:value=>{visibleKeywordIds=value},getKeywords:()=>demoData.keywords,setKeywords:value=>{demoData.keywords=value},renderKeywords,showTokenUsage,escapeHtml});
 trendKeywordController.mount(document);
 function setAuthMode(mode){
   return authUIController.setMode(mode);
 }
-document.querySelector('#keywordGrid').addEventListener('click',event=>{
-  const card=event.target.closest('.keyword-card');
-  if(!card)return;
-  event.preventDefault();
-  if(keywordStageLocked){document.querySelector('#keywordMessage').textContent='대본이 확정된 콘텐츠의 키워드는 수정할 수 없습니다.';return}
-  const id=card.dataset.keyword;
-  if(selectedKeywords.has(id)){selectedKeywords.delete(id);keywordTilts.delete(id)}
-  else if(selectedKeywords.size<5)selectedKeywords.add(id);
-  else{
-    document.querySelector('#keywordMessage').textContent='키워드는 최대 5개까지 선택할 수 있습니다.';
-    return;
-  }
-  document.querySelector('#keywordMessage').textContent='';
-  renderKeywords();
-});
-document.querySelector('#keywordRefresh').addEventListener('click',refreshKeywordBatch);
-document.querySelector('#keywordNext').addEventListener('click',async()=>{
-  const button=document.querySelector('#keywordNext');
-  const message=document.querySelector('#keywordMessage');
-  message.textContent='';
-  if(button.disabled)return;
-  button.disabled=true;button.setAttribute('aria-busy','true');
-  try{
-    if(keywordStageLocked){
-      const token=beginNav();
-      try{await loadProjectContent(activeProjectId,token)}catch(error){if(!isStaleNav(token))throw error;return}
-      if(isStaleNav(token))return;
-      showStep(3);
-      return;
-    }
-    if(!selectedKeywords.size)throw new Error('키워드를 1개 이상 선택해 주세요.');
-    if(!await ensureStepApiReady(2))return;
-    const saved=await api('/api/keywords',{method:'POST',body:JSON.stringify({project_id:activeProjectId,selected:[...selectedKeywords]})});
-    demoData.state=saved.state;
-    await runAiWorkflow();
-  }catch(error){message.textContent=error.message}
-  finally{button.disabled=false;button.removeAttribute('aria-busy')}
-});
 document.querySelector('#scriptNext').addEventListener('click',async()=>{
   const message=document.querySelector('#scriptMessage');
   message.textContent='';

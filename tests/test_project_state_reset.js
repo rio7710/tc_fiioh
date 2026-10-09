@@ -7,9 +7,18 @@ const ContentIndexController = require('../01_app/assets/steps/step01/step01-con
 
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 assert.match(html, /let demoData=\{state:\{\},timeline:\{scenes:\[\]\},keywords:\[\]\};/, 'project restore starts from a safe non-null demo state');
-const resetStart = html.indexOf('function resetProjectScopedState()');
-const resetEnd = html.indexOf('\nconst keywordTilts=', resetStart);
-assert.ok(resetStart >= 0 && resetEnd > resetStart, 'project reset helper must exist');
+function extractFunction(source, signature) {
+  const start = source.indexOf(signature);
+  assert.ok(start >= 0, `${signature} must exist`);
+  const bodyStart = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = bodyStart; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}' && --depth === 0) return source.slice(start, index + 1);
+  }
+  assert.fail(`${signature} must have a complete body`);
+}
+const resetSource = extractFunction(html, 'function resetProjectScopedState()');
 
 const context = vm.createContext({
   timelineBridge: { reset() { context.timelineBridgeResetCount += 1; } },
@@ -26,7 +35,7 @@ vm.runInContext(`
   let storedStoryboardVideoCandidates=new Map([['old',[{}]]]);
   let selectedKeywords=new Set(['old']);
   let activeProjectId='old-project';
-  ${html.slice(resetStart, resetEnd)}
+  ${resetSource}
   resetProjectScopedState();
 `, context);
 
