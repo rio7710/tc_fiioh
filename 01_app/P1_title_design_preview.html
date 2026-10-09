@@ -26,6 +26,7 @@
 <script src="/01_app/assets/steps/step02/trend-keyword-controller.js?v=20261009_v40"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
+<script src="/01_app/assets/steps/step03/scene-video-controller.js?v=20261009_v44"></script>
 <script src="/01_app/assets/steps/step03/production-workflow-controller.js?v=20261009_v43"></script>
 <script src="/01_app/assets/video-editor/scene-navigation.js?v=20261007_v2"></script>
 <script src="/01_app/assets/video-editor/ratio-profiles.js?v=20261008_v24"></script>
@@ -1236,8 +1237,6 @@ let storedStoryboardImageCandidates=new Map();
 let storedStoryboardVoiceClips=new Map();
 let storedStoryboardVideos=new Map();
 let storedStoryboardVideoCandidates=new Map();
-const resumedKlingTaskIds=new Set();
-let pendingVideoResumeBusy=false;
 let storyboardLook='original';
 function applyStoryboardLook(look){
   storyboardLook=['original','warm','cool','realistic'].includes(look)?look:'original';
@@ -1675,72 +1674,16 @@ async function generateMissingSceneVoices(){
   }finally{bulkButton.disabled=false;bulkButton.textContent='미생성 음성 일괄 생성'}
 }
 async function pollSceneVideo(card,taskId){
-  const statusNode=card.querySelector('.storyboard-video-status');
-  for(let attempt=0;attempt<180;attempt+=1){
-    await sleep(attempt?5000:1200);
-    const result=await api(`/api/storyboard/video-status?task_id=${encodeURIComponent(taskId)}`);
-    statusNode.textContent=result.status==='running'?'Kling 영상 생성 중…':'Kling 작업 대기 중…';
-    if(result.status==='failed')throw new Error('Kling 영상 생성에 실패했습니다.');
-    if(result.status==='succeeded'){
-      const video=result.video;if(!video?.uri)throw new Error('완료된 Kling 영상 주소를 받지 못했습니다.');
-      storedStoryboardVideos.set(card.dataset.scene,video);
-      const candidates=storedStoryboardVideoCandidates.get(card.dataset.scene)||[];
-      candidates.forEach(item=>item.selected=false);
-      if(!candidates.some(item=>item.artifact_id===video.artifact_id))candidates.push({...video,selected:true});
-      storedStoryboardVideoCandidates.set(card.dataset.scene,candidates);
-      renderStoryboardGrid();return video;
-    }
-  }
-  throw new Error('Kling 영상 생성 대기 시간이 초과되었습니다. 나중에 다시 확인해 주세요.');
+  return sceneVideoController.poll(card,taskId);
 }
 async function resumePendingSceneVideos(){
-  if(!activeProjectId||pendingVideoResumeBusy)return;
-  pendingVideoResumeBusy=true;
-  try{
-    const result=await api(`/api/storyboard/video-jobs?project_id=${encodeURIComponent(activeProjectId)}`);
-    (result.jobs||[]).forEach(job=>{
-      if(!job.task_id||resumedKlingTaskIds.has(job.task_id))return;
-      const card=document.querySelector(`.storyboard-card[data-scene="${CSS.escape(job.scene_id)}"]`);
-      if(!card)return;
-      resumedKlingTaskIds.add(job.task_id);
-      const statusNode=card.querySelector('.storyboard-video-status');
-      statusNode.textContent='저장된 Kling 작업을 다시 연결하고 있습니다.';
-      pollSceneVideo(card,job.task_id).catch(error=>{
-        statusNode.textContent=error.message;
-        document.querySelector('#storyboardMessage').textContent=error.message;
-      });
-    });
-  }catch(error){console.error('Kling 작업 복원 실패',error)}
-  finally{pendingVideoResumeBusy=false}
+  return sceneVideoController.resume();
 }
 async function generateSceneVideo(button,force=true){
-  const card=button.closest('.storyboard-card');const sceneId=card.dataset.scene;
-  if(!storedStoryboardImages.has(sceneId))throw new Error('이 씬의 이미지를 먼저 생성해 주세요.');
-  button.disabled=true;const statusNode=card.querySelector('.storyboard-video-status');statusNode.textContent='Kling에 영상 작업을 접수하고 있습니다.';
-  try{
-    const result=await api('/api/storyboard/video-generate',{method:'POST',body:JSON.stringify({project_id:activeProjectId,scene_id:sceneId,force,motion_prompt:card.querySelector('.storyboard-motion-positive').value,negative_prompt:card.querySelector('.storyboard-motion-negative').value})});
-    const job=result.video_job||{};
-    if(job.status==='succeeded'&&job.video){storedStoryboardVideos.set(sceneId,job.video);renderStoryboardGrid();return job.video}
-    if(!job.task_id)throw new Error('Kling 작업 ID를 받지 못했습니다.');
-    return await pollSceneVideo(card,job.task_id);
-  }finally{button.disabled=false}
+  return sceneVideoController.generate(button,force);
 }
 async function generateMissingSceneVideos(){
-  const bulkButton=document.querySelector('#storyboardVideoBulkGenerate');
-  const cards=[...document.querySelectorAll('.storyboard-card')];
-  const missing=cards.filter(card=>!storedStoryboardVideos.has(card.dataset.scene));
-  if(!missing.length){document.querySelector('#storyboardMessage').textContent='모든 씬의 Kling 영상이 이미 생성되어 있습니다.';return []}
-  const absentImage=missing.find(card=>!storedStoryboardImages.has(card.dataset.scene));
-  if(absentImage)throw new Error(`${absentImage.querySelector('.storyboard-card-head b').textContent} 이미지를 먼저 생성해 주세요.`);
-  document.querySelector('#storyboardMessage').textContent=`미생성 씬 영상 ${missing.length}개를 Kling으로 생성합니다.`;
-  bulkButton.disabled=true;
-  const results=new Array(missing.length);let cursor=0;let completed=0;
-  async function worker(){while(cursor<missing.length){const index=cursor;cursor+=1;results[index]=await generateSceneVideo(missing[index].querySelector('.storyboard-video-generate'),false);completed+=1;bulkButton.textContent=`Kling 영상 생성 중 ${completed}/${missing.length}`}}
-  try{
-    await Promise.all(Array.from({length:Math.min(2,missing.length)},worker));
-    document.querySelector('#storyboardMessage').textContent=`미생성 씬 Kling 영상 ${missing.length}개를 생성했습니다.`;
-    return results;
-  }finally{bulkButton.disabled=false;bulkButton.textContent='미생성 Kling 영상 일괄 생성'}
+  return sceneVideoController.generateMissing();
 }
 async function previewVoiceProfile(button){
   const profileId=button.dataset.voiceProfile;
@@ -2339,6 +2282,8 @@ const contentIndexController=Step01ContentIndexController.create({request:(...ar
 contentIndexController.mount(document);
 const scriptGenerationController=Step02ScriptGenerationController.create({getRoot:()=>document,configureWorkflowModal,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getSelectedKeywordLabels:selectedKeywordLabels,now:()=>Date.now(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),sleep,setGeneratedState:state=>{demoData.state=state},setGeneratedTimeline:timeline=>{demoData.timeline=timeline},setGeneratedDocument:value=>{activeStoryboardDocument=value},setKeywordLocked:setKeywordStageLocked,setVoiceProfile,applyTimeline,removeStoredScript:()=>localStorage.removeItem(SCRIPT_STORAGE_KEY),fillScript,applyScript,refreshProjectIndex,showStep});
 scriptGenerationController.mount(document);
+const sceneVideoController=Step03SceneVideoController.create({getRoot:()=>document,request:(...args)=>api(...args),sleep,getActiveProjectId:()=>activeProjectId,getImages:()=>storedStoryboardImages,getVideos:()=>storedStoryboardVideos,getVideoCandidates:()=>storedStoryboardVideoCandidates,renderStoryboardGrid,escapeSelector:value=>CSS.escape(value),onError:(feature,error)=>console.error(`[SceneVideo:${feature}]`,error)});
+sceneVideoController.mount(document);
 const productionWorkflowController=Step03ProductionWorkflowController.create({getRoot:()=>document,configureWorkflowModal,generateMissingSceneVideos,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,sleep,setupSceneProgressBadges,runDemoSceneProgress,showStep});
 productionWorkflowController.mount(document);
 const keywordController=Step02Keyword.create({getRoot:()=>document,getKeywords:()=>demoData.keywords,getVisibleKeywordIds:()=>visibleKeywordIds,setVisibleKeywordIds:value=>{visibleKeywordIds=value},getSelectedKeywords:()=>selectedKeywords,getActiveProjectId:()=>activeProjectId,beginNav,isStaleNav,loadProjectContent,showStep,ensureStepApiReady,request:(...args)=>api(...args),setDemoState:state=>{demoData.state=state},runAiWorkflow,random:()=>Math.random()});
@@ -2382,18 +2327,11 @@ document.querySelector('#storyboardGrid').addEventListener('click',async event=>
   const button=event.target.closest('.storyboard-speaker');if(!button)return;
   try{await generateOrPlaySceneVoice(button)}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
 });
-document.querySelector('#storyboardGrid').addEventListener('click',async event=>{
-  const button=event.target.closest('.storyboard-video-generate');if(!button)return;
-  try{await generateSceneVideo(button)}catch(error){document.querySelector('#storyboardMessage').textContent=error.message;button.closest('.storyboard-card').querySelector('.storyboard-video-status').textContent=error.message}
-});
 document.querySelector('#storyboardBulkGenerate').addEventListener('click',async()=>{
   try{await generateMissingStoryboardImages()}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
 });
 document.querySelector('#storyboardVoiceBulkGenerate').addEventListener('click',async()=>{
   try{await generateMissingSceneVoices()}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
-});
-document.querySelector('#storyboardVideoBulkGenerate').addEventListener('click',async()=>{
-  try{await generateMissingSceneVideos()}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
 });
 document.querySelector('#storyboardLookToolbar').addEventListener('click',event=>{
   const button=event.target.closest('[data-look]');if(button)applyStoryboardLook(button.dataset.look);
