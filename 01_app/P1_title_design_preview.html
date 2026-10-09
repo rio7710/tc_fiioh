@@ -26,6 +26,7 @@
 <script src="/01_app/assets/steps/step02/trend-keyword-controller.js?v=20261009_v40"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
+<script src="/01_app/assets/steps/step03/storyboard-grid-renderer.js?v=20261009_v49"></script>
 <script src="/01_app/assets/steps/step03/voice-profile-controller.js?v=20261009_v48"></script>
 <script src="/01_app/assets/steps/step03/scene-voice-controller.js?v=20261009_v47"></script>
 <script src="/01_app/assets/steps/step03/candidate-selection-controller.js?v=20261009_v46"></script>
@@ -1505,33 +1506,7 @@ function updateStoryboardVoiceControls(){
   return sceneVoiceController.updateControls();
 }
 function renderStoryboardGrid(){
-  applyStoryboardLook(localStorage.getItem(`thinkcast-storyboard-look-${activeProjectId}`)||storyboardLook);
-  const production=activeStoryboardDocument?.production||{};
-  const storyboardScenes=production.timeline?.scenes||[];
-  const defaultVideoNegative=production.global_prompts?.negative?.text||'순간 이동, 공중 부양, 얼굴 변형, 손가락 왜곡, 발 미끄러짐, 물체 증식, 깜빡임, 카메라 흔들림, 글자, 로고 금지';
-  const cueMap=new Map((production.narration_cues||[]).map(cue=>[cue.id,cue]));
-  const currentLines=currentScriptPayload().lines;
-  if(!storyboardScenes.length)throw new Error('저장된 씬별 콘티 정보를 찾을 수 없습니다.');
-  document.querySelector('#storyboardGrid').innerHTML=storyboardScenes.map((scene,index)=>{
-    const cueId=(scene.narration_cue_ids||[])[0];const cue=cueMap.get(cueId)||{};
-    const lineIndex=(production.narration_cues||[]).findIndex(item=>item.id===cueId);
-    const narration=currentLines[lineIndex]||cue.narration?.text||scene.narration?.text||'';
-    const prompt=scene.image_prompt?.text||'';
-    const saved=storedStoryboardImages.get(scene.id);const usage=saved?.usage||{};
-    const tokenLabel=saved?` · 사용 토큰 ${Number(usage.total_tokens||0).toLocaleString()} (입력 ${Number(usage.input_tokens||0).toLocaleString()} / 출력 ${Number(usage.output_tokens||0).toLocaleString()})`:'';
-    const candidates=storedStoryboardImageCandidates.get(scene.id)||[];
-    const candidateControls=candidates.length>1?`<button class="storyboard-candidate-nav prev" type="button" data-direction="-1" aria-label="이전 이미지 후보"></button><button class="storyboard-candidate-nav next" type="button" data-direction="1" aria-label="다음 이미지 후보"></button>`:'';
-    const candidateIndex=Math.max(0,candidates.findIndex(item=>item.uri===saved?.uri));
-    const candidateLabel=candidates.length>1?` · 후보 ${candidateIndex+1}/${candidates.length}`:'';
-    const result=saved?`<div class="storyboard-result"><div class="storyboard-image-frame"><a href="${escapeHtml(saved.uri)}" target="_blank" rel="noopener" title="원본 이미지 새 창에서 보기"><img src="${escapeHtml(saved.uri)}" alt="저장된 씬 이미지"></a>${candidateControls}</div><small>${escapeHtml(saved.model)} · 저장된 생성 이미지${escapeHtml(candidateLabel)}${escapeHtml(tokenLabel)}</small></div>`:'<div class="storyboard-result" hidden></div>';
-    const voice=sceneVoiceContext(scene.id).voice;const voiceTitle=voice?'저장된 음성 재생':'이 내레이션 음성 생성';
-    const voiceTokens=Number(voice?.usage?.total_tokens||0);const voiceUsage=voiceTokens?`음성 사용 토큰 ${voiceTokens.toLocaleString()} (입력 ${Number(voice.usage.input_tokens||0).toLocaleString()} / 출력 ${Number(voice.usage.output_tokens||0).toLocaleString()})`:'';
-    const video=storedStoryboardVideos.get(scene.id);const videoCandidates=storedStoryboardVideoCandidates.get(scene.id)||[];const videoIndex=Math.max(0,videoCandidates.findIndex(item=>item.artifact_id===video?.artifact_id||item.uri===video?.uri));const videoControls=videoCandidates.length>1?`<button class="storyboard-video-candidate-nav prev" type="button" data-direction="-1" aria-label="이전 영상 후보"></button><button class="storyboard-video-candidate-nav next" type="button" data-direction="1" aria-label="다음 영상 후보"></button>`:'';const videoPreview=video?`<div class="storyboard-video-frame"><video class="storyboard-video-preview" controls preload="metadata" src="${escapeHtml(video.uri)}"></video>${videoControls}</div><small>영상 후보 ${videoIndex+1}/${videoCandidates.length||1}</small>`:'';
-    const motionPrompt=scene.motion_prompt?.text||'';
-    return `<article class="storyboard-card" data-scene="${escapeHtml(scene.id)}"><header class="storyboard-card-head"><b>S#${String(index+1).padStart(2,'0')}</b><strong>${escapeHtml(scene.title||`장면 ${index+1}`)}</strong></header><details class="storyboard-prompt-details"><summary>이미지 프롬프트 보기</summary><p class="storyboard-prompt">${escapeHtml(prompt)}</p></details><details class="storyboard-motion-details"><summary>이미지 → 영상 프롬프트</summary><div class="storyboard-motion-fields"><label>일반 모션 프롬프트<textarea class="storyboard-motion-positive">${escapeHtml(motionPrompt)}</textarea></label><label>네거티브 프롬프트<textarea class="storyboard-motion-negative">${escapeHtml(defaultVideoNegative)}</textarea></label></div></details><div class="storyboard-actions"><span class="storyboard-narration" title="${escapeHtml(narration)}">${escapeHtml(narration)}</span><button class="storyboard-speaker ${voice?'has-audio':''}" type="button" aria-label="${voiceTitle}" title="${voiceTitle}"></button><button class="storyboard-generate" type="button">${saved?'다시 생성':'이미지 생성'}</button><small class="storyboard-voice-usage" ${voiceUsage?'':'hidden'}>${escapeHtml(voiceUsage)}</small>${result}<div class="storyboard-video-block"><button class="storyboard-video-generate" type="button">${video?'다시 영상 생성':'영상 생성'}</button><span class="storyboard-video-status">${video?'Kling 영상 생성 완료':''}</span>${videoPreview}</div></div></article>`;
-  }).join('');
-  updateStoryboardVoiceControls();
-  resumePendingSceneVideos();
+  return storyboardGridRenderer.render();
 }
 async function cycleStoryboardCandidate(button){
   return candidateSelectionController.selectImage(button);
@@ -2147,6 +2122,7 @@ const contentIndexController=Step01ContentIndexController.create({request:(...ar
 contentIndexController.mount(document);
 const scriptGenerationController=Step02ScriptGenerationController.create({getRoot:()=>document,configureWorkflowModal,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getSelectedKeywordLabels:selectedKeywordLabels,now:()=>Date.now(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),sleep,setGeneratedState:state=>{demoData.state=state},setGeneratedTimeline:timeline=>{demoData.timeline=timeline},setGeneratedDocument:value=>{activeStoryboardDocument=value},setKeywordLocked:setKeywordStageLocked,setVoiceProfile,applyTimeline,removeStoredScript:()=>localStorage.removeItem(SCRIPT_STORAGE_KEY),fillScript,applyScript,refreshProjectIndex,showStep});
 scriptGenerationController.mount(document);
+const storyboardGridRenderer=Step03StoryboardGridRenderer.create({getRoot:()=>document,storage:localStorage,getActiveProjectId:()=>activeProjectId,getStoryboardLook:()=>storyboardLook,applyStoryboardLook,getStoryboardDocument:()=>activeStoryboardDocument,getCurrentScriptLines:()=>currentScriptPayload().lines,getImages:()=>storedStoryboardImages,getImageCandidates:()=>storedStoryboardImageCandidates,getVoiceContext:sceneVoiceContext,getVideos:()=>storedStoryboardVideos,getVideoCandidates:()=>storedStoryboardVideoCandidates,escapeHtml,updateVoiceControls:updateStoryboardVoiceControls,resumePendingVideos:resumePendingSceneVideos});
 const voiceProfileController=Step03VoiceProfileController.create({getRoot:()=>document,request:(...args)=>api(...args),fetch:(...args)=>fetch(...args),createObjectURL:blob=>URL.createObjectURL(blob),revokeObjectURL:url=>URL.revokeObjectURL(url),getActiveProjectId:()=>activeProjectId,getSelectedProfile:()=>selectedVoiceProfile,setSelectedProfile:value=>{selectedVoiceProfile=value},onError:(feature,error)=>console.error(`[VoiceProfile:${feature}]`,error)});
 voiceProfileController.mount(document);
 const sceneVoiceController=Step03SceneVoiceController.create({getRoot:()=>document,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getStoryboardDocument:()=>activeStoryboardDocument,getVoiceClips:()=>storedStoryboardVoiceClips,getSelectedVoiceProfile:()=>selectedVoiceProfile,setDemoTimeline:timeline=>{demoData.timeline=timeline},applyTimeline,onError:(feature,error)=>console.error(`[SceneVoice:${feature}]`,error)});
