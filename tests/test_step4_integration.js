@@ -38,6 +38,7 @@ const shellNavigationControllerPath = '01_app/assets/core/shell-navigation-contr
 const sessionBootstrapControllerPath = '01_app/assets/core/session-bootstrap-controller.js';
 const authUIControllerPath = '01_app/assets/core/auth-ui-controller.js';
 const projectHydrationControllerPath = '01_app/assets/core/project-hydration-controller.js';
+const projectHydrationApplierPath = '01_app/assets/core/project-hydration-applier.js';
 const promptLabControllerPath = '01_app/assets/core/prompt-lab-controller.js';
 const providerSettingsControllerPath = '01_app/assets/core/provider-settings-controller.js';
 const scriptEditorControllerPath = '01_app/assets/steps/step03/step03-script-editor-controller.js';
@@ -88,6 +89,7 @@ assert.ok(fs.existsSync(shellNavigationControllerPath), 'shell-navigation-contro
 assert.ok(fs.existsSync(sessionBootstrapControllerPath), 'session-bootstrap-controller.js must exist');
 assert.ok(fs.existsSync(authUIControllerPath), 'auth-ui-controller.js must exist');
 assert.ok(fs.existsSync(projectHydrationControllerPath), 'project-hydration-controller.js must exist');
+assert.ok(fs.existsSync(projectHydrationApplierPath), 'project-hydration-applier.js must exist');
 assert.ok(fs.existsSync(promptLabControllerPath), 'prompt-lab-controller.js must exist');
 assert.ok(fs.existsSync(providerSettingsControllerPath), 'provider-settings-controller.js must exist');
 assert.ok(fs.existsSync(scriptEditorControllerPath), 'step03-script-editor-controller.js must exist');
@@ -110,6 +112,7 @@ const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
 const brandLibrarySource = fs.readFileSync(brandLibraryControllerPath, 'utf8');
 const projectHydrationSource = fs.readFileSync(projectHydrationControllerPath, 'utf8');
+const projectHydrationApplierSource = fs.readFileSync(projectHydrationApplierPath, 'utf8');
 assert.match(partialHtml, /id="step4"/, 'Partial HTML contains #step4');
 assert.match(partialHtml, /id="imageRegenerationModal"/, 'Partial HTML contains #imageRegenerationModal');
 assert.doesNotMatch(step04Source, /document\.addEventListener\('click',[\s\S]*\.ratio-btn/, 'ratio controls must not have a duplicate global click listener');
@@ -122,7 +125,9 @@ const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 assert.match(html, /src="\/01_app\/assets\/core\/shell-navigation-controller\.js\?v=20261009_v32"/, 'HTML cache-busts shell navigation controller');
 assert.match(html, /src="\/01_app\/assets\/core\/session-bootstrap-controller\.js\?v=20261009_v33"/, 'HTML cache-busts session bootstrap controller');
 assert.match(html, /src="\/01_app\/assets\/core\/auth-ui-controller\.js\?v=20261009_v34"/, 'HTML cache-busts auth UI controller');
-assert.match(html, /src="\/01_app\/assets\/core\/project-hydration-controller\.js\?v=20261009_v36"/, 'HTML cache-busts project hydration controller');
+assert.match(html, /src="\/01_app\/assets\/core\/project-hydration-applier\.js\?v=20261009_v57"/, 'HTML cache-busts project hydration applier');
+assert.match(html, /src="\/01_app\/assets\/core\/project-hydration-controller\.js\?v=20261009_v57"/, 'HTML cache-busts project hydration controller');
+assert.ok(html.indexOf('project-hydration-applier.js') < html.indexOf('project-hydration-controller.js'), 'hydration applier loads before controller');
 assert.match(html, /src="\/01_app\/assets\/core\/prompt-lab-controller\.js\?v=20261009_v37"/, 'HTML cache-busts prompt lab controller');
 assert.match(html, /src="\/01_app\/assets\/core\/provider-settings-controller\.js\?v=20261009_v39"/, 'HTML cache-busts provider settings controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/trend-keyword-controller\.js\?v=20261009_v40"/, 'HTML cache-busts trend keyword controller');
@@ -176,6 +181,8 @@ assert.doesNotMatch(html, /document\.querySelector\('#loginForm'\)\.addEventList
 assert.match(html, /async function loadProjectContent\(projectId,token\)\{\s*return projectHydrationController\.loadContent\(projectId,token\);\s*\}/, 'P1 keeps a thin project content hydration wrapper');
 assert.match(html, /async function loadProjectState\(projectId,token\)\{\s*return projectHydrationController\.loadState\(projectId,token\);\s*\}/, 'P1 keeps a thin project state hydration wrapper');
 assert.match(html, /const projectHydrationController=ThinkCastProjectHydrationController\.create\(/, 'P1 wires the project hydration controller');
+assert.match(html, /applier:projectHydrationApplier/, 'P1 explicitly injects hydration applier');
+assert.doesNotMatch(projectHydrationSource,/setSceneCropPositions|setDemoTimeline|setSelectedKeywords/,'transport controller has no state setter dependencies');
 assert.ok(html.indexOf('projectHydrationController=') < html.indexOf('shellNavigationController='), 'project hydration is wired before shell navigation');
 assert.doesNotMatch(html, /\/api\/project-content\?project_id=/, 'P1 removes the project content hydration body');
 assert.doesNotMatch(html, /\/api\/project-state\?project_id=/, 'P1 removes the project state hydration body');
@@ -370,7 +377,7 @@ assert.match(html, /function showBrandLibrary\(show\)\{return brandLibraryContro
 assert.match(html, /brandLibraryController\.mount\(document\)/, 'P1 mounts the brand library controller after partials load');
 assert.doesNotMatch(html, /document\.querySelector\('#brandUploadButton'\)\.addEventListener/, 'P1 does not retain the brand upload implementation');
 assert.doesNotMatch(html, /if\(path==='\/api\/brand-assets'&&Array\.isArray\(result\.selections\)\)/, 'generic API has no hidden brand selection mutation');
-assert.match(projectHydrationSource, /deps\.hydrateBrandSelections\(\{assets: result\.brand_assets \|\| \[\], selections: result\.brand_selections \|\| \[\]\}\)/, 'project content load hydrates brand data explicitly');
+assert.match(projectHydrationApplierSource, /deps\.hydrateBrandSelections\(\{assets:result\.brand_assets\|\|\[\],selections:result\.brand_selections\|\|\[\]\}\)/, 'project content applier hydrates brand data explicitly');
 assert.match(brandLibrarySource, /selectionController\.hydrate\(\{assets: result\.assets \|\| \[\], selections: result\.selections \|\| \[\]\}\)/, 'brand library refresh hydrates brand data explicitly');
 const brandStateDeclaration = "const brandOverlayState=Step04BrandState.create();";
 assert.ok(html.indexOf(brandStateDeclaration) > 0 && html.indexOf(brandStateDeclaration) < html.indexOf('function activeWatermarkProfile'), 'brand state is initialized before Step 4 settings restore');
@@ -507,6 +514,7 @@ function createPrePartialContext() {
     ThinkCastSessionBootstrapController: require('../01_app/assets/core/session-bootstrap-controller.js'),
     ThinkCastAuthUIController: require('../01_app/assets/core/auth-ui-controller.js'),
     ThinkCastProjectHydrationController: require('../01_app/assets/core/project-hydration-controller.js'),
+    ThinkCastProjectHydrationApplier: require('../01_app/assets/core/project-hydration-applier.js'),
     ThinkCastPromptLabController: require('../01_app/assets/core/prompt-lab-controller.js'),
     ThinkCastProviderSettingsController: require('../01_app/assets/core/provider-settings-controller.js'),
     Step03ScriptEditorController: require('../01_app/assets/steps/step03/step03-script-editor-controller.js'),
