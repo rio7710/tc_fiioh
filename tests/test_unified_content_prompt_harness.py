@@ -388,6 +388,21 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertEqual(2, len(calls))
         self.assertEqual("establish", result["document"]["production"]["timeline"]["scenes"][0]["sequence"]["camera_axis_transition"])
 
+    def test_three_failed_repairs_trigger_one_fresh_generation(self):
+        calls = []
+        valid = json.dumps(document(["안심"]), ensure_ascii=False)
+
+        def generate(prompt):
+            calls.append(prompt)
+            return valid if len(calls) == 5 else "not json"
+
+        result = run_generation_harness(generate, ["안심"], "자료")
+
+        self.assertEqual(5, len(calls))
+        self.assertEqual(3, result["repair_count"])
+        self.assertEqual(1, result["regeneration_count"])
+        self.assertEqual(calls[0], calls[4], "fresh generation reuses the original request, not the broken JSON")
+
     def test_missing_project_metadata_is_filled_from_locked_inputs(self):
         value = document(["안심"])
         value["project"] = {}

@@ -18,6 +18,7 @@ PRODUCTION_SECTION_KEYS = (
     "timeline", "narration_cues", "postproduction", "output",
 )
 MAX_VALIDATION_REPAIRS = 3
+MAX_FRESH_REGENERATIONS = 1
 
 
 def parse_json_document(candidate: str) -> dict[str, Any]:
@@ -908,16 +909,27 @@ def run_generation_harness(
     prompt = build_prompt(selected_keywords, source_material, previous_documents, reference_material)
     candidate = generate(prompt)
     repair_count = 0
+    repairs_in_generation = 0
+    regeneration_count = 0
     while True:
         try:
             document = complete_provenance(parse_json_document(candidate))
             validate_document(document, selected_keywords, strict_schema, locked_plan)
             break
         except (UnifiedContentError, KeyError, TypeError, ValueError) as validation_error:
-            if repair_count >= MAX_VALIDATION_REPAIRS:
+            if repairs_in_generation < MAX_VALIDATION_REPAIRS:
+                candidate = generate(build_repair_prompt(candidate, validation_error, locked_plan))
+                repair_count += 1
+                repairs_in_generation += 1
+                continue
+            if regeneration_count >= MAX_FRESH_REGENERATIONS:
                 raise
-            candidate = generate(build_repair_prompt(candidate, validation_error, locked_plan))
-            repair_count += 1
+            # Repeatedly patching a malformed structure tends to preserve the
+            # same defect.  Discard it after three repairs and ask for one
+            # completely new document from the original request instead.
+            candidate = generate(prompt)
+            regeneration_count += 1
+            repairs_in_generation = 0
     similarity = maximum_similarity(document, previous_documents)
     if similarity >= similarity_threshold:
         revised = generate(build_novelty_repair_prompt(json.dumps(document, ensure_ascii=False), similarity))
@@ -933,4 +945,9 @@ def run_generation_harness(
             pass
     if persist:
         persist(document)
-    return {"document": document, "repair_count": repair_count, "maximum_similarity": similarity}
+    return {
+        "document": document,
+        "repair_count": repair_count,
+        "regeneration_count": regeneration_count,
+        "maximum_similarity": similarity,
+    }
