@@ -45,6 +45,7 @@ const productionWorkflowControllerPath = '01_app/assets/steps/step03/production-
 const sceneVideoControllerPath = '01_app/assets/steps/step03/scene-video-controller.js';
 const sceneImageControllerPath = '01_app/assets/steps/step03/scene-image-controller.js';
 const candidateSelectionControllerPath = '01_app/assets/steps/step03/candidate-selection-controller.js';
+const sceneVoicePlaybackControllerPath = '01_app/assets/steps/step03/scene-voice-playback-controller.js';
 const sceneVoiceControllerPath = '01_app/assets/steps/step03/scene-voice-controller.js';
 const voiceProfileControllerPath = '01_app/assets/steps/step03/voice-profile-controller.js';
 const storyboardGridRendererPath = '01_app/assets/steps/step03/storyboard-grid-renderer.js';
@@ -92,6 +93,7 @@ assert.ok(fs.existsSync(productionWorkflowControllerPath), 'production-workflow-
 assert.ok(fs.existsSync(sceneVideoControllerPath), 'scene-video-controller.js must exist');
 assert.ok(fs.existsSync(sceneImageControllerPath), 'scene-image-controller.js must exist');
 assert.ok(fs.existsSync(candidateSelectionControllerPath), 'candidate-selection-controller.js must exist');
+assert.ok(fs.existsSync(sceneVoicePlaybackControllerPath), 'scene-voice-playback-controller.js must exist');
 assert.ok(fs.existsSync(sceneVoiceControllerPath), 'scene-voice-controller.js must exist');
 assert.ok(fs.existsSync(voiceProfileControllerPath), 'voice-profile-controller.js must exist');
 assert.ok(fs.existsSync(storyboardGridRendererPath), 'storyboard-grid-renderer.js must exist');
@@ -126,7 +128,8 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step03\/production-workflow-co
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-video-controller\.js\?v=20261009_v44"/, 'HTML cache-busts scene video controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-image-controller\.js\?v=20261009_v45"/, 'HTML cache-busts scene image controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/candidate-selection-controller\.js\?v=20261009_v46"/, 'HTML cache-busts candidate selection controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-voice-controller\.js\?v=20261009_v47"/, 'HTML cache-busts scene voice controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-voice-playback-controller\.js\?v=20261009_v54"/, 'HTML cache-busts scene voice playback controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-voice-controller\.js\?v=20261009_v54"/, 'HTML cache-busts scene voice controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/voice-profile-controller\.js\?v=20261009_v48"/, 'HTML cache-busts voice profile controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-look-controller\.js\?v=20261009_v52"/, 'HTML cache-busts storyboard look controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-grid-renderer\.js\?v=20261009_v52"/, 'HTML cache-busts storyboard grid renderer');
@@ -139,6 +142,7 @@ assert.ok(html.indexOf('scene-video-controller.js') < html.indexOf('production-w
 assert.ok(html.indexOf('scene-image-controller.js') < html.indexOf('scene-video-controller.js'), 'scene image controller loads before scene video controller');
 assert.ok(html.indexOf('candidate-selection-controller.js') < html.indexOf('scene-image-controller.js'), 'candidate selection controller loads before scene image controller');
 assert.ok(html.indexOf('scene-voice-controller.js') < html.indexOf('candidate-selection-controller.js'), 'scene voice controller loads before candidate selection controller');
+assert.ok(html.indexOf('scene-voice-playback-controller.js') < html.indexOf('scene-voice-controller.js'), 'scene voice playback loads before scene voice orchestration');
 assert.ok(html.indexOf('voice-profile-controller.js') < html.indexOf('scene-voice-controller.js'), 'voice profile controller loads before scene voice controller');
 assert.ok(html.indexOf('storyboard-look-controller.js') < html.indexOf('storyboard-grid-renderer.js') && html.indexOf('storyboard-grid-renderer.js') < html.indexOf('voice-profile-controller.js'), 'storyboard look and grid controllers load before voice profile controller');
 assert.ok(html.indexOf('storyboard-project-state-controller.js') < html.indexOf('voice-profile-controller.js'), 'storyboard project state controller loads before voice profile controller');
@@ -217,6 +221,8 @@ assert.match(html,/async function cycleStoryboardCandidate\(button\)\{\s*return 
 assert.match(html,/async function cycleStoryboardVideoCandidate\(button\)\{\s*return candidateSelectionController\.selectVideo\(button\);\s*\}/,'P1 keeps thin video candidate wrapper');
 assert.doesNotMatch(html,/\/api\/storyboard\/(?:image|video)-select|const candidateButton=event\.target\.closest\('\.storyboard-(?:video-)?candidate-nav'/,'P1 removes candidate selection API bodies and listeners');
 assert.match(html,/const sceneVoiceController=Step03SceneVoiceController\.create\(/,'P1 wires scene voice controller');
+assert.match(html,/const sceneVoicePlaybackController=Step03SceneVoicePlaybackController\.create\(/,'P1 wires scene voice playback controller');
+assert.match(html,/playback:sceneVoicePlaybackController/,'P1 explicitly injects playback into scene voice orchestration');
 assert.match(html,/sceneVoiceController\.mount\(document\)/,'P1 mounts scene voice interactions');
 assert.match(html,/function sceneVoiceContext\(sceneId\)\{\s*return sceneVoiceController\.context\(sceneId\);\s*\}/,'P1 keeps thin voice context wrapper');
 assert.match(html,/function updateStoryboardVoiceControls\(\)\{\s*return sceneVoiceController\.updateControls\(\);\s*\}/,'P1 keeps thin voice controls wrapper');
@@ -421,6 +427,8 @@ function createPrePartialContext() {
         listeners.set(type, list.filter(f => f !== fn));
       },
       focus() {},
+      pause() {},
+      play() { return Promise.resolve(); },
       setLoggedIn() {},
       closest() { return null; },
       querySelector() { return null; },
@@ -498,6 +506,7 @@ function createPrePartialContext() {
     Step03SceneVideoController: require('../01_app/assets/steps/step03/scene-video-controller.js'),
     Step03SceneImageController: require('../01_app/assets/steps/step03/scene-image-controller.js'),
     Step03CandidateSelectionController: require('../01_app/assets/steps/step03/candidate-selection-controller.js'),
+    Step03SceneVoicePlaybackController: require('../01_app/assets/steps/step03/scene-voice-playback-controller.js'),
     Step03SceneVoiceController: require('../01_app/assets/steps/step03/scene-voice-controller.js'),
     Step03VoiceProfileController: require('../01_app/assets/steps/step03/voice-profile-controller.js'),
     Step03StoryboardGridRenderer: require('../01_app/assets/steps/step03/storyboard-grid-renderer.js'),
