@@ -20,6 +20,7 @@ partials.forEach(([container, path]) => {
   assert.match(shell, new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${path} is loaded`);
 });
 assert.match(shell, /await ensureStepPartialsLoaded\(\);[\s\S]*await ensureStep4Loaded\(\);[\s\S]*await initDemo\(\);[\s\S]*await restoreLoginSession\(\)/, 'partials and demo initialize before session route restoration');
+assert.ok(shell.indexOf('await ensureStepPartialsLoaded();') < shell.indexOf('authUIController.mount(document)'), 'auth UI mounts after step partials load');
 
 const nodes = Object.fromEntries(partials.map(([id]) => [id, { innerHTML: '' }]));
 const root = { querySelector: selector => nodes[selector.slice(1)] || null };

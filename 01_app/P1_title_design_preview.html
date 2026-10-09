@@ -13,6 +13,7 @@
 <script src="/01_app/assets/core/content-route.js?v=20261007_v2"></script>
 <script src="/01_app/assets/core/shell-navigation-controller.js?v=20261009_v32"></script>
 <script src="/01_app/assets/core/session-bootstrap-controller.js?v=20261009_v33"></script>
+<script src="/01_app/assets/core/auth-ui-controller.js?v=20261009_v34"></script>
 <script src="/01_app/assets/core/project-store.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step-partial-loader.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step01/step01-project-index-controller.js?v=20261009_v31"></script>
@@ -1290,16 +1291,8 @@ const keywordTilts=new Map();
 let visibleKeywordIds=[];
 let settingsReady=false;
 let scriptBaselineLines=[];
-let isLoggedIn=false;
-let activeAccount=null;
-
 function setLoginAccess(enabled,account=null){
-  isLoggedIn=enabled;activeAccount=enabled?account:null;document.body.classList.toggle('is-logged-in',enabled);
-  const toolbar=document.querySelector('.global-api-toolbar'),nav=document.querySelector('thinkcast-top-nav');if(toolbar)toolbar.inert=!enabled;if(nav){nav.inert=!enabled;nav.setLoggedIn(enabled)}
-  document.querySelector('#loginForm').hidden=enabled;document.querySelector('#loginActions').hidden=enabled;
-  document.querySelector('#registerForm').hidden=true;document.querySelector('#registerActions').hidden=true;
-  document.querySelector('#loggedInPanel').hidden=!enabled;document.querySelector('#loggedInActions').hidden=!enabled;
-  if(enabled){document.querySelector('#loggedInUsername').textContent=account?.user?.username||account?.user?.name||'';document.querySelector('#loggedInProject').textContent=account?.project?.name?`연결 프로젝트 · ${account.project.name}`:'연결 프로젝트 준비됨'}
+  return authUIController.setAccess(enabled,account);
 }
 
 const fmt=s=>{const n=Math.max(0,Math.floor(s||0));return `${String(Math.floor(n/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`};
@@ -2744,7 +2737,9 @@ brandLibraryController.mount(document);
 const brandOverlayMount=brandOverlayController.mount(document);if(!brandOverlayMount.watermark.ok)console.error('[BrandOverlay:watermark]',brandOverlayMount.watermark.error);if(!brandOverlayMount.outro.ok)console.error('[BrandOverlay:outro]',brandOverlayMount.outro.error);
 const projectIndexController=Step01ProjectIndexController.create({getRoot:()=>document,projectsIndex:indexProjects,getCalendarEntries:()=>calendarEntries,calendarContentVersions,getRememberedProjectId:()=>localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY),getActiveProjectId:()=>activeProjectId,setActiveProjectId,request:(...args)=>api(...args),refreshBrandLibrary,escapeHtml,projectDate,automationStageLabel,setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),onPollError:error=>console.error('[ProjectIndex:poll]',error)});
 projectIndexController.startPolling();
-const shellNavigationController=ThinkCastShellNavigationController.create({contentRoute:ThinkCastContentRoute,getLocation:()=>location,getHistory:()=>history,getWindow:()=>window,isLoggedIn:()=>isLoggedIn,getActiveProjectId:()=>activeProjectId,setActiveProjectId,getProjects:()=>indexProjects,refreshProjectIndex,loadProjectState,loadProjectContent,openIndexProject,updateContentUuidLabels,getPreviewVideo:()=>typeof video!=='undefined'&&video?video:document.querySelector('#video'),scrollTo:options=>window.scrollTo(options),renderStoryboardGrid,connectStoryboardAssetsToEditor,setContentIndexError,onError:(feature,error)=>console.error(`[ShellNavigation:${feature}]`,error)});
+const authUIController=ThinkCastAuthUIController.create({getRoot:()=>document,request:(...args)=>api(...args),setDemoState:state=>{demoData.state=state},refreshProjectIndex,showStep,setActiveProjectId,setKeywordStageLocked});
+authUIController.mount(document);
+const shellNavigationController=ThinkCastShellNavigationController.create({contentRoute:ThinkCastContentRoute,getLocation:()=>location,getHistory:()=>history,getWindow:()=>window,isLoggedIn:()=>authUIController.isLoggedIn(),getActiveProjectId:()=>activeProjectId,setActiveProjectId,getProjects:()=>indexProjects,refreshProjectIndex,loadProjectState,loadProjectContent,openIndexProject,updateContentUuidLabels,getPreviewVideo:()=>typeof video!=='undefined'&&video?video:document.querySelector('#video'),scrollTo:options=>window.scrollTo(options),renderStoryboardGrid,connectStoryboardAssetsToEditor,setContentIndexError,onError:(feature,error)=>console.error(`[ShellNavigation:${feature}]`,error)});
 shellNavigationController.mount(document);
 const sessionBootstrapController=ThinkCastSessionBootstrapController.create({request:(...args)=>api(...args),navigation:shellNavigationController,setLoginAccess,refreshProjectIndex,hydrateCalendarEntries,getActiveProjectId:()=>activeProjectId,openIndexProject,loadProjectState,loadProjectContent,setContentIndexError});
 const contentIndexController=Step01ContentIndexController.create({request:(...args)=>api(...args),getProjects:()=>indexProjects,getActiveProjectId:()=>activeProjectId,beginNav,setActiveProjectId,showStep,showBrandLibrary,navigateProjectStep,resetProjectScopedState,setKeywordStageLocked,setVoiceProfile,getKeywords:()=>demoData.keywords,setVisibleKeywordIds:ids=>{visibleKeywordIds=ids},renderKeywords,refreshProjectIndex,confirm:message=>confirm(message),alert:message=>alert(message),escapeHtml,projectCreatedDate});
@@ -2781,47 +2776,8 @@ document.querySelector('#trendKeywordClose').addEventListener('click',()=>{docum
 document.querySelector('#trendKeywordLimitClose')?.addEventListener('click',()=>{document.querySelector('#trendKeywordLimitModal').hidden=true;document.body.classList.remove('modal-open')});
 document.querySelector('#trendKeywordApply').addEventListener('click',()=>{const applied=trendKeywordChoices.filter(item=>trendKeywordSelection.has(item.id));seasonalKeywordIds.forEach(id=>selectedKeywords.delete(id));seasonalKeywordIds=new Set(applied.map(item=>item.id));demoData.keywords=[...demoData.keywords.filter(item=>!item.seasonal),...applied];const baseIds=visibleKeywordIds.filter(id=>!demoData.keywords.find(item=>item.id===id)?.seasonal).slice(0,8);const refill=demoData.keywords.filter(item=>!item.seasonal&&!baseIds.includes(item.id)).map(item=>item.id);while(baseIds.length<8&&refill.length)baseIds.push(refill.shift());const targetCount=8-applied.length;for(let index=baseIds.length-1;baseIds.length>targetCount&&index>=0;index--){if(!selectedKeywords.has(baseIds[index]))baseIds.splice(index,1)}applied.forEach(item=>selectedKeywords.add(item.id));visibleKeywordIds=[...baseIds.slice(0,targetCount),...applied.map(item=>item.id)];document.querySelector('#trendKeywordModal').hidden=true;document.body.classList.remove('modal-open');document.querySelector('#keywordMessage').textContent=`AI 추천 ${applied.length}개를 뒤쪽 카드에 반영했습니다.`;renderKeywords()});
 function setAuthMode(mode){
-  if(isLoggedIn)return;
-  const registering=mode==='register';
-  document.querySelector('#loginForm').hidden=registering;
-  document.querySelector('#loginActions').hidden=registering;
-  document.querySelector('#registerForm').hidden=!registering;
-  document.querySelector('#registerActions').hidden=!registering;
-  document.querySelector(registering?'#registerUsername':'#loginUsername').focus();
+  return authUIController.setMode(mode);
 }
-document.querySelector('#registerOpen').addEventListener('click',()=>setAuthMode('register'));
-document.querySelector('#registerBack').addEventListener('click',()=>setAuthMode('login'));
-document.querySelector('#loginForm').addEventListener('submit',async event=>{
-  event.preventDefault();
-  const message=document.querySelector('#loginMessage');
-  message.textContent='';
-  try{
-    const result=await api('/api/login',{method:'POST',body:JSON.stringify({username:document.querySelector('#loginUsername').value,password:document.querySelector('#loginPassword').value})});
-    document.querySelector('#loginPassword').value='';
-    demoData.state=result.state;
-    setLoginAccess(true,result.state);
-    await refreshProjectIndex();
-    showStep('index');
-  }catch(error){message.textContent=error.message}
-});
-document.querySelector('#registerForm').addEventListener('submit',async event=>{
-  event.preventDefault();
-  const message=document.querySelector('#registerMessage');
-  const username=document.querySelector('#registerUsername').value.trim();
-  const password=document.querySelector('#registerPassword').value;
-  const passwordConfirm=document.querySelector('#registerPasswordConfirm').value;
-  message.textContent='';
-  if(password!==passwordConfirm){message.textContent='비밀번호 확인이 일치하지 않습니다.';return}
-  try{
-    const result=await api('/api/register',{method:'POST',body:JSON.stringify({username,password,password_confirm:passwordConfirm})});
-    document.querySelector('#registerPassword').value='';document.querySelector('#registerPasswordConfirm').value='';
-    demoData.state=result.state;setLoginAccess(true,result.state);await refreshProjectIndex();showStep('index');
-  }catch(error){message.textContent=error.message}
-});
-document.querySelector('#logoutButton').addEventListener('click',async()=>{
-  await api('/api/logout',{method:'POST',body:'{}'});
-  setActiveProjectId(null);setKeywordStageLocked(false);setLoginAccess(false);setAuthMode('login');showStep(1);
-});
 document.querySelector('#keywordGrid').addEventListener('click',event=>{
   const card=event.target.closest('.keyword-card');
   if(!card)return;
@@ -3133,8 +3089,9 @@ boot();
   function syncRepeatLimit(){const unit=repeatFieldset.querySelector('input[name="userRepeatUnit"]:checked')?.value||'day';repeatInterval.max=unit==='count'?'100':'365';repeatSuffix.textContent=unit==='count'?'회 연속':'마다';}
   repeatFieldset.addEventListener('change',syncRepeatLimit);
   function settingsKey(){
+    const activeAccount=authUIController.getActiveAccount();
     const userId=activeAccount?.user?.id||activeAccount?.user?.user_id||activeAccount?.user?.username;
-    if(!isLoggedIn||!userId)throw new Error('로그인 후 설정을 저장해 주세요.');
+    if(!authUIController.isLoggedIn()||!userId)throw new Error('로그인 후 설정을 저장해 주세요.');
     return `thinkcast-user-automation-v1:${userId}`;
   }
   function restoreAutomationSettings(saved){

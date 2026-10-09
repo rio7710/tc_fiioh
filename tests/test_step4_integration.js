@@ -34,6 +34,7 @@ const bindingsPath = '01_app/assets/steps/step04/step04-ui-bindings.js';
 const videoEditorPath = '01_app/assets/video-editor/index.js';
 const shellNavigationControllerPath = '01_app/assets/core/shell-navigation-controller.js';
 const sessionBootstrapControllerPath = '01_app/assets/core/session-bootstrap-controller.js';
+const authUIControllerPath = '01_app/assets/core/auth-ui-controller.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
@@ -63,6 +64,7 @@ assert.ok(fs.existsSync(bindingsPath), 'step04-ui-bindings.js must exist');
 assert.ok(fs.existsSync(videoEditorPath), 'video-editor/index.js must exist');
 assert.ok(fs.existsSync(shellNavigationControllerPath), 'shell-navigation-controller.js must exist');
 assert.ok(fs.existsSync(sessionBootstrapControllerPath), 'session-bootstrap-controller.js must exist');
+assert.ok(fs.existsSync(authUIControllerPath), 'auth-ui-controller.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
@@ -78,8 +80,10 @@ console.log('✓ File integrity checks passed');
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 assert.match(html, /src="\/01_app\/assets\/core\/shell-navigation-controller\.js\?v=20261009_v32"/, 'HTML cache-busts shell navigation controller');
 assert.match(html, /src="\/01_app\/assets\/core\/session-bootstrap-controller\.js\?v=20261009_v33"/, 'HTML cache-busts session bootstrap controller');
+assert.match(html, /src="\/01_app\/assets\/core\/auth-ui-controller\.js\?v=20261009_v34"/, 'HTML cache-busts auth UI controller');
 assert.ok(html.indexOf('content-route.js') < html.indexOf('shell-navigation-controller.js'), 'content route helper loads before shell navigation');
 assert.ok(html.indexOf('shell-navigation-controller.js') < html.indexOf('session-bootstrap-controller.js'), 'shell navigation loads before session bootstrap');
+assert.ok(html.indexOf('session-bootstrap-controller.js') < html.indexOf('auth-ui-controller.js'), 'session bootstrap loads before auth UI controller');
 for (const contract of [
   /function readContentRoute\(\)\{\s*return shellNavigationController\.readRoute\(\);\s*\}/,
   /function writeContentRoute\(step,mode='push'\)\{\s*return shellNavigationController\.writeRoute\(step,mode\);\s*\}/,
@@ -91,6 +95,12 @@ assert.match(html, /async function restoreLoginSession\(\)\{\s*return sessionBoo
 assert.match(html, /const sessionBootstrapController=ThinkCastSessionBootstrapController\.create\(/, 'P1 wires the session bootstrap controller');
 assert.ok(html.indexOf('sessionBootstrapController=') < html.indexOf('async function boot()'), 'session bootstrap is ready before boot');
 assert.doesNotMatch(html, /async function restoreLoginSession\(\)\{\s*setLoginAccess\(false\)/, 'P1 removes the session bootstrap implementation');
+assert.match(html, /function setLoginAccess\(enabled,account=null\)\{\s*return authUIController\.setAccess\(enabled,account\);\s*\}/, 'P1 keeps a thin login access wrapper');
+assert.match(html, /function setAuthMode\(mode\)\{\s*return authUIController\.setMode\(mode\);\s*\}/, 'P1 keeps a thin auth mode wrapper');
+assert.match(html, /const authUIController=ThinkCastAuthUIController\.create\(/, 'P1 wires the auth UI controller');
+assert.match(html, /authUIController\.mount\(document\)/, 'P1 mounts auth UI after partial loading');
+assert.match(html, /isLoggedIn:\(\)=>authUIController\.isLoggedIn\(\)/, 'shell navigation reads auth state from the controller');
+assert.doesNotMatch(html, /document\.querySelector\('#loginForm'\)\.addEventListener|document\.querySelector\('#registerForm'\)\.addEventListener|document\.querySelector\('#logoutButton'\)\.addEventListener/, 'P1 removes inline auth event bodies');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v31"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
@@ -261,6 +271,8 @@ function createPrePartialContext() {
         const list = listeners.get(type) || [];
         listeners.set(type, list.filter(f => f !== fn));
       },
+      focus() {},
+      setLoggedIn() {},
       closest() { return null; },
       querySelector() { return null; },
       querySelectorAll() { return []; },
@@ -325,6 +337,7 @@ function createPrePartialContext() {
     ThinkCastContentRoute: require('../01_app/assets/core/content-route.js'),
     ThinkCastShellNavigationController: require('../01_app/assets/core/shell-navigation-controller.js'),
     ThinkCastSessionBootstrapController: require('../01_app/assets/core/session-bootstrap-controller.js'),
+    ThinkCastAuthUIController: require('../01_app/assets/core/auth-ui-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),
