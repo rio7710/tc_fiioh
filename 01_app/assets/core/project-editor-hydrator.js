@@ -1,0 +1,8 @@
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.ThinkCastProjectEditorHydrator=api})(typeof self!=='undefined'?self:this,function(){
+  'use strict';
+  function create(dependencies){const deps=dependencies||{};for(const name of ['setDemoTimeline','mergeDemoState','setActiveStoryboardDocument','setKeywordStageLocked','applyTimeline','connectStoryboardAssetsToEditor','fillScript','applyScript'])if(typeof deps[name]!=='function')throw new TypeError(`ThinkCastProjectEditorHydrator requires ${name}`);
+    function contentStart(result){deps.setDemoTimeline(result.timeline);deps.mergeDemoState({script:result.script,selected_keywords:result.selected_keyword_ids||[]})}function contentDocument(result){deps.setActiveStoryboardDocument(result.document||null);deps.setKeywordStageLocked(Boolean(result.document))}function contentEditor(result){deps.applyTimeline(result.timeline);deps.connectStoryboardAssetsToEditor();deps.fillScript(result.script);deps.applyScript(result.script)}
+    function stateDocument(content){deps.setKeywordStageLocked(true);deps.setActiveStoryboardDocument(content.document||null)}function stateEditor(content,ids){deps.setDemoTimeline(content.timeline);deps.mergeDemoState({script:content.script,selected_keywords:ids});deps.applyTimeline(content.timeline);deps.fillScript(content.script);deps.applyScript(content.script)}function stateWithoutContent(){deps.setKeywordStageLocked(false)}
+    return Object.freeze({contentStart,contentDocument,contentEditor,stateDocument,stateEditor,stateWithoutContent})}
+  return Object.freeze({create});
+});

@@ -17,7 +17,8 @@
 <script src="/01_app/assets/core/project-keyword-hydrator.js?v=20261009_v58"></script>
 <script src="/01_app/assets/core/project-media-hydrator.js?v=20261009_v59"></script>
 <script src="/01_app/assets/core/project-brand-platform-hydrator.js?v=20261009_v60"></script>
-<script src="/01_app/assets/core/project-hydration-applier.js?v=20261009_v60"></script>
+<script src="/01_app/assets/core/project-editor-hydrator.js?v=20261009_v61"></script>
+<script src="/01_app/assets/core/project-hydration-applier.js?v=20261009_v61"></script>
 <script src="/01_app/assets/core/project-hydration-controller.js?v=20261009_v57"></script>
 <script src="/01_app/assets/core/prompt-lab-controller.js?v=20261009_v37"></script>
 <script src="/01_app/assets/core/provider-settings-controller.js?v=20261009_v39"></script>
@@ -2034,7 +2035,8 @@ const storyboardProjectStateController=Step03StoryboardProjectStateController.cr
 const projectKeywordHydrator=ThinkCastProjectKeywordHydrator.create({getDemoKeywords:()=>demoData.keywords,setDemoKeywords:value=>{demoData.keywords=value},setSelectedKeywords:value=>{selectedKeywords=value},setSeasonalKeywordIds:value=>{seasonalKeywordIds=value},setVisibleKeywordIds:value=>{visibleKeywordIds=value},renderKeywords});
 const projectMediaHydrator=ThinkCastProjectMediaHydrator.create({setSceneCropPositions:positions=>{sceneCropPositions=positions;if(window.Step04VideoEditor?.setSceneCropPositions)window.Step04VideoEditor.setSceneCropPositions(positions)},setStoryboardImages:value=>{storedStoryboardImages=value},setStoryboardImageCandidates,setStoryboardVoiceClips:value=>{storedStoryboardVoiceClips=value},setStoryboardVideos:value=>{storedStoryboardVideos=value},setStoryboardVideoCandidates,setVoiceProfile});
 const projectBrandPlatformHydrator=ThinkCastProjectBrandPlatformHydrator.create({hydrateBrandSelections:value=>brandSelectionController.hydrate(value),renderBrandChoices,getPlatformButtons:()=>platformButtons,getSelectedPlatforms:()=>selectedPlatforms,setPlatformPreview});
-const projectHydrationApplier=ThinkCastProjectHydrationApplier.create({keywordHydrator:projectKeywordHydrator,mediaHydrator:projectMediaHydrator,brandPlatformHydrator:projectBrandPlatformHydrator,setDemoTimeline:timeline=>{demoData.timeline=timeline},mergeDemoState:values=>{demoData.state={...(demoData.state||{}),...values}},setActiveStoryboardDocument:value=>{activeStoryboardDocument=value},setKeywordStageLocked,applyTimeline,connectStoryboardAssetsToEditor,fillScript,applyScript});
+const projectEditorHydrator=ThinkCastProjectEditorHydrator.create({setDemoTimeline:timeline=>{demoData.timeline=timeline},mergeDemoState:values=>{demoData.state={...(demoData.state||{}),...values}},setActiveStoryboardDocument:value=>{activeStoryboardDocument=value},setKeywordStageLocked,applyTimeline,connectStoryboardAssetsToEditor,fillScript,applyScript});
+const projectHydrationApplier=ThinkCastProjectHydrationApplier.create({keywordHydrator:projectKeywordHydrator,mediaHydrator:projectMediaHydrator,brandPlatformHydrator:projectBrandPlatformHydrator,editorHydrator:projectEditorHydrator});
 const projectHydrationController=ThinkCastProjectHydrationController.create({request:(...args)=>api(...args),isStale:isStaleNav,getActiveProjectId:()=>activeProjectId,applier:projectHydrationApplier});
 const projectIndexView=Step01ProjectIndexView.create({getRoot:()=>document,getCalendarEntries:()=>calendarEntries,calendarContentVersions,escapeHtml,projectDate,automationStageLabel});
 const projectIndexController=Step01ProjectIndexController.create({projectsIndex:indexProjects,view:projectIndexView,getRememberedProjectId:()=>localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY),getActiveProjectId:()=>activeProjectId,setActiveProjectId,request:(...args)=>api(...args),refreshBrandLibrary,setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),onPollError:error=>console.error('[ProjectIndex:poll]',error)});
