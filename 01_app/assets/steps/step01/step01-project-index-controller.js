@@ -13,35 +13,14 @@
 
   function create(dependencies) {
     const deps = dependencies || {};
-    for (const name of [
-      'getRoot', 'getCalendarEntries', 'calendarContentVersions', 'getRememberedProjectId',
-      'getActiveProjectId', 'setActiveProjectId', 'request', 'refreshBrandLibrary', 'escapeHtml',
-      'projectDate', 'automationStageLabel', 'setInterval', 'clearInterval', 'onPollError'
-    ]) if (typeof deps[name] !== 'function') throw new TypeError(`Step01ProjectIndexController requires ${name}`);
+    for (const name of ['getRememberedProjectId','getActiveProjectId','setActiveProjectId','request','refreshBrandLibrary','setInterval','clearInterval','onPollError']) if (typeof deps[name] !== 'function') throw new TypeError(`Step01ProjectIndexController requires ${name}`);
+    if (!deps.view || typeof deps.view.render !== 'function' || typeof deps.view.isVisible !== 'function') throw new TypeError('Step01ProjectIndexController requires view');
     if (!deps.projectsIndex || typeof deps.projectsIndex !== 'object' || Array.isArray(deps.projectsIndex)) {
       throw new TypeError('Step01ProjectIndexController requires projectsIndex');
     }
     const intervalMs = Number.isFinite(Number(deps.intervalMs)) ? Number(deps.intervalMs) : 5000;
     let timerId = null;
     let pollBusy = false;
-
-    function requireRoot() {
-      const rootNode = deps.getRoot();
-      if (!rootNode || typeof rootNode.querySelector !== 'function') throw new Error('Step01ProjectIndexController requires DOM root');
-      return rootNode;
-    }
-    function requireNode(selector) {
-      const node = requireRoot().querySelector(selector);
-      if (!node) throw new Error(`Step01ProjectIndexController missing ${selector}`);
-      return node;
-    }
-    function hasFinalVideo(project, entries) {
-      return entries.some(entry => {
-        const props = entry.extendedProps || {};
-        return Boolean(props.contentUrl || deps.calendarContentVersions(entry).length) &&
-          (props.projectId === project.project_id || (!props.projectId && entry.title === project.name));
-      });
-    }
 
     function render(projects) {
       const list = Array.isArray(projects) ? projects : [];
@@ -53,52 +32,8 @@
           steps: STEPS.map(item => ({...item}))
         };
       });
-      const entries = deps.getCalendarEntries();
-      const completed = list.filter(project => hasFinalVideo(project, entries));
-      const scheduledProjects = new Set(entries.filter(entry => entry.extendedProps?.status === 'scheduled')
-        .map(entry => entry.extendedProps?.projectId || entry.title));
-      const counts = {
-        all: list.length, progress: list.length - completed.length, completed: completed.length,
-        scheduled: list.filter(project => scheduledProjects.has(project.project_id) || scheduledProjects.has(project.name)).length
-      };
-      const rootNode = requireRoot();
-      Object.entries(counts).forEach(([key, value]) => {
-        const target = rootNode.querySelector(`[data-index-count="${key}"]`);
-        if (target) target.textContent = String(value).padStart(2, '0');
-      });
-      const holder = requireNode('#contentIndex');
-      holder.querySelectorAll('[data-project-id],.content-index-empty').forEach(item => item.remove());
-      if (!list.length) {
-        holder.insertAdjacentHTML('beforeend', '<p class="content-index-empty">아직 제작한 콘텐츠가 없습니다. 아래 버튼으로 첫 콘텐츠를 만들어 보세요.</p>');
-        return;
-      }
-      list.forEach((project, index) => {
-        const automationStatus = project.automation_status || '';
-        const automationActive = ['queued', 'running'].includes(automationStatus);
-        const automationFailed = automationStatus === 'failed';
-        const automationStopped = automationStatus === 'cancelled';
-        const statusClass = {queued: 'automation-queued', running: 'automation-running', failed: 'automation-failed', cancelled: 'automation-cancelled', succeeded: 'automation-succeeded'}[automationStatus] || '';
-        const statusText = {queued: '자동 대기', running: '자동 진행 중', failed: '자동 오류', cancelled: '자동 중지', succeeded: '자동 완료'}[automationStatus] || `STEP ${String(project.current_stage || 2).padStart(2, '0')}`;
-        const detail = (automationActive || automationFailed || automationStopped)
-          ? `<span class="content-index-automation-detail ${automationFailed ? 'failed' : automationActive ? 'running' : ''}"${automationFailed && project.automation_error_message ? ` title="${deps.escapeHtml(project.automation_error_message)}"` : ''}>${automationFailed ? '오류 정지 위치' : automationStopped ? '중지 위치' : automationActive ? '진행 단계' : ''} · ${deps.escapeHtml(deps.automationStageLabel(project.automation_stage))}</span>` : '';
-        holder.insertAdjacentHTML('beforeend', `<article class="content-index-row" data-project-id="${deps.escapeHtml(project.project_id)}" data-state="${hasFinalVideo(project, entries) ? 'completed' : 'progress'}"><span class="content-index-no">${String(index + 1).padStart(3, '0')}</span><div class="content-index-title"><strong>${deps.escapeHtml(project.name)}${project.is_automated ? '<span class="content-index-auto-badge" aria-label="자동 생성 콘텐츠">자동</span>' : ''}</strong><small>${deps.escapeHtml(project.project_id)}</small></div><span class="content-index-status ${hasFinalVideo(project, entries) ? 'done' : ''} ${statusClass}">${deps.escapeHtml(statusText)}</span><span class="content-index-meta"><span>${deps.projectDate(project.updated_at)}</span>${detail}</span><button class="content-index-open" type="button">상세 보기</button></article>`);
-      });
-      list.forEach(project => {
-        const stage = project.automation_stage || '';
-        if (!project.is_automated || !['3-1', '4', '5'].includes(project.automation_endpoint) || !(stage === 'voice_prepare' || stage.startsWith('image_') || stage.startsWith('video_') || stage.startsWith('crop_') || stage === 'final_export_calendar')) return;
-        const row = [...holder.querySelectorAll('.content-index-row[data-project-id]')].find(item => item.dataset.projectId === project.project_id);
-        const meta = row?.querySelector('.content-index-meta');
-        if (!meta) return;
-        const voiceTotal = Number(project.automation_voice_total) || 0;
-        const voiceDone = Math.min(Number(project.automation_voice_done) || 0, voiceTotal);
-        const imageTotal = Number(project.automation_images_total) || 0;
-        const imageDone = Math.min(Number(project.automation_images_done) || 0, imageTotal);
-        if (stage === 'voice_prepare' && voiceTotal) meta.insertAdjacentHTML('beforeend', `<span class="content-index-automation-progress">음성 ${voiceDone}/${voiceTotal}</span>`);
-        if (stage !== 'voice_prepare') {
-          if (voiceTotal) meta.insertAdjacentHTML('beforeend', `<span class="content-index-automation-progress">음성 ${voiceDone}/${voiceTotal}</span>`);
-          if (imageTotal) meta.insertAdjacentHTML('beforeend', `<span class="content-index-automation-progress">장면 이미지 ${imageDone}/${imageTotal}</span>`);
-        }
-      });
+      deps.view.render(list);
+      if (!list.length) return;
       const remembered = deps.getRememberedProjectId();
       if (remembered && deps.projectsIndex[remembered]) deps.setActiveProjectId(remembered);
       else if (!remembered && list.length === 1) deps.setActiveProjectId(list[0].project_id);
@@ -112,10 +47,10 @@
     }
 
     async function pollOnce() {
-      let holder;
-      try { holder = requireRoot().querySelector('#contentIndex'); }
+      let visible;
+      try { visible = deps.view.isVisible(); }
       catch (error) { deps.onPollError(error); return; }
-      if (!holder || holder.offsetParent === null || pollBusy) return;
+      if (!visible || pollBusy) return;
       pollBusy = true;
       try {
         const result = await deps.request('/api/projects');

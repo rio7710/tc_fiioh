@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const Controller = require('../01_app/assets/steps/step01/step01-project-index-controller.js');
+const View = require('../01_app/assets/steps/step01/step01-project-index-view.js');
 
 (async () => {
   const counts = Object.fromEntries(['all', 'progress', 'completed', 'scheduled'].map(key => [key, {textContent: ''}]));
@@ -35,21 +36,24 @@ const Controller = require('../01_app/assets/steps/step01/step01-project-index-c
   const errors = [];
   const timers = new Map();
   let nextTimer = 1;
-  const deps = {
-    getRoot: () => root, projectsIndex, getCalendarEntries: () => calendarEntries,
+  const viewDeps = {getRoot: () => root, getCalendarEntries: () => calendarEntries,
     calendarContentVersions: entry => entry.extendedProps?.contentVersions?.filter(item => item?.url) || [],
+    escapeHtml: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
+    projectDate: value => `DATE:${value || 'none'}`, automationStageLabel: value => `STAGE:${value || 'none'}`};
+  const view = View.create(viewDeps);
+  const deps = {
+    projectsIndex, view,
     getRememberedProjectId: () => remembered, getActiveProjectId: () => active,
     setActiveProjectId: id => { active = id; calls.push(['active', id]); },
     request: async (...args) => { calls.push(['request', ...args]); return requestHandler(...args); },
     refreshBrandLibrary: async () => { calls.push(['brand']); return brandHandler(); },
-    escapeHtml: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
-    projectDate: value => `DATE:${value || 'none'}`, automationStageLabel: value => `STAGE:${value || 'none'}`,
     setInterval: (callback, delay) => { const id = nextTimer++; timers.set(id, {callback, delay}); return id; },
     clearInterval: id => { calls.push(['clear', id]); timers.delete(id); }, onPollError: error => errors.push(error)
   };
   const controller = Controller.create(deps);
   assert.equal(Object.isFrozen(controller), true);
-  assert.throws(() => Controller.create(), /requires getRoot/);
+  assert.throws(() => Controller.create(), /requires getRememberedProjectId/);
+  assert.throws(() => Controller.create({...deps, view: null}), /requires view/);
   assert.throws(() => Controller.create({...deps, projectsIndex: null}), /requires projectsIndex/);
 
   const raw = [
@@ -150,12 +154,12 @@ const Controller = require('../01_app/assets/steps/step01/step01-project-index-c
   requestHandler = async () => { throw new Error('poll failed'); };
   await controller.pollOnce();
   assert.match(errors.at(-1).message, /poll failed/);
-  const originalCalendarGetter = deps.getCalendarEntries;
-  deps.getCalendarEntries = () => { throw new Error('render failed'); };
+  const originalCalendarGetter = viewDeps.getCalendarEntries;
+  viewDeps.getCalendarEntries = () => { throw new Error('render failed'); };
   requestHandler = async () => ({projects: voice});
   await controller.pollOnce();
   assert.match(errors.at(-1).message, /render failed/);
-  deps.getCalendarEntries = originalCalendarGetter;
+  viewDeps.getCalendarEntries = originalCalendarGetter;
   requestHandler = async () => ({projects: voice});
   await controller.pollOnce();
   assert.equal(calls.filter(item => item[0] === 'request').length, 4, 'poll recovers after request and render failures');
@@ -178,9 +182,6 @@ const Controller = require('../01_app/assets/steps/step01/step01-project-index-c
   assert.equal(controller.isPolling(), false);
   assert.equal(controller.startPolling(), true, 'polling restarts after stop');
   controller.stopPolling();
-
-  const missing = Controller.create({...deps, getRoot: () => ({querySelector: () => null}), projectsIndex: {}});
-  assert.throws(() => missing.render([]), /missing #contentIndex/);
 
   console.log('Step01 project index controller tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });
