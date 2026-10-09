@@ -75,6 +75,7 @@
 <script src="/01_app/assets/steps/step05/step05-calendar.js?v=20261009_v63"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-store.js?v=20261009_v64"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-view-controller.js?v=20261009_v65"></script>
+<script src="/01_app/assets/steps/step05/step05-calendar-renderer.js?v=20261009_v66"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css?v=20261007_v2">
@@ -1572,86 +1573,20 @@ function formatCalendarTime(value){
   return Step05Calendar.formatCalendarTime(value);
 }
 function calendarTimeInputValue(item){return Step05Calendar.calendarTimeInputValue(item)}
-function renderCalendarStickers(entries,limit=Infinity){
-  const groups=groupCalendarEntries(entries);
-  const visible=groups.slice(0,limit);
-  const html=visible.map((group,itemIndex)=>{
-    const statuses=group.items.map(item=>item.extendedProps?.status||'draft');
-    const aggregate=statuses.every(status=>status==='deleted')?'deleted':statuses.includes('published')?'published':statuses.includes('scheduled')?'scheduled':'draft';
-    const icons=group.items.map(item=>{
-      const status=item.extendedProps?.status||'draft';
-      const platform=item.extendedProps?.platform||'youtube';
-      const label=calendarStatusLabels[status]||calendarStatusLabels.draft;
-      const mediaReady=Boolean(item.extendedProps?.contentUrl);
-      const readiness=mediaReady?'영상 제작 완료':'영상 없음';
-      return `<span class="calendar-platform-state" data-status="${status}" data-media-ready="${mediaReady}" title="${calendarPlatformLabels[platform]||platform} · ${readiness} · ${label}"><span class="calendar-platform" data-platform="${platform}" aria-label="${readiness} · ${label}"></span></span>`;
-    }).join('');
-    const times=group.items.map(item=>`${calendarTimeLabels[item.extendedProps?.status||'draft']} ${formatCalendarTime(calendarStatusTimestamp(item))}`).join(' · ');
-    const mediaReady=group.items.some(item=>Boolean(item.extendedProps?.contentUrl));
-    const readiness=mediaReady?'영상 제작 완료':'영상 없음';
-    return `<div class="calendar-sticker" draggable="true" data-group-id="${escapeHtml(group.items[0].id)}" data-status="${aggregate}" data-media-ready="${mediaReady}" title="${escapeHtml(group.title)} · ${readiness} · ${calendarStatusLabels[aggregate]} · 드래그하여 날짜 이동 · 우클릭하여 설정" style="--sticker-tilt:${itemIndex%2?'.35deg':'-.3deg'}"><span class="calendar-event-copy"><span class="calendar-event-title">${escapeHtml(group.title)}</span><time class="calendar-event-time">${escapeHtml(times)}</time></span><span class="calendar-platforms">${icons}</span></div>`;
-  }).join('');
-  return {html,extra:Math.max(0,groups.length-visible.length)};
-}
-function calendarDayMarkup(date,{outside=false,limit=Infinity}={}){
-  const key=dateKey(date);
-  const rendered=renderCalendarStickers(calendarEntries.filter(item=>item.start===key),limit);
-  const more=rendered.extra?`<button class="calendar-more" type="button" data-date="${key}">외 ${rendered.extra}개</button>`:'';
-  return `<div class="calendar-day ${outside?'outside':''} ${key===dateKey(new Date())?'today':''}" data-date="${key}"><span class="calendar-day-number">${date.getDate()}</span><div class="calendar-events">${rendered.html}${more}</div></div>`;
-}
 function calendarMinuteOfDay(item){
   return Step05Calendar.calendarMinuteOfDay(item);
-}
-function renderCalendarTimeGrid(dates){
-  const headers=dates.map(date=>`<span>${date.toLocaleDateString('ko-KR',{month:'numeric',day:'numeric',weekday:'short'})}</span>`).join('');
-  const hours=Array.from({length:24},(_,hour)=>`<span class="calendar-hour-label">${String(hour).padStart(2,'0')}:00</span>`).join('');
-  const columns=dates.map(date=>{
-    const key=dateKey(date);
-    const groups=groupCalendarEntries(calendarEntries.filter(item=>item.start===key));
-    const events=groups.map(group=>{
-      const minute=Math.min(...group.items.map(calendarMinuteOfDay));
-      const sticker=renderCalendarStickers(group.items).html;
-      return `<div class="calendar-timed-event" style="--event-top:${(minute*52/60).toFixed(1)}px">${sticker}</div>`;
-    }).join('');
-    return `<div class="calendar-time-column ${key===dateKey(new Date())?'today':''}" data-date="${key}">${events}</div>`;
-  }).join('');
-  return `<div class="calendar-time-head"><span class="time-zone">24H</span>${headers}</div><div class="calendar-time-body"><div class="calendar-hour-axis">${hours}</div><div class="calendar-time-columns">${columns}</div></div>`;
 }
 function renderCalendar({preserveScroll=false}={}){
   const {view:calendarView,cursor:calendarCursor}=calendarViewController.snapshot();
   const scroller=calendarGrid.parentElement;
   const previousScroll={top:scroller.scrollTop,left:scroller.scrollLeft,pageX:window.scrollX,pageY:window.scrollY};
-  const year=calendarCursor.getFullYear();
-  const month=calendarCursor.getMonth();
-  const weekdays=['SUN','MON','TUE','WED','THU','FRI','SAT'];
-  const cells=[];
+  const model=calendarRenderer.render({view:calendarView,cursor:calendarCursor,entries:calendarEntries,now:new Date()});
   document.querySelectorAll('.calendar-view-btn').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.calendarView===calendarView)));
-  scroller.classList.toggle('time-scroll',calendarView!=='month');
-  if(calendarView==='month'){
-    calendarGrid.className='calendar-grid view-month';
-    calendarMonthTitle.textContent=`${year}. ${String(month+1).padStart(2,'0')}`;
-    weekdays.forEach(day=>cells.push(`<div class="calendar-weekday">${day}</div>`));
-    const first=new Date(year,month,1);
-    const gridStart=new Date(year,month,1-first.getDay());
-    for(let index=0;index<42;index++){
-      const date=new Date(gridStart);date.setDate(gridStart.getDate()+index);
-      cells.push(calendarDayMarkup(date,{outside:date.getMonth()!==month,limit:2}));
-    }
-  }else if(calendarView==='week'){
-    const start=new Date(calendarCursor);start.setDate(start.getDate()-start.getDay());
-    const end=new Date(start);end.setDate(end.getDate()+6);
-    calendarMonthTitle.textContent=`${start.getFullYear()}. ${String(start.getMonth()+1).padStart(2,'0')}. ${String(start.getDate()).padStart(2,'0')} — ${String(end.getMonth()+1).padStart(2,'0')}. ${String(end.getDate()).padStart(2,'0')}`;
-    const dates=[];for(let index=0;index<7;index++){const date=new Date(start);date.setDate(start.getDate()+index);dates.push(date)}
-    calendarGrid.className='calendar-time-grid view-week';
-    calendarGrid.style.setProperty('--calendar-days','7');
-    cells.push(renderCalendarTimeGrid(dates));
-  }else{
-    calendarMonthTitle.textContent=calendarCursor.toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'});
-    calendarGrid.className='calendar-time-grid view-day';
-    calendarGrid.style.setProperty('--calendar-days','1');
-    cells.push(renderCalendarTimeGrid([calendarCursor]));
-  }
-  calendarGrid.innerHTML=cells.join('');
+  scroller.classList.toggle('time-scroll',model.timeScroll);
+  calendarGrid.className=model.className;
+  calendarMonthTitle.textContent=model.title;
+  if(model.calendarDays)calendarGrid.style.setProperty('--calendar-days',model.calendarDays);
+  calendarGrid.innerHTML=model.html;
   if(preserveScroll){
     scroller.scrollTop=previousScroll.top;scroller.scrollLeft=previousScroll.left;
     requestAnimationFrame(()=>{scroller.scrollTop=previousScroll.top;scroller.scrollLeft=previousScroll.left;window.scrollTo(previousScroll.pageX,previousScroll.pageY)});
@@ -2145,6 +2080,7 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!calendarSe
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!platformGuideModal.hidden)closePlatformGuide()});
 const calendarStore=Step05CalendarStore.create({storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:(...args)=>api(...args),collapseDuplicates:Step05Calendar.collapseDuplicates,uniquenessKey:Step05Calendar.uniquenessKey});
 const calendarViewController=Step05CalendarViewController.create({storage:localStorage,storageKey:CALENDAR_UI_STORAGE_KEY,now:()=>new Date(),isDateKey:value=>/^\d{4}-\d{2}-\d{2}$/.test(value||''),dateKey:Step05Calendar.dateKey});
+const calendarRenderer=Step05CalendarRenderer.create({dateKey:Step05Calendar.dateKey,groupEntries:Step05Calendar.groupCalendarEntries,statusTimestamp:Step05Calendar.calendarStatusTimestamp,formatTime:Step05Calendar.formatCalendarTime,minuteOfDay:Step05Calendar.calendarMinuteOfDay,escapeHtml,statusLabels:calendarStatusLabels,platformLabels:calendarPlatformLabels,timeLabels:calendarTimeLabels});
 loadCalendarUi();
 loadCalendarEntries();
 loadLatestExport();
