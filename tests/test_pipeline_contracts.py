@@ -29,6 +29,7 @@ class PipelineContractTests(unittest.TestCase):
         step4_html = (ROOT / "01_app" / "pages" / "steps" / "step04-video.html").read_text(encoding="utf-8")
         step4_js = (ROOT / "01_app" / "assets" / "steps" / "step04" / "step04-video.js").read_text(encoding="utf-8")
         cls.render_controller = (ROOT / "01_app" / "assets" / "steps" / "step04" / "step04-render-controller.js").read_text(encoding="utf-8")
+        cls.session_bootstrap_controller = (ROOT / "01_app" / "assets" / "core" / "session-bootstrap-controller.js").read_text(encoding="utf-8")
         step5_html = (ROOT / "01_app" / "pages" / "steps" / "step05-calendar.html").read_text(encoding="utf-8")
         step5_css = (ROOT / "01_app" / "assets" / "steps" / "step05" / "step05-calendar.css").read_text(encoding="utf-8")
         cls.html = "\n".join((HTML_PATH.read_text(encoding="utf-8"), step4_html, step4_js, step5_html, step5_css))
@@ -172,7 +173,7 @@ class PipelineContractTests(unittest.TestCase):
         self.assertNotIn("image_to_video", phases["production"])
 
     def test_session_cookie_contract(self):
-        self.assertIn("api('/api/session')", self.html)
+        self.assertIn("deps.request('/api/session')", self.session_bootstrap_controller)
         # Exercise the actual endpoint without a live server or production DB.
         handler = object.__new__(self.server.Handler)
         handler.path = '/api/session'

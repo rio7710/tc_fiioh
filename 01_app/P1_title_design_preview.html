@@ -12,6 +12,7 @@
 <script src="/01_app/assets/core/api-client.js?v=20261007_v2"></script>
 <script src="/01_app/assets/core/content-route.js?v=20261007_v2"></script>
 <script src="/01_app/assets/core/shell-navigation-controller.js?v=20261009_v32"></script>
+<script src="/01_app/assets/core/session-bootstrap-controller.js?v=20261009_v33"></script>
 <script src="/01_app/assets/core/project-store.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step-partial-loader.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step01/step01-project-index-controller.js?v=20261009_v31"></script>
@@ -2730,71 +2731,7 @@ async function initDemo(){
 }
 
 async function restoreLoginSession(){
-  setLoginAccess(false);
-  const bootToken=beginNav();
-  const route=readContentRoute();
-  let session;
-  try{
-    session=await api('/api/session');
-  }catch(error){
-    if(!isStaleNav(bootToken)){setLoginAccess(false);showStep(1,'replace');}
-    return;
-  }
-  if(isStaleNav(bootToken))return;
-  setLoginAccess(Boolean(session.authenticated),session);
-  if(!session.authenticated){showStep(1,'replace');return}
-  try{
-    await refreshProjectIndex();
-    if(!isStaleNav(bootToken))setContentIndexError('index','');
-  }catch(error){
-    if(!isStaleNav(bootToken))setContentIndexError('index',`콘텐츠 목록을 불러오지 못했습니다: ${error.message}`);
-  }
-  try{
-    await hydrateCalendarEntries();
-    if(!isStaleNav(bootToken))setContentIndexError('calendar','');
-  }catch(error){
-    if(!isStaleNav(bootToken))setContentIndexError('calendar',`배포 캘린더를 불러오지 못했습니다: ${error.message}`);
-  }
-  if(isStaleNav(bootToken))return;
-  const validRouteProject=selectRouteProject(route);
-  let requestedStep=validRouteProject?route.step:'index';
-  if(requestedStep==='project'&&activeProjectId){openIndexProject(activeProjectId,'replace');return}
-  let loadedContent=false;
-  try{
-    if(activeProjectId){
-      let restored;
-      try{
-        restored=await loadProjectState(activeProjectId,bootToken);
-      }catch(error){
-        if(!isStaleNav(bootToken))throw error;
-        return;
-      }
-      if(isStaleNav(bootToken))return;
-      const requestedContentStep=requestedStep==='3-1'||Number(requestedStep)>=3;
-      if(requestedContentStep&&!restored.content)requestedStep='2';
-      else if(requestedContentStep){
-        try{
-          await loadProjectContent(activeProjectId,bootToken);
-        }catch(error){
-          if(!isStaleNav(bootToken))throw error;
-          return;
-        }
-        if(isStaleNav(bootToken))return;
-      }
-      loadedContent=true;
-    }else if(requestedStep&&requestedStep!=='index'){
-      requestedStep='index';
-      setContentIndexError('content','이전에 보던 콘텐츠를 찾을 수 없어 목록으로 이동했습니다. 아래에서 다시 선택해 주세요.');
-    }
-    if(isStaleNav(bootToken))return;
-    showStep(requestedStep||'index','replace');
-    prepareRestoredStep(requestedStep||'index');
-    if(loadedContent)setContentIndexError('content','');
-  }catch(error){
-    if(isStaleNav(bootToken))return;
-    showStep('index','replace');
-    setContentIndexError('content',`콘텐츠를 불러오지 못했습니다: ${error.message}`);
-  }
+  return sessionBootstrapController.restore();
 }
 
 const brandOverlayController=BrandOverlayController.create({state:brandOverlayState,getBrandAssets:()=>brandSelectionController.getAssets(),prepareOutroPreview:item=>ensureOutroRatioAssets(item,{force:true}),saveSelection:saveBrandSelections,applyPosition:applyWatermarkPosition,backgroundColor:outroBackgroundColor,updateWatermarkPreview,updateOutroPreview:updateCommonOutroPreview,onError:(feature,error)=>console.error(`[BrandOverlay:${feature}]`,error)});
@@ -2809,6 +2746,7 @@ const projectIndexController=Step01ProjectIndexController.create({getRoot:()=>do
 projectIndexController.startPolling();
 const shellNavigationController=ThinkCastShellNavigationController.create({contentRoute:ThinkCastContentRoute,getLocation:()=>location,getHistory:()=>history,getWindow:()=>window,isLoggedIn:()=>isLoggedIn,getActiveProjectId:()=>activeProjectId,setActiveProjectId,getProjects:()=>indexProjects,refreshProjectIndex,loadProjectState,loadProjectContent,openIndexProject,updateContentUuidLabels,getPreviewVideo:()=>typeof video!=='undefined'&&video?video:document.querySelector('#video'),scrollTo:options=>window.scrollTo(options),renderStoryboardGrid,connectStoryboardAssetsToEditor,setContentIndexError,onError:(feature,error)=>console.error(`[ShellNavigation:${feature}]`,error)});
 shellNavigationController.mount(document);
+const sessionBootstrapController=ThinkCastSessionBootstrapController.create({request:(...args)=>api(...args),navigation:shellNavigationController,setLoginAccess,refreshProjectIndex,hydrateCalendarEntries,getActiveProjectId:()=>activeProjectId,openIndexProject,loadProjectState,loadProjectContent,setContentIndexError});
 const contentIndexController=Step01ContentIndexController.create({request:(...args)=>api(...args),getProjects:()=>indexProjects,getActiveProjectId:()=>activeProjectId,beginNav,setActiveProjectId,showStep,showBrandLibrary,navigateProjectStep,resetProjectScopedState,setKeywordStageLocked,setVoiceProfile,getKeywords:()=>demoData.keywords,setVisibleKeywordIds:ids=>{visibleKeywordIds=ids},renderKeywords,refreshProjectIndex,confirm:message=>confirm(message),alert:message=>alert(message),escapeHtml,projectCreatedDate});
 contentIndexController.mount(document);
 let trendRequestVersion=0;
