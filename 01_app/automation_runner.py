@@ -74,7 +74,13 @@ class InternalAPI:
                 if exc.code == 409 and attempt + 1 < self.settings.api_retry_count:
                     time.sleep(self.settings.api_retry_backoff_seconds * (2 ** attempt))
                     continue
-                raise AdapterFailure(f'제작 API 요청이 실패했습니다 (HTTP {exc.code}). 결과 확인 후 다시 시도해 주세요.') from None
+                try:
+                    error_body = json.load(exc)
+                    detail = str(error_body.get('error', '')).strip()[:500] if isinstance(error_body, dict) else ''
+                except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                    detail = ''
+                message = detail or '결과 확인 후 다시 시도해 주세요.'
+                raise AdapterFailure(f'제작 API 요청이 실패했습니다 (HTTP {exc.code}): {message}') from None
             except (URLError, TimeoutError, ConnectionError, json.JSONDecodeError):
                 raise AdapterFailure('제작 API 응답을 확인하지 못했습니다. 중복 과금을 피하기 위해 실행을 멈췄습니다.') from None
 

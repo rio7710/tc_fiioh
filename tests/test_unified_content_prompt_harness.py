@@ -29,6 +29,175 @@ def document(keywords):
 
 
 class UnifiedContentPromptHarnessTests(unittest.TestCase):
+    def test_schema_version_is_pinned_to_the_validated_contract(self):
+        value = document(["안심"])
+        value["schema_version"] = "1.1"
+        self.assertEqual("1.0.0", normalize_document_shape(value)["schema_version"])
+
+    def test_timeline_scene_array_shorthand_is_wrapped(self):
+        value = document(["안심"])
+        scenes = value["production"]["timeline"]["scenes"]
+        value["production"]["timeline"] = scenes
+        normalized = normalize_document_shape(value)
+        self.assertEqual(scenes, normalized["production"]["timeline"]["scenes"])
+        self.assertEqual(
+            "timeline.scenes[-1].end",
+            normalized["production"]["timeline"]["duration_source"],
+        )
+
+    def test_missing_narration_cue_fields_are_recovered_from_linked_scene(self):
+        value = document(["안심"])
+        value["production"]["narration_cues"] = [{
+            "id": "narration-01", "start": 0, "end": 30
+        }]
+        normalized = normalize_document_shape(value)
+        cue = normalized["production"]["narration_cues"][0]
+        self.assertEqual(["scene-01"], cue["scene_ids"])
+        self.assertEqual("함께 걷는 오늘", cue["narration"]["text"])
+        self.assertEqual(cue["narration"], cue["caption"])
+        self.assertEqual("estimated_speech_rate", cue["timing_source"])
+        self.assertEqual(30, cue["estimated_duration_seconds"])
+        self.assertIsNone(cue["measured_duration_seconds"])
+        self.assertIsNone(cue["audio_uri"])
+
+    def test_narration_cue_text_shorthand_does_not_leak_source_to_cue(self):
+        value = document(["안심"])
+        value["production"]["narration_cues"] = [{
+            "id": "narration-01", "start": 0, "end": 30,
+            "text": "함께 걷는 오늘", "source": "ai_inferred",
+        }]
+        cue = normalize_document_shape(value)["production"]["narration_cues"][0]
+        self.assertNotIn("text", cue)
+        self.assertNotIn("source", cue)
+        self.assertEqual("함께 걷는 오늘", cue["narration"]["text"])
+        self.assertEqual("ai_inferred", cue["narration"]["source"])
+
+    def test_missing_postproduction_fields_get_contract_defaults(self):
+        value = document(["안심"])
+        value["production"]["postproduction"] = {}
+        postproduction = normalize_document_shape(value)["production"]["postproduction"]
+        self.assertEqual(
+            {"captions", "voice", "bgm", "transitions"},
+            set(postproduction),
+        )
+        self.assertTrue(all(item["source"] == "ai_inferred" for item in postproduction.values()))
+
+    def test_system_owned_production_metadata_is_canonicalized(self):
+        value = document(["안심"])
+        production = value["production"]
+        production["continuity"] = {"characters": "invalid", "extra": []}
+        production["global_prompts"] = {"style": "담백한 실사", "extra": "invalid"}
+        production["timing_policy"] = {"estimated_characters_per_second": 99, "extra": True}
+        production["output"] = {"video_codec": "vp9", "extra": True}
+        normalized = normalize_document_shape(value)["production"]
+        self.assertEqual({"characters": [], "locations": [], "props": []}, normalized["continuity"])
+        self.assertEqual({"style", "negative"}, set(normalized["global_prompts"]))
+        self.assertEqual("담백한 실사", normalized["global_prompts"]["style"]["text"])
+        self.assertEqual(4.5, normalized["timing_policy"]["estimated_characters_per_second"])
+        self.assertEqual("h264", normalized["output"]["video_codec"])
+        self.assertNotIn("extra", normalized["output"])
+
+    def test_scene_shorthand_is_recovered_from_cues_and_references(self):
+        value = document(["안심"])
+        scene = value["production"]["timeline"]["scenes"][0]
+        for key in ("title", "media_type", "source_media", "reference_ids", "characters", "narration_cue_ids"):
+            scene.pop(key, None)
+        scene["sequence"] = {"camera_motion": "invalid", "extra": True}
+        scene = normalize_document_shape(value)["production"]["timeline"]["scenes"][0]
+        self.assertEqual("장면 1", scene["title"])
+        self.assertEqual("image", scene["media_type"])
+        self.assertIsNone(scene["source_media"])
+        self.assertEqual(["ref-character-elder", "ref-location-dining"], scene["reference_ids"])
+        self.assertEqual(["narration-01"], scene["narration_cue_ids"])
+        self.assertEqual("fixed", scene["sequence"]["camera_motion"])
+        self.assertNotIn("extra", scene["sequence"])
+
+    def test_concept_shorthand_is_completed_and_canonicalized(self):
+        value = document(["안심"])
+        value["concept_variants"] = [{"id": "draft", "extra": True}]
+        value["selected_variant_id"] = "draft"
+        normalized = normalize_document_shape(value)
+        concept = normalized["concept_variants"][0]
+        self.assertEqual("concept-01", concept["id"])
+        self.assertEqual(["안심"], concept["keywords"])
+        self.assertEqual("ai_inferred", concept["source"])
+        self.assertNotIn("extra", concept)
+        self.assertEqual("concept-01", normalized["selected_variant_id"])
+
+    def test_locked_plan_text_wins_over_generated_narration(self):
+        value = document(["안심"])
+        value["project"]["title"] = "모델이 바꾼 제목"
+        value["production"]["narration_cues"][0]["narration"]["text"] = "모델이 바꾼 문장"
+        value["production"]["narration_cues"][0]["caption"]["text"] = "모델이 바꾼 문장"
+        generated = run_generation_harness(
+            lambda _prompt: json.dumps(value, ensure_ascii=False),
+            ["안심"],
+            "자료",
+            locked_plan={"title": "확정 제목", "narration_beats": ["확정 문장"]},
+        )
+        result = generated["document"]
+        self.assertEqual("확정 제목", result["project"]["title"])
+        self.assertEqual("확정 문장", result["production"]["narration_cues"][0]["narration"]["text"])
+        self.assertEqual("확정 문장", result["production"]["timeline"]["scenes"][0]["caption"]["text"])
+
+    def test_locked_plan_rebuilds_a_different_number_of_cues(self):
+        value = document(["안심"])
+        generated = run_generation_harness(
+            lambda _prompt: json.dumps(value, ensure_ascii=False),
+            ["안심"],
+            "자료",
+            locked_plan={"title": "확정 제목", "narration_beats": ["첫 문장", "둘째 문장"]},
+        )["document"]
+        cues = generated["production"]["narration_cues"]
+        scene = generated["production"]["timeline"]["scenes"][0]
+        self.assertEqual(["첫 문장", "둘째 문장"], [cue["narration"]["text"] for cue in cues])
+        self.assertEqual(["narration-01", "narration-02"], scene["narration_cue_ids"])
+        self.assertEqual(["scene-01"], cues[1]["scene_ids"])
+
+    def test_unknown_table_shape_gets_reference_lock_despite_unrelated_props(self):
+        value = document(["안심"])
+        value["production"]["continuity"] = {
+            "characters": [], "locations": [],
+            "props": [{"text": "다른 식당의 원형 테이블", "source": "provided"}],
+        }
+        scene = value["production"]["timeline"]["scenes"][0]
+        scene["title"] = "상담실"
+        scene["image_prompt"] = {"text": "상담실 테이블 앞 대화", "source": "ai_inferred"}
+        normalize_unknown_table_reference_locks(value)
+        self.assertIn("기준 레퍼런스", scene["image_prompt"]["text"])
+
+    def test_multiple_table_shapes_are_locked_to_current_reference_without_guessing(self):
+        value = document(["안심"])
+        value["production"]["continuity"] = {
+            "characters": [], "locations": [],
+            "props": [
+                {"text": "원형 테이블", "source": "provided"},
+                {"text": "사각형 테이블", "source": "provided"},
+            ],
+        }
+        scene = value["production"]["timeline"]["scenes"][0]
+        scene["image_prompt"] = {"text": "테이블 곁에서 대화한다.", "source": "ai_inferred"}
+        normalize_unknown_table_reference_locks(value)
+        self.assertIn("현재 장소의 기준 레퍼런스", scene["image_prompt"]["text"])
+        validate_visual_continuity(value)
+
+    def test_missing_or_repeated_camera_and_motion_prompts_are_varied(self):
+        value = document(["안심"])
+        first = value["production"]["timeline"]["scenes"][0]
+        second = json.loads(json.dumps(first, ensure_ascii=False))
+        second["id"] = "scene-02"
+        second["title"] = "두 번째 행동"
+        second["start"], second["end"] = 30, 60
+        second["sequence"]["continuity_from"] = "scene-01"
+        second["camera"] = dict(first.get("camera", {}))
+        second["motion_prompt"] = dict(first.get("motion_prompt", {}))
+        value["production"]["timeline"]["scenes"].append(second)
+        normalized = normalize_document_shape(value)
+        scenes = normalized["production"]["timeline"]["scenes"]
+        self.assertNotEqual(scenes[0]["camera"]["text"], scenes[1]["camera"]["text"])
+        self.assertNotEqual(scenes[0]["motion_prompt"]["text"], scenes[1]["motion_prompt"]["text"])
+        self.assertIn("두 번째 행동", scenes[1]["motion_prompt"]["text"])
+
     def test_prompt_carries_variable_keywords_and_contract(self):
         prompt = build_prompt(["재활", "존중"], "시설 자료")
         self.assertIn('["재활", "존중"]', prompt)
@@ -88,7 +257,12 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
     def test_normalizes_root_timeline_and_timing_policy(self):
         value = document(["안심"])
         timeline = value["production"].pop("timeline")
-        timing_policy = {"minimum_scene_duration_seconds": 1.5}
+        timing_policy = {
+            "planning_source": "estimated_speech_rate",
+            "final_source": "tts_measured_duration",
+            "estimated_characters_per_second": 5,
+            "reconciliation": "retime_timeline_narration_captions_transitions_and_export",
+        }
         value["timeline"] = timeline
         value["timing_policy"] = timing_policy
 
@@ -108,9 +282,11 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
 
         normalized = normalize_document_shape(value)
 
-        for key, section in expected.items():
+        for key in expected:
             self.assertNotIn(key, normalized)
-            self.assertEqual(section, normalized["production"][key])
+            self.assertIn(key, normalized["production"])
+        for key in ("reference_assets", "timeline", "narration_cues"):
+            self.assertEqual(expected[key], normalized["production"][key])
 
     def test_missing_continuity_source_is_marked_ai_inferred(self):
         value = document(["안심"])

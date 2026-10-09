@@ -13,6 +13,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 import uuid
 import unicodedata
 import re
@@ -20,6 +21,7 @@ import webbrowser
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
+from difflib import SequenceMatcher
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
@@ -146,6 +148,7 @@ def log_script_generation_failure(project_id, exc):
         "project_id": project_id,
         "error_type": type(exc).__name__,
         "message": str(exc)[:800],
+        "traceback": "".join(traceback.format_exception(exc))[-1600:],
     }
     print(json.dumps(diagnostic, ensure_ascii=False), file=sys.stderr, flush=True)
 
@@ -853,6 +856,57 @@ def group_story_reference_context(resources, character_limit=45_000, included_ty
     return "\n".join(sections)
 
 
+def human_storyboard_reference_context(resources, character_limit=70_000):
+    """Return the complete authored corpus, excluding generated contract fixtures.
+
+    The group contains JSON/Markdown outputs used to test the schema as well as
+    actual authored manuscripts. Only the explicit authoring sources and the
+    submitted 12-concept manuscript belong in the creative reference corpus.
+    """
+    selected = []
+    for resource in resources:
+        resource_type = resource.get("resource_type")
+        resource_key = str(resource.get("resource_key", ""))
+        is_authored = resource_type in {
+            "prompt_guidance_source", "canonical_storyboard_spec",
+            "human_storyboard_reference",
+        } or (resource_type == "test_content_sample" and "12안" in unicodedata.normalize("NFC", resource_key))
+        payload = resource.get("payload", {})
+        content = payload.get("content") if isinstance(payload, dict) else None
+        if is_authored and isinstance(content, str) and content.strip():
+            selected.append((resource_key, content.strip()))
+    sections = []
+    for resource_key, content in sorted(selected):
+        section = f"\n===== 사람 작성 원고: {resource_key} =====\n{content}"
+        if sum(len(item) for item in sections) + len(section) > character_limit:
+            continue
+        sections.append(section)
+    return "".join(sections).strip()
+
+
+def _copy_normalized(value):
+    return re.sub(r"[^0-9A-Za-z가-힣]", "", unicodedata.normalize("NFC", str(value or ""))).lower()
+
+
+def authored_copy_similarity(plan, authored_context):
+    """Find near-verbatim narration reuse while allowing shared production grammar."""
+    beats = [str(item).strip() for item in plan.get("narration_beats", []) if str(item).strip()]
+    planned = _copy_normalized(" ".join(beats))
+    reference = _copy_normalized(authored_context)
+    if planned and planned in reference:
+        return 1.0
+    reference_lines = [
+        _copy_normalized(line) for line in str(authored_context or "").splitlines()
+        if len(_copy_normalized(line)) >= 12
+    ]
+    return max(
+        (SequenceMatcher(None, _copy_normalized(beat), line).ratio()
+         for beat in beats if len(_copy_normalized(beat)) >= 12
+         for line in reference_lines),
+        default=0.0,
+    )
+
+
 def openai_project_script(api_key, selected_labels, scene_specs, resource_context):
     if not api_key:
         raise ValueError("OpenAI API 키가 연결되지 않았습니다.")
@@ -917,7 +971,7 @@ lines는 반드시 {len(scene_specs)}개이며 각 항목은 비어 있지 않�
     return clean_script, result
 
 
-def validate_script_plan(plan):
+def validate_script_plan(plan, authored_context=""):
     validate_json_schema_file(plan, ROOT / "contracts" / "script-plan.schema.json")
     beats = plan["narration_beats"]
     narration_length = sum(len(beat.strip()) for beat in beats)
@@ -930,6 +984,8 @@ def validate_script_plan(plan):
     names = {name for name in names if 2 <= len(name) <= 12 and " " not in name}
     if any(name in beat for name in names for beat in beats):
         raise ValueError("인물 이름은 나레이션이 아닌 캐스팅·콘티에만 넣어 주세요.")
+    if authored_context and authored_copy_similarity(plan, authored_context) >= 0.90:
+        raise ValueError("사람 작성 샘플의 제목·내레이션 문장을 그대로 복제하지 말고 새 사건과 문장으로 작성해 주세요.")
 
 
 def openai_script_plan(api_key, selected_labels, resources, recent_usage):
@@ -938,11 +994,14 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage):
     model = os.environ.get("OPENAI_SCRIPT_MODEL", "gpt-5.6-luna")
     context = group_story_reference_context(resources, 45_000,
         {"default_asset_manifest", "reference_library", "prompt_contract"})
+    authored_context = human_storyboard_reference_context(resources)
     prompt = f"""생각담 | ThinkCast 한국어 콘텐츠의 1차 대본만 작성한다. JSON 객체 하나만 출력한다.
 형식: {{"schema_version":"1.0.0","title":"제목","synopsis":"서사 요약","narration_beats":["실제 낭독 문장",...],"cast_choices":["자료 속 인물/역할"],"location_choices":["자료 속 장소"]}}
 키워드: {json.dumps(selected_labels, ensure_ascii=False)}
 그룹 자료: {context}
+사람 작성 원고 전체: {authored_context or '등록된 사람 작성 원고 없음'}
 최근 같은 그룹의 실제 사용 인물/장소: {json.dumps(recent_usage, ensure_ascii=False)}
+사람 작성 원고는 완성도, 감성 밀도, 화면으로 증명하는 방식과 30초 서사 구조의 기준이다. 모든 원고를 먼저 비교해 공통 제작 문법을 이해하되 제목, 내레이션 문장, 중심 사건, 행동 순서, 장소 이동 순서와 결말 장면을 그대로 복제하지 않는다. 일부 카메라 문법과 일반적인 돌봄 행동은 유사할 수 있지만 새 결과의 주인공 관점·시작 행동·핵심 소품·공간 경로·마지막 이미지는 기존 각 원고와 구별되어야 한다.
 최근 자주 쓰인 특정 인물과 장소를 습관적으로 반복하지 말고, 이야기와 맞는 후보를 골고루 선택한다. 균등 할당을 위해 억지 인물이나 장소를 넣지는 않는다. 인물이나 장소가 바뀌면 서사상 이유를 둔다.
 요양원에 대한 긍정적 인상은 과장 광고나 근거 없는 서비스·치료 효과 주장이 아니라, 제공된 자료가 뒷받침할 때 어르신의 선택을 존중하는 태도, 편안하고 정돈된 공간, 세심한 일상 돌봄, 가족과의 자연스러운 교류 같은 화면 가능한 행동으로 절제해 표현한다.
 주요 인물만 cast_choices에 지정한다. 로비 등 분위기상 자연스러운 장소에는 익명 엑스트라를 연출로 보완할 수 있지만 cast_choices의 주요 인물과 구분하고 실제 시설 사실로 주장하지 않는다. 이어지는 같은 장소에서 배경 인물의 외형·옷·좌석·행동을 유지하도록 synopsis의 연출 맥락에 기록한다. 세로 크롭에 최소 한 명이 들어오는 조건은 주요 인물에게만 적용하고 엑스트라는 예외다. 구체적인 안전 여백·구도 변주·환경의 미세한 움직임은 후속 콘티에서 설계한다.
@@ -972,7 +1031,7 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage):
     plan = generate(prompt)
     for attempt in range(2):
         try:
-            validate_script_plan(plan)
+            validate_script_plan(plan, authored_context)
             break
         except (JsonSchemaError, TypeError, ValueError) as exc:
             if attempt:
@@ -1011,10 +1070,7 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
     if script_plan:
         source_material += "\n확정된 1차 대본(2차에서 제목과 나레이션 문장을 그대로 유지): " + json.dumps(script_plan, ensure_ascii=False)
         source_material += "\n2차 콘티에서는 확정 대본을 씬으로 확장한다. 제목과 나레이션 원문을 새 시어로 바꾸거나 어색한 비유를 덧붙이지 않는다. 모든 씬은 나레이션 큐에 속해야 한다. 인물/장소 선택은 1차와 일치시킨다. 각 씬의 현재 구역, 문턱 통과, 이동 방향, 다음 도착 구역을 sequence에 명시한다. 문을 열고 들어갔다면 다음 씬은 내부 장소이며 문 앞 재등장과 왕복을 금지한다."
-    reference_material = group_story_reference_context(
-        resources, 40_000,
-        {"canonical_storyboard_spec"},
-    )
+    reference_material = human_storyboard_reference_context(resources, 70_000)
     responses = []
 
     def generate(prompt):
@@ -3553,7 +3609,8 @@ class Handler(SimpleHTTPRequestHandler):
                         return
                     resource_types = (
                         "default_asset_manifest", "reference_library", "prompt_contract",
-                        "canonical_storyboard_spec",
+                        "canonical_storyboard_spec", "prompt_guidance_source",
+                        "human_storyboard_reference", "test_content_sample",
                     )
                     resources = get_auth_store().project_group_resources(
                         user["user_id"], project_id, resource_types

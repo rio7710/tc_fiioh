@@ -53,6 +53,40 @@ def normalize_document_shape(document: dict[str, Any]) -> dict[str, Any]:
     occasionally emit complete sections (especially timeline and timing_policy)
     at the document root. Move misplaced sections without losing conflicts.
     """
+    # The only version accepted by this harness is the contract it validates
+    # below. Models occasionally echo a model/version label here instead.
+    document["schema_version"] = "1.0.0"
+    project = document.get("project") if isinstance(document.get("project"), dict) else {}
+    selected_keywords = project.get("selected_keywords")
+    if not isinstance(selected_keywords, list):
+        selected_keywords = []
+    concepts = document.get("concept_variants")
+    if not isinstance(concepts, list):
+        concepts = []
+    normalized_concepts = []
+    for index, item in enumerate(concepts):
+        concept = item if isinstance(item, dict) else {}
+        keywords = concept.get("keywords")
+        if not isinstance(keywords, list) or not keywords:
+            keywords = list(selected_keywords)
+        title = str(concept.get("title") or project.get("title") or f"콘셉트 {index + 1}").strip()
+        normalized_concepts.append({
+            "id": f"concept-{index + 1:02d}",
+            "title": title,
+            "theme": str(concept.get("theme") or "선택 키워드를 일상의 장면으로 전달한다.").strip(),
+            "lead": str(concept.get("lead") or "인물의 자연스러운 하루를 따라간다.").strip(),
+            "story_method": str(concept.get("story_method") or "연속된 관찰형 장면으로 전개한다.").strip(),
+            "visual_tone": str(concept.get("visual_tone") or "따뜻하고 절제된 실사 시네마틱 톤").strip(),
+            "core_message": str(concept.get("core_message") or title).strip(),
+            "keywords": keywords,
+            "source": concept.get("source") if concept.get("source") in {"provided", "ai_inferred"} else "ai_inferred",
+        })
+    if normalized_concepts:
+        document["concept_variants"] = normalized_concepts
+        selected_variant_id = document.get("selected_variant_id")
+        valid_concept_ids = {item["id"] for item in normalized_concepts}
+        if selected_variant_id not in valid_concept_ids:
+            document["selected_variant_id"] = normalized_concepts[0]["id"]
     production = document.get("production")
     if not isinstance(production, dict):
         return document
@@ -67,42 +101,232 @@ def normalize_document_shape(document: dict[str, Any]) -> dict[str, Any]:
             production[key] = document[key]
         del document[key]
     _complete_missing_source(production)
-    scenes = production.get("timeline", {}).get("scenes", [])
+    continuity = production.get("continuity")
+    if not isinstance(continuity, dict):
+        continuity = {}
+    production["continuity"] = {
+        key: continuity.get(key) if isinstance(continuity.get(key), list) else []
+        for key in ("characters", "locations", "props")
+    }
+    global_prompts = production.get("global_prompts")
+    if not isinstance(global_prompts, dict):
+        global_prompts = {}
+    prompt_defaults = {
+        "style": "참조 자산의 인물·장소 정체성을 유지하는 자연스러운 실사 시네마틱 스타일.",
+        "negative": "글자, 로고, 워터마크, 왜곡, 중복 인물, 공간 순간이동, 반복 입장을 금지한다.",
+    }
+    production["global_prompts"] = {
+        key: (
+            value if isinstance((value := global_prompts.get(key)), dict)
+            else {"text": value.strip(), "source": "ai_inferred"}
+            if isinstance(value, str) and value.strip()
+            else {"text": text, "source": "ai_inferred"}
+        )
+        for key, text in prompt_defaults.items()
+    }
+    timing_policy = production.get("timing_policy")
+    if not isinstance(timing_policy, dict):
+        timing_policy = {}
+    characters_per_second = timing_policy.get("estimated_characters_per_second")
+    if (
+        isinstance(characters_per_second, bool)
+        or not isinstance(characters_per_second, (int, float))
+        or not 3 <= characters_per_second <= 8
+    ):
+        characters_per_second = 4.5
+    production["timing_policy"] = {
+        "planning_source": "estimated_speech_rate",
+        "final_source": "tts_measured_duration",
+        "estimated_characters_per_second": characters_per_second,
+        "reconciliation": "retime_timeline_narration_captions_transitions_and_export",
+    }
+    production["output"] = {
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "pixel_format": "yuv420p",
+        "faststart": True,
+    }
+    timeline = production.get("timeline")
+    if isinstance(timeline, list):
+        timeline = {"scenes": timeline}
+        production["timeline"] = timeline
+    if not isinstance(timeline, dict):
+        return document
+    timeline.setdefault("duration_source", "timeline.scenes[-1].end")
+    scenes = timeline.get("scenes", [])
     if not isinstance(scenes, list):
         return document
+    narration_cues = production.get("narration_cues", [])
+    if not isinstance(narration_cues, list):
+        narration_cues = []
+        production["narration_cues"] = narration_cues
+    reference_ids = [
+        item.get("id") for item in production.get("reference_assets", [])
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    ]
+    postproduction = production.get("postproduction")
+    if not isinstance(postproduction, dict):
+        postproduction = {}
+        production["postproduction"] = postproduction
+    postproduction_defaults = {
+        "captions": "나레이션 문장을 그대로 사용하고 화면 안전영역 안에 배치한다.",
+        "voice": "저장된 사용자 음성 프로필과 측정된 오디오 길이를 사용한다.",
+        "bgm": "나레이션을 방해하지 않도록 낮은 음량으로 유지한다.",
+        "transitions": "장면 연결은 짧은 컷 또는 디졸브로 처리한다.",
+    }
+    production["postproduction"] = {
+        key: (
+            value if isinstance((value := postproduction.get(key)), dict)
+            else {"text": value.strip(), "source": "ai_inferred"}
+            if isinstance(value, str) and value.strip()
+            else {"text": text, "source": "ai_inferred"}
+        )
+        for key, text in postproduction_defaults.items()
+    }
     for index, scene in enumerate(scenes):
         if not isinstance(scene, dict):
             continue
         title = str(scene.get("title") or f"장면 {index + 1}").strip()
+        scene["title"] = title
+        scene.setdefault("media_type", "image")
+        scene.setdefault("source_media", None)
+        if not isinstance(scene.get("reference_ids"), list) or not scene.get("reference_ids"):
+            scene["reference_ids"] = list(reference_ids)
+        if not isinstance(scene.get("characters"), list):
+            scene["characters"] = []
+        if not isinstance(scene.get("narration_cue_ids"), list) or not scene.get("narration_cue_ids"):
+            scene_start, scene_end = scene.get("start"), scene.get("end")
+            matching_cues = [
+                cue.get("id") for cue in narration_cues
+                if isinstance(cue, dict)
+                and isinstance(cue.get("id"), str)
+                and (
+                    scene.get("id") in (cue.get("scene_ids") or [])
+                    or (
+                        isinstance(scene_start, (int, float))
+                        and isinstance(scene_end, (int, float))
+                        and isinstance(cue.get("start"), (int, float))
+                        and isinstance(cue.get("end"), (int, float))
+                        and scene_start < cue["end"]
+                        and scene_end > cue["start"]
+                    )
+                )
+            ]
+            if not matching_cues and narration_cues:
+                fallback_cue = narration_cues[min(index, len(narration_cues) - 1)]
+                if isinstance(fallback_cue, dict) and isinstance(fallback_cue.get("id"), str):
+                    matching_cues = [fallback_cue["id"]]
+            scene["narration_cue_ids"] = matching_cues
         previous_id = scenes[index - 1].get("id") if index else None
         sequence = scene.get("sequence")
         if not isinstance(sequence, dict):
             sequence = {}
-            scene["sequence"] = sequence
+        allowed_camera_motions = {
+            "fixed", "zoom_in", "zoom_out", "dolly_in", "dolly_out",
+            "pan", "tilt", "tracking", "match_cut", "cutaway",
+        }
+        if sequence.get("camera_motion") not in allowed_camera_motions:
+            sequence["camera_motion"] = "fixed"
+        if sequence.get("camera_axis_transition") not in {"establish", "same_side", "motivated_cross"}:
+            sequence["camera_axis_transition"] = "establish" if index == 0 else "same_side"
         sequence.setdefault("continuity_from", previous_id)
         sequence.setdefault("entry_action", "직전 씬의 위치와 동작을 자연스럽게 이어받는다." if index else "확정된 첫 위치에서 자연스럽게 시작한다.")
         sequence.setdefault("exit_action", "현재 진행 방향을 유지하며 다음 동작으로 이어진다.")
-        sequence.setdefault("camera_motion", "fixed")
         sequence.setdefault("camera_bridge", "직전 씬의 화면 축·인물 위치·시선 방향을 유지한다.")
         sequence.setdefault("continuity_anchor", "인물의 현재 구역, 이미 통과한 경계, 이동 방향과 소품 상태를 직전 씬에서 상속한다.")
         sequence.setdefault("character_blocking", "인물의 좌우 배치와 이동 방향을 유지하고 문 앞 왕복·반복 입장을 금지한다.")
-        sequence.setdefault("camera_axis_transition", "establish" if index == 0 else "same_side")
+        scene["sequence"] = {
+            key: sequence[key] for key in (
+                "continuity_from", "entry_action", "exit_action", "camera_motion",
+                "camera_bridge", "continuity_anchor", "character_blocking",
+                "camera_axis_transition",
+            )
+        }
 
         references = ", ".join(str(item) for item in scene.get("reference_ids", []))
+        camera_palette = (
+            ("24mm 눈높이 공간 확립 와이드숏, 고정", "fixed"),
+            ("70mm 손과 핵심 소품 디테일 클로즈업, 아주 느린 돌리인", "dolly_in"),
+            ("35mm 3/4 측면 미디엄숏, 행동 방향을 따르는 짧은 트래킹", "tracking"),
+            ("85mm 표정 반응 클로즈업, 고정", "fixed"),
+            ("28mm 주인공 어깨너머로 다음 행동과 공간을 여는 오버숄더 와이드", "pan"),
+            ("50mm 두 인물의 시선과 손을 함께 담는 미디엄 투숏, 느린 돌리아웃", "dolly_out"),
+            ("90mm 손·소품의 결과를 보여주는 매크로 인서트, 고정", "fixed"),
+            ("40mm 상대의 반응을 분리해 보여주는 3/4 리액션숏, 짧은 팬", "pan"),
+            ("32mm 이동 방향과 공간 깊이를 함께 담는 측면 와이드, 느린 트래킹", "tracking"),
+            ("55mm 주인공 중심 엔딩 미디엄 클로즈업, 아주 느린 줌인", "zoom_in"),
+        )
+        camera_text, camera_motion = camera_palette[index % len(camera_palette)]
+        previous_camera = _text(scenes[index - 1].get("camera")) if index else ""
+        current_camera = _text(scene.get("camera"))
+        camera_is_missing_or_repeated = not current_camera.strip() or current_camera.strip() == previous_camera.strip()
+        if camera_is_missing_or_repeated:
+            scene["camera"] = {
+                "text": f"{camera_text}. 직전 씬과 화면 크기·각도·주 피사체가 분명히 다르다.",
+                "source": "ai_inferred",
+            }
+            scene["sequence"]["camera_motion"] = camera_motion
+        motion_is_missing_or_repeated = not _text(scene.get("motion_prompt")).strip()
+        if index and _text(scene.get("motion_prompt")).strip() == _text(scenes[index - 1].get("motion_prompt")).strip():
+            motion_is_missing_or_repeated = True
         defaults = {
             "image_prompt": f"{title}. 참조 자산({references})의 인물 정체성·의상·공간 구조·조명을 유지하고, 직전 씬의 현재 위치와 진행 방향을 이어받는 실사 시네마틱 씬. 문 앞 왕복, 반복 입장, 공간 순간이동, 글자와 로고 금지.",
-            "camera": "직전 씬의 화면 축과 인물 배치를 유지하는 눈높이 고정 숲.",
+            "camera": f"{camera_text}. 직전 씬과 화면 크기·각도·주 피사체가 분명히 다르다.",
             "lighting": "참조 장소와 직전 씬의 광원 방향·노출·색온도를 그대로 유지한다.",
-            "motion_prompt": "현재 승인 이미지의 인물·공간·소품을 고정하고 핵심 동작 하나만 작고 자연스럽게 이어간다. 프리즈·루프·장소 변경·립싱크 금지.",
+            "motion_prompt": f"현재 승인 이미지의 인물·공간·소품을 고정하고, '{title}' 장면의 핵심 행동 하나만 작고 자연스럽게 이어간다. {scene['sequence']['exit_action']} 프리즈·루프·장소 변경·립싱크 금지.",
             "transition": "장면 전환은 생성 후 편집 단계에서 짧은 디졸브 또는 컷으로 처리한다.",
         }
         for key, text in defaults.items():
-            if not isinstance(scene.get(key), dict):
+            if not isinstance(scene.get(key), dict) or (key == "motion_prompt" and motion_is_missing_or_repeated):
                 scene[key] = {"text": text, "source": "ai_inferred"}
     scene_by_id = {scene.get("id"): scene for scene in scenes if isinstance(scene, dict)}
     for cue in production.get("narration_cues", []):
         if not isinstance(cue, dict):
             continue
+        # A provider sometimes emits the shorthand {"text": ..., "source": ...}
+        # at cue level. ``_complete_missing_source`` may also complete that pair
+        # before the text is promoted into narration. Neither shorthand key is
+        # part of the canonical narrationCue contract.
+        cue_source = cue.pop("source", None)
+        cue_id = cue.get("id")
+        linked_scenes = [
+            scene for scene in scenes
+            if isinstance(scene, dict) and cue_id in (scene.get("narration_cue_ids") or [])
+        ]
+        if not isinstance(cue.get("scene_ids"), list) or not cue.get("scene_ids"):
+            explicit_scene = cue.pop("scene_id", None)
+            cue["scene_ids"] = (
+                [explicit_scene] if explicit_scene in scene_by_id
+                else [scene.get("id") for scene in linked_scenes if scene.get("id")]
+            )
+        for field in ("narration", "caption"):
+            current = cue.get(field)
+            if isinstance(current, str) and current.strip():
+                cue[field] = {"text": current.strip(), "source": "ai_inferred"}
+                continue
+            if isinstance(current, dict) and str(current.get("text", "")).strip():
+                continue
+            alias = cue.pop("text", None) if field == "narration" else None
+            candidates = [alias] if alias else [scene.get(field) for scene in linked_scenes]
+            normalized = [_text(item).strip() for item in candidates if _text(item).strip()]
+            if normalized and len(set(normalized)) == 1:
+                cue[field] = {
+                    "text": normalized[0],
+                    "source": cue_source if cue_source in {"provided", "ai_inferred"} else "ai_inferred",
+                }
+        if not isinstance(cue.get("caption"), dict) and isinstance(cue.get("narration"), dict):
+            cue["caption"] = json.loads(json.dumps(cue["narration"], ensure_ascii=False))
+        cue.setdefault("timing_source", "estimated_speech_rate")
+        cue.setdefault("measured_duration_seconds", None)
+        cue.setdefault("audio_uri", None)
+        cue_start, cue_end = cue.get("start"), cue.get("end")
+        if (
+            "estimated_duration_seconds" not in cue
+            and isinstance(cue_start, (int, float))
+            and isinstance(cue_end, (int, float))
+            and cue_end > cue_start
+        ):
+            cue["estimated_duration_seconds"] = round(cue_end - cue_start, 3)
         ids = cue.get("scene_ids", [])
         if not isinstance(ids, list) or not ids or any(scene_id not in scene_by_id for scene_id in ids):
             continue
@@ -213,8 +437,6 @@ def normalize_unknown_table_reference_locks(document: dict[str, Any]) -> dict[st
     continuity = production.get("continuity") or {}
     property_text = " ".join(_text(item) for item in continuity.get("props", [])
                               if isinstance(item, (dict, str)))
-    known_shape_terms = ("원형", "둥근", "정사각", "사각형", "사각 테이블", "사각 상판",
-                         "네모난", "직사각", "긴 사각")
     def shapes(text: str) -> set[str]:
         found = {shape for shape, terms in {
             "round": ("원형", "둥근"),
@@ -251,18 +473,25 @@ def normalize_unknown_table_reference_locks(document: dict[str, Any]) -> dict[st
         matching_props = [text for text in props if any(term in text for term in scene_places)]
         local_shapes = shapes(" ".join(matching_props)) if matching_props else set()
         reference_shapes = shapes(reference_text)
-        if len(local_shapes) == 1:
-            selected_shape = next(iter(local_shapes))
-            if reference_shapes and selected_shape not in reference_shapes:
-                continue
-            if not shapes(prompt_text):
-                image_prompt["text"] = f"{prompt_text} {labels[selected_shape]} 테이블 형태와 비율을 해당 장소 기준 레퍼런스대로 유지한다.".strip()
-                continue
         context = f"{prompt_text} {property_text} {reference_text}"
         if "테이블" not in context:
             continue
-        shape_source = f"{property_text} {reference_text}"
-        if any(term in shape_source for term in known_shape_terms):
+        props_shapes = local_shapes if matching_props else shapes(property_text)
+        compatible_shapes = (
+            reference_shapes & props_shapes
+            if reference_shapes and props_shapes
+            else reference_shapes or props_shapes
+        )
+        prompt_shapes = shapes(prompt_text)
+        if len(compatible_shapes) == 1 and not prompt_shapes:
+            selected_shape = next(iter(compatible_shapes))
+            image_prompt["text"] = f"{prompt_text} {labels[selected_shape]} 테이블 형태와 비율을 해당 장소 기준 레퍼런스대로 유지한다.".strip()
+            continue
+        if len(compatible_shapes) > 1 and not prompt_shapes:
+            lock = "테이블이 보이면 현재 장소의 기준 레퍼런스 실루엣·비율·방향을 그대로 유지하고, 다른 장소의 테이블 형태를 섞지 않는다."
+            image_prompt["text"] = f"{prompt_text} {lock}".strip()
+            continue
+        if compatible_shapes:
             continue
         lower = prompt_text.lower()
         if any(term in lower for term in (
@@ -395,6 +624,8 @@ def validate_visual_continuity(document: dict[str, Any]) -> None:
             selected_shapes = known_shapes & prompt_shapes
             if len(selected_shapes) == 1:
                 known_shapes = selected_shapes
+            elif reference_locked:
+                continue
             else:
                 raise UnifiedContentError(
                     f"{scene.get('id', 'scene')} 기준 레퍼런스/continuity.props에 복수 테이블 형태가 있어 씬별로 하나를 명시해야 합니다 "
@@ -508,13 +739,87 @@ def run_generation_harness(
         concepts = document.get("concept_variants") or []
         concept_title = concepts[0].get("title", "") if concepts and isinstance(concepts[0], dict) else ""
         locked_title = (locked_plan or {}).get("title", "")
-        project.setdefault("title", locked_title or concept_title or "요양원 일상의 작은 순간")
+        if locked_title:
+            project["title"] = locked_title
+        else:
+            project.setdefault("title", concept_title or "요양원 일상의 작은 순간")
         project.setdefault("brand", "생각담 | ThinkCast")
         project.setdefault("purpose", (locked_plan or {}).get("synopsis") or "요양원 일상을 담은 따뜻한 스토리형 숏폼 콘텐츠")
         project.setdefault("audience", ["요양원 입소 어르신", "가족 및 보호자"])
-        project.setdefault("selected_keywords", list(selected_keywords))
+        project["selected_keywords"] = list(selected_keywords)
         project.setdefault("aspect_ratio", "16:9")
         project.setdefault("resolution", {"width": 1920, "height": 1080})
+        locked_beats = (locked_plan or {}).get("narration_beats")
+        production = document.get("production", {})
+        cues = production.get("narration_cues", []) if isinstance(production, dict) else []
+        scenes = production.get("timeline", {}).get("scenes", []) if isinstance(production, dict) else []
+        if (
+            isinstance(locked_beats, list)
+            and locked_beats
+            and isinstance(scenes, list)
+            and scenes
+            and len(cues) != len(locked_beats)
+        ):
+            rebuilt_cues = []
+            scene_cue_ids = {scene.get("id"): [] for scene in scenes if isinstance(scene, dict)}
+            scene_count, beat_count = len(scenes), len(locked_beats)
+            for index, beat in enumerate(locked_beats):
+                if scene_count >= beat_count:
+                    first = index * scene_count // beat_count
+                    last = max(first, ((index + 1) * scene_count // beat_count) - 1)
+                else:
+                    first = min(index * scene_count // beat_count, scene_count - 1)
+                    last = first
+                covered = [scene for scene in scenes[first:last + 1] if isinstance(scene, dict)]
+                if not covered:
+                    continue
+                cue_id = f"narration-{index + 1:02d}"
+                scene_ids = [scene["id"] for scene in covered]
+                for scene_id in scene_ids:
+                    scene_cue_ids[scene_id].append(cue_id)
+                start, end = covered[0]["start"], covered[-1]["end"]
+                text = str(beat).strip()
+                rebuilt_cues.append({
+                    "id": cue_id,
+                    "start": start,
+                    "end": end,
+                    "scene_ids": scene_ids,
+                    "narration": {"text": text, "source": "provided"},
+                    "caption": {"text": text, "source": "provided"},
+                    "timing_source": "estimated_speech_rate",
+                    "estimated_duration_seconds": round(float(end) - float(start), 3),
+                    "measured_duration_seconds": None,
+                    "audio_uri": None,
+                })
+            cues = rebuilt_cues
+            production["narration_cues"] = cues
+            cue_text = {cue["id"]: cue["narration"] for cue in cues}
+            for scene in scenes:
+                if not isinstance(scene, dict):
+                    continue
+                ids = scene_cue_ids.get(scene.get("id"), [])
+                scene["narration_cue_ids"] = ids
+                if ids:
+                    scene["narration"] = dict(cue_text[ids[0]])
+                    scene["caption"] = dict(cue_text[ids[0]])
+        if isinstance(locked_beats, list) and len(cues) == len(locked_beats):
+            cue_text_by_id = {}
+            for cue, beat in zip(cues, locked_beats):
+                if not isinstance(cue, dict) or not isinstance(beat, str) or not beat.strip():
+                    continue
+                sourced = {"text": beat.strip(), "source": "provided"}
+                cue["narration"] = dict(sourced)
+                cue["caption"] = dict(sourced)
+                if isinstance(cue.get("id"), str):
+                    cue_text_by_id[cue["id"]] = sourced
+            for scene in scenes if isinstance(scenes, list) else []:
+                if not isinstance(scene, dict):
+                    continue
+                cue_ids = scene.get("narration_cue_ids") or []
+                sourced = next((cue_text_by_id[item] for item in cue_ids if item in cue_text_by_id), None)
+                if sourced:
+                    scene["narration"] = dict(sourced)
+                    scene["caption"] = dict(sourced)
         normalize_unmotivated_axis_crossings(document)
         normalize_unknown_table_reference_locks(document)
         if provenance and not isinstance(document.get("provenance"), dict):
