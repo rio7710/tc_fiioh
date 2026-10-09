@@ -17,7 +17,7 @@ PRODUCTION_SECTION_KEYS = (
     "reference_assets", "continuity", "global_prompts", "timing_policy",
     "timeline", "narration_cues", "postproduction", "output",
 )
-MAX_VALIDATION_REPAIRS = 2
+MAX_VALIDATION_REPAIRS = 3
 
 
 def parse_json_document(candidate: str) -> dict[str, Any]:
@@ -682,7 +682,8 @@ def validate_document(document: dict[str, Any], selected_keywords: list[str], st
     return validate_timeline(document)
 
 
-def build_repair_prompt(candidate: str, error: Exception) -> str:
+def build_repair_prompt(candidate: str, error: Exception,
+                        locked_plan: dict[str, Any] | None = None) -> str:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     sequence = schema.get("$defs", {}).get("sequenceContinuity", {}).get("properties", {})
     enum_hints = []
@@ -691,10 +692,23 @@ def build_repair_prompt(candidate: str, error: Exception) -> str:
         if allowed:
             enum_hints.append(f"sequence.{key}는 다음 값 중 하나만 사용한다: {json.dumps(allowed, ensure_ascii=False)}")
     enum_contract = "\n".join(enum_hints)
+    error_text = str(error)
+    empty_scene_recovery = ""
+    if "timeline.scenes" in error_text and "too few items" in error_text:
+        empty_scene_recovery = (
+            "production.timeline.scenes가 비어 있다. 이전 빈 배열을 유지하지 말고, 확정 1차 대본의 각 "
+            "narration_beats를 화면으로 보여 주는 완전한 씬을 최소 하나씩 새로 작성한다. 모든 씬은 최소 "
+            "1.5초이며 시작·종료 시간이 연속되어야 한다. narration_cues도 각 확정 문장과 같은 순서로 "
+            "만들고 각 씬을 정확히 연결한다. 아래 전체 JSON 스키마의 scene, sequenceContinuity, "
+            "narrationCue 필수 필드를 모두 채운다.\n"
+            f"확정 1차 대본:\n{json.dumps(locked_plan or {}, ensure_ascii=False)}\n"
+            f"전체 JSON 스키마:\n{json.dumps(schema, ensure_ascii=False)}\n"
+        )
     return (
         "이전 JSON 후보가 스키마 또는 장면 연속성 계약 검증에 실패했다. 오류 메시지에 표시된 필드만 최소 변경하고, 그 밖의 모든 값은 이전 JSON에서 정확히 유지하라. 특히 카메라 축, 씬 동선, 장소, 인물, 구도와 프롬프트는 해당 오류가 직접 지적하지 않는 한 절대 바꾸지 않는다.\n"
         "장소 복귀는 이유와 이동 경로를 sequence에 기록하고, 가구 형태는 기준 레퍼런스 및 continuity.props와 모든 씬 프롬프트에서 일치시킨다. 아래 오류를 모두 수정하고 완전한 JSON 객체 하나만 다시 출력하라.\n"
         f"열거형 계약:\n{enum_contract}\n"
+        f"{empty_scene_recovery}"
         "화면축 검증 오류라면 camera_bridge·entry_action·exit_action에 실제로 보이는 카메라/인물의 축 횡단 이동이 명시된 경우에만 motivated_cross를 유지한다. 이동 근거가 없으면 해당 씬을 same_side로 고치며, 단순한 샷 크기·각도 변화는 축 횡단으로 취급하지 않는다.\n"
         "테이블 형태 누락 오류라면 오류에 표시된 한국어 형태명을 해당 scene의 image_prompt.text에 직접 넣고, continuity.props 및 기준 레퍼런스와 일치시킨다.\n"
         "기준 metadata에 테이블 형태가 없으면 형태를 추측하지 않는다. 해당 씬의 image_prompt.text에 기준 레퍼런스의 테이블 실루엣·비율·방향을 그대로 유지하라고 명시한다.\n"
@@ -838,7 +852,7 @@ def run_generation_harness(
         except (UnifiedContentError, KeyError, TypeError, ValueError) as validation_error:
             if repair_count >= MAX_VALIDATION_REPAIRS:
                 raise
-            candidate = generate(build_repair_prompt(candidate, validation_error))
+            candidate = generate(build_repair_prompt(candidate, validation_error, locked_plan))
             repair_count += 1
     similarity = maximum_similarity(document, previous_documents)
     if similarity >= similarity_threshold:

@@ -988,6 +988,27 @@ def validate_script_plan(plan, authored_context=""):
         raise ValueError("사람 작성 샘플의 제목·내레이션 문장을 그대로 복제하지 말고 새 사건과 문장으로 작성해 주세요.")
 
 
+def normalize_script_plan(plan):
+    """Canonicalize harmless model formatting drift before strict validation."""
+    if not isinstance(plan, dict):
+        return plan
+    normalized = {
+        "schema_version": "1.0.0",
+        "title": str(plan.get("title", "")).strip(),
+        "synopsis": str(plan.get("synopsis", "")).strip(),
+        "narration_beats": plan.get("narration_beats", []),
+        "cast_choices": plan.get("cast_choices", []),
+        "location_choices": plan.get("location_choices", []),
+    }
+    for key in ("narration_beats", "cast_choices", "location_choices"):
+        value = normalized[key]
+        if isinstance(value, str):
+            value = [value]
+        if isinstance(value, list):
+            normalized[key] = [str(item).strip() for item in value if str(item).strip()]
+    return normalized
+
+
 def openai_script_plan(api_key, selected_labels, resources, recent_usage):
     if not api_key:
         raise ValueError("OpenAI API 키가 연결되지 않았습니다.")
@@ -1005,7 +1026,7 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage):
 최근 자주 쓰인 특정 인물과 장소를 습관적으로 반복하지 말고, 이야기와 맞는 후보를 골고루 선택한다. 균등 할당을 위해 억지 인물이나 장소를 넣지는 않는다. 인물이나 장소가 바뀌면 서사상 이유를 둔다.
 요양원에 대한 긍정적 인상은 과장 광고나 근거 없는 서비스·치료 효과 주장이 아니라, 제공된 자료가 뒷받침할 때 어르신의 선택을 존중하는 태도, 편안하고 정돈된 공간, 세심한 일상 돌봄, 가족과의 자연스러운 교류 같은 화면 가능한 행동으로 절제해 표현한다.
 주요 인물만 cast_choices에 지정한다. 로비 등 분위기상 자연스러운 장소에는 익명 엑스트라를 연출로 보완할 수 있지만 cast_choices의 주요 인물과 구분하고 실제 시설 사실로 주장하지 않는다. 이어지는 같은 장소에서 배경 인물의 외형·옷·좌석·행동을 유지하도록 synopsis의 연출 맥락에 기록한다. 세로 크롭에 최소 한 명이 들어오는 조건은 주요 인물에게만 적용하고 엑스트라는 예외다. 구체적인 안전 여백·구도 변주·환경의 미세한 움직임은 후속 콘티에서 설계한다.
-나레이션은 줄거리 해설이나 인물 행동 보고서가 아니다. 짧은 시처럼 이미지와 여운이 이어지는 낭독 카피를 2~8개 문장으로 쓰고, 전체 분량은 180~210자로 하며 200자에 가깝게 작성한다. 글자 수는 각 문장의 앞뒤 공백을 제외하고 문장 내부 공백과 문장부호를 포함해 센다. 인물의 이름과 캐릭터 ID는 cast_choices와 후속 콘티에만 쓰며 narration_beats에는 절대 넣지 않는다. '누가 무엇을 했습니다' 식의 사건 설명을 연속 나열하지 않는다. 실제 한국어로 낭독했을 때 뜻이 바로 들리는 익숙하고 자연스러운 시적 표현을 쓴다. 승인된 사람 작성 원고의 좋은 문장은 장면에 맞으면 인용해도 되지만 예시를 매번 반복하지 않는다. “내 속도로”, “곁의 눈빛이 먼저 살피고”, “방향이 놓이고”처럼 시점이나 주어·동작이 어색한 조합은 피한다. 시적인 여운은 실제 인물의 행동과 화면에 보이는 장면에서 출발한다. 한 문장 사이에 여러 씬이 들어갈 수 있지만 나레이션 없는 씬은 후속 단계에서 만들지 않는다. 이 단계에서는 씬 수, 카메라, 이미지 프롬프트를 작성하지 않는다."""
+나레이션은 줄거리 해설이나 인물 행동 보고서가 아니다. 짧은 시처럼 이미지와 여운이 이어지는 낭독 카피를 2~8개 문장으로 쓰고, 전체 분량은 180~210자로 하며 200자에 가깝게 작성한다. 글자 수는 각 문장의 앞뒤 공백을 제외하고 문장 내부 공백과 문장부호를 포함해 센다. 인물의 이름과 캐릭터 ID는 cast_choices와 후속 콘티에만 쓰며 narration_beats에는 절대 넣지 않는다. '누가 무엇을 했습니다' 식의 사건 설명을 연속 나열하지 않는다. 실제 한국어로 낭독했을 때 뜻이 바로 들리는 익숙하고 자연스러운 시적 표현을 쓴다. 사람 작성 원고의 문장을 직접 인용하거나 일부 단어만 바꿔 재사용하지 않는다. “내 속도로”, “곁의 눈빛이 먼저 살피고”, “방향이 놓이고”처럼 시점이나 주어·동작이 어색한 조합은 피한다. 시적인 여운은 실제 인물의 행동과 화면에 보이는 장면에서 출발한다. 한 문장 사이에 여러 씬이 들어갈 수 있지만 나레이션 없는 씬은 후속 단계에서 만들지 않는다. 이 단계에서는 씬 수, 카메라, 이미지 프롬프트를 작성하지 않는다."""
     responses = []
     def generate(input_text):
         body = {"model": model, "input": input_text, "max_output_tokens": 6_000,
@@ -1029,23 +1050,38 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage):
             raise RuntimeError("1차 대본 JSON을 읽지 못했습니다.") from None
 
     plan = generate(prompt)
-    for attempt in range(2):
+    validation_errors = []
+    for attempt in range(4):
+        plan = normalize_script_plan(plan)
         try:
             validate_script_plan(plan, authored_context)
             break
         except (JsonSchemaError, TypeError, ValueError) as exc:
-            if attempt:
-                raise RuntimeError("1차 대본의 나레이션 형식 검증에 실패했습니다. 다시 요청해 주세요.") from None
+            validation_errors.append(str(exc))
+            if attempt == 3:
+                detail = str(exc).strip() or type(exc).__name__
+                raise RuntimeError(f"1차 대본 검증에 실패했습니다: {detail}") from None
+            beats = plan.get("narration_beats", []) if isinstance(plan, dict) else []
+            current_length = sum(len(str(beat).strip()) for beat in beats) if isinstance(beats, list) else 0
             plan = generate(
                 "아래 1차 대본 JSON을 형식에 맞게 고쳐 완전한 JSON 객체 하나만 출력하라. "
                 "인물 이름 없는 짧은 시적 나레이션으로 바꾸되 제목·캐스팅·장소·서사 취지는 유지하라. "
-                f"검증 오류: {exc}\n이전 결과: {json.dumps(plan, ensure_ascii=False)}"
+                "narration_beats는 2~8개, 각 항목은 70자 이하, 전체는 반드시 180~210자로 맞춘다. "
+                "사람 작성 원고의 문장을 인용하거나 단어만 바꿔 재사용하지 말고 전부 새 문장으로 쓴다. "
+                f"현재 나레이션 글자 수: {current_length}. 검증 오류: {exc}\n"
+                f"이전 검증 오류들: {json.dumps(validation_errors, ensure_ascii=False)}\n"
+                f"이전 결과: {json.dumps(plan, ensure_ascii=False)}"
             )
     usage = {key: sum(int(item.get("usage", {}).get(key, 0)) for item in responses)
              for key in ("input_tokens", "output_tokens", "total_tokens")}
     result = responses[-1]
     return plan, {"id": result.get("id", ""), "model": result.get("model", model),
-                  "usage": usage, "request_count": len(responses)}
+                  "usage": usage, "request_count": len(responses),
+                  "recovery": {
+                      "attempts": len(validation_errors),
+                      "validation_errors": validation_errors,
+                      "normalized_before_validation": True,
+                  }}
 
 
 def openai_unified_storyboard(api_key, selected_labels, resources, previous_documents, script_plan=None):

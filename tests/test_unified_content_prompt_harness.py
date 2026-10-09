@@ -34,6 +34,19 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         value["schema_version"] = "1.1"
         self.assertEqual("1.0.0", normalize_document_shape(value)["schema_version"])
 
+    def test_empty_scene_repair_receives_locked_plan_and_full_contract(self):
+        prompt = build_repair_prompt(
+            '{"production":{"timeline":{"scenes":[]}}}',
+            UnifiedContentError(
+                "schema validation failed: $.production.timeline.scenes: too few items"
+            ),
+            {"title": "확정 제목", "narration_beats": ["확정 문장"]},
+        )
+        self.assertIn("production.timeline.scenes가 비어 있다", prompt)
+        self.assertIn("확정 제목", prompt)
+        self.assertIn('"$defs"', prompt)
+        self.assertIn("각 확정 문장", prompt)
+
     def test_timeline_scene_array_shorthand_is_wrapped(self):
         value = document(["안심"])
         scenes = value["production"]["timeline"]["scenes"]
