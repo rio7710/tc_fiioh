@@ -43,6 +43,7 @@ const projectKeywordHydratorPath = '01_app/assets/core/project-keyword-hydrator.
 const projectMediaHydratorPath = '01_app/assets/core/project-media-hydrator.js';
 const projectBrandPlatformHydratorPath = '01_app/assets/core/project-brand-platform-hydrator.js';
 const projectEditorHydratorPath = '01_app/assets/core/project-editor-hydrator.js';
+const projectHydrationComposerPath = '01_app/assets/core/project-hydration-composer.js';
 const promptLabControllerPath = '01_app/assets/core/prompt-lab-controller.js';
 const providerSettingsControllerPath = '01_app/assets/core/provider-settings-controller.js';
 const scriptEditorControllerPath = '01_app/assets/steps/step03/step03-script-editor-controller.js';
@@ -98,6 +99,7 @@ assert.ok(fs.existsSync(projectKeywordHydratorPath), 'project-keyword-hydrator.j
 assert.ok(fs.existsSync(projectMediaHydratorPath), 'project-media-hydrator.js must exist');
 assert.ok(fs.existsSync(projectBrandPlatformHydratorPath), 'project-brand-platform-hydrator.js must exist');
 assert.ok(fs.existsSync(projectEditorHydratorPath), 'project-editor-hydrator.js must exist');
+assert.ok(fs.existsSync(projectHydrationComposerPath), 'project-hydration-composer.js must exist');
 assert.ok(fs.existsSync(promptLabControllerPath), 'prompt-lab-controller.js must exist');
 assert.ok(fs.existsSync(providerSettingsControllerPath), 'provider-settings-controller.js must exist');
 assert.ok(fs.existsSync(scriptEditorControllerPath), 'step03-script-editor-controller.js must exist');
@@ -139,12 +141,14 @@ assert.match(html, /src="\/01_app\/assets\/core\/project-media-hydrator\.js\?v=2
 assert.match(html, /src="\/01_app\/assets\/core\/project-brand-platform-hydrator\.js\?v=20261009_v60"/, 'HTML cache-busts project brand platform hydrator');
 assert.match(html, /src="\/01_app\/assets\/core\/project-editor-hydrator\.js\?v=20261009_v61"/, 'HTML cache-busts project editor hydrator');
 assert.match(html, /src="\/01_app\/assets\/core\/project-hydration-applier\.js\?v=20261009_v61"/, 'HTML cache-busts project hydration applier');
+assert.match(html, /src="\/01_app\/assets\/core\/project-hydration-composer\.js\?v=20261009_v62"/, 'HTML cache-busts project hydration composer');
 assert.match(html, /src="\/01_app\/assets\/core\/project-hydration-controller\.js\?v=20261009_v57"/, 'HTML cache-busts project hydration controller');
 assert.ok(html.indexOf('project-hydration-applier.js') < html.indexOf('project-hydration-controller.js'), 'hydration applier loads before controller');
 assert.ok(html.indexOf('project-keyword-hydrator.js') < html.indexOf('project-hydration-applier.js'), 'keyword hydrator loads before hydration applier');
 assert.ok(html.indexOf('project-media-hydrator.js') < html.indexOf('project-hydration-applier.js'), 'media hydrator loads before hydration applier');
 assert.ok(html.indexOf('project-brand-platform-hydrator.js') < html.indexOf('project-hydration-applier.js'), 'brand platform hydrator loads before hydration applier');
 assert.ok(html.indexOf('project-editor-hydrator.js') < html.indexOf('project-hydration-applier.js'), 'editor hydrator loads before hydration applier');
+assert.ok(html.indexOf('project-hydration-applier.js') < html.indexOf('project-hydration-composer.js') && html.indexOf('project-hydration-composer.js') < html.indexOf('project-hydration-controller.js'), 'composer loads after applier and before controller');
 assert.match(html, /src="\/01_app\/assets\/core\/prompt-lab-controller\.js\?v=20261009_v37"/, 'HTML cache-busts prompt lab controller');
 assert.match(html, /src="\/01_app\/assets\/core\/provider-settings-controller\.js\?v=20261009_v39"/, 'HTML cache-busts provider settings controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/trend-keyword-controller\.js\?v=20261009_v40"/, 'HTML cache-busts trend keyword controller');
@@ -198,11 +202,10 @@ assert.doesNotMatch(html, /document\.querySelector\('#loginForm'\)\.addEventList
 assert.match(html, /async function loadProjectContent\(projectId,token\)\{\s*return projectHydrationController\.loadContent\(projectId,token\);\s*\}/, 'P1 keeps a thin project content hydration wrapper');
 assert.match(html, /async function loadProjectState\(projectId,token\)\{\s*return projectHydrationController\.loadState\(projectId,token\);\s*\}/, 'P1 keeps a thin project state hydration wrapper');
 assert.match(html, /const projectHydrationController=ThinkCastProjectHydrationController\.create\(/, 'P1 wires the project hydration controller');
-assert.match(html, /applier:projectHydrationApplier/, 'P1 explicitly injects hydration applier');
-assert.match(html, /keywordHydrator:projectKeywordHydrator/, 'P1 explicitly injects keyword hydrator');
-assert.match(html, /mediaHydrator:projectMediaHydrator/, 'P1 explicitly injects media hydrator');
-assert.match(html, /brandPlatformHydrator:projectBrandPlatformHydrator/, 'P1 explicitly injects brand platform hydrator');
-assert.match(html, /editorHydrator:projectEditorHydrator/, 'P1 explicitly injects editor hydrator');
+assert.match(html, /applier:projectHydrationComposition\.applier/, 'P1 explicitly injects composed hydration applier');
+assert.match(html, /ThinkCastProjectHydrationComposer\.create\(\{factories:\{keyword:ThinkCastProjectKeywordHydrator,media:ThinkCastProjectMediaHydrator,brandPlatform:ThinkCastProjectBrandPlatformHydrator,editor:ThinkCastProjectEditorHydrator,applier:ThinkCastProjectHydrationApplier\}/, 'P1 delegates hydration construction to composer');
+assert.match(html, /applier:projectHydrationComposition\.applier/, 'P1 injects only composed applier into transport controller');
+assert.doesNotMatch(html, /ThinkCastProject(?:KeywordHydrator|MediaHydrator|BrandPlatformHydrator|EditorHydrator|HydrationApplier)\.create\(/, 'P1 has no individual hydration create calls');
 assert.doesNotMatch(projectHydrationSource,/setSceneCropPositions|setDemoTimeline|setSelectedKeywords/,'transport controller has no state setter dependencies');
 assert.doesNotMatch(projectHydrationApplierSource,/getDemoKeywords|setDemoKeywords|setSelectedKeywords|setSeasonalKeywordIds|setVisibleKeywordIds|renderKeywords/,'hydration applier has no keyword setter dependencies');
 assert.doesNotMatch(projectHydrationApplierSource,/setSceneCropPositions|setStoryboardImages|setStoryboardImageCandidates|setStoryboardVoiceClips|setStoryboardVideos|setStoryboardVideoCandidates|setVoiceProfile/,'hydration applier has no media setter dependencies');
@@ -544,6 +547,7 @@ function createPrePartialContext() {
     ThinkCastProjectMediaHydrator: require('../01_app/assets/core/project-media-hydrator.js'),
     ThinkCastProjectBrandPlatformHydrator: require('../01_app/assets/core/project-brand-platform-hydrator.js'),
     ThinkCastProjectEditorHydrator: require('../01_app/assets/core/project-editor-hydrator.js'),
+    ThinkCastProjectHydrationComposer: require('../01_app/assets/core/project-hydration-composer.js'),
     ThinkCastPromptLabController: require('../01_app/assets/core/prompt-lab-controller.js'),
     ThinkCastProviderSettingsController: require('../01_app/assets/core/provider-settings-controller.js'),
     Step03ScriptEditorController: require('../01_app/assets/steps/step03/step03-script-editor-controller.js'),

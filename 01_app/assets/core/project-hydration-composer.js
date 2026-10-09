@@ -1,0 +1,6 @@
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.ThinkCastProjectHydrationComposer=api})(typeof self!=='undefined'?self:this,function(){
+  'use strict';
+  const roles=['keyword','media','brandPlatform','editor','applier'];
+  function create(options){const value=options||{},factories=value.factories||{};for(const role of roles){if(!factories[role]||typeof factories[role].create!=='function')throw new TypeError(`ThinkCastProjectHydrationComposer requires ${role} factory`);if(!value[`${role}Dependencies`]||typeof value[`${role}Dependencies`]!=='object'||Array.isArray(value[`${role}Dependencies`]))throw new TypeError(`ThinkCastProjectHydrationComposer requires ${role}Dependencies`)}const keyword=factories.keyword.create(value.keywordDependencies),media=factories.media.create(value.mediaDependencies),brandPlatform=factories.brandPlatform.create(value.brandPlatformDependencies),editor=factories.editor.create(value.editorDependencies),applier=factories.applier.create({...value.applierDependencies,keywordHydrator:keyword,mediaHydrator:media,brandPlatformHydrator:brandPlatform,editorHydrator:editor});return Object.freeze({keyword,media,brandPlatform,editor,applier})}
+  return Object.freeze({create});
+});
