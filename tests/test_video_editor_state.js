@@ -33,6 +33,11 @@ console.log('Testing Scene Navigation & OUT -> scene -> OUT transitions...');
   // Seek time calculations
   assert.equal(SceneNav.calculateSceneSeekTime(mockScenes[0]), 0.55); // cueStart + 0.05
   assert.equal(SceneNav.calculateSceneSeekTime(mockScenes[2]), 9.05); // start + 0.05 (no text)
+  assert.equal(
+    SceneNav.calculateSceneSeekTime({start: 4, end: 7, cueStart: 0, text: 'shared narration'}),
+    4.05,
+    'a shared narration cue must not seek backward before the visual scene'
+  );
   assert.equal(SceneNav.calculateOutroSeekTime(duration), 14.95);
 
   // Initial state at start

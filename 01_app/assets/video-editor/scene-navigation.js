@@ -28,9 +28,15 @@
 
   function calculateSceneSeekTime(scene) {
     if (!scene) return 0;
-    const base = scene.text && Number.isFinite(Number(scene.cueStart))
-      ? Number(scene.cueStart)
-      : Number(scene.start) || 0;
+    const sceneStart = Number(scene.start) || 0;
+    const cueStart = Number(scene.cueStart);
+    // One narration cue may span multiple visual shots. In that case a later
+    // scene inherits an earlier cueStart, so seeking to the cue would jump
+    // backwards and leave the previous scene active. Never seek before the
+    // visual scene's own boundary.
+    const base = scene.text && Number.isFinite(cueStart)
+      ? Math.max(sceneStart, cueStart)
+      : sceneStart;
     return base + 0.05;
   }
 
