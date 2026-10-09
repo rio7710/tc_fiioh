@@ -1,0 +1,63 @@
+<dialog class="user-settings-dialog" id="userSettingsDialog" aria-labelledby="userSettingsTitle">
+  <header class="user-settings-head"><div><small>YOUR WORKFLOW · USER SETTINGS</small><h2 id="userSettingsTitle">사용자 설정</h2></div><button class="user-settings-close" id="userSettingsClose" type="button" aria-label="사용자 설정 닫기" autofocus>×</button></header>
+  <div class="user-settings-body">
+    <section class="user-settings-section user-automation-layout" aria-label="단계별 자동화 설정">
+      <label class="user-settings-value" for="userAutomationRange" id="userAutomationValue">수동 진행</label>
+      <input class="user-settings-range" id="userAutomationRange" type="range" min="0" max="0" step="1" value="0" aria-label="자동화 종료 단계" aria-describedby="userAutomationSummary">
+      <div class="user-settings-stages" id="userAutomationStages"></div>
+      <p class="user-settings-summary" id="userAutomationSummary" role="status" aria-live="polite"></p>
+      <form id="userStageOptionsForm" autocomplete="off">
+        <section class="user-stage-options" data-user-stage="manual"><h4>수동 진행</h4><p>슬라이더로 자동화 범위를 지정하거나 단계명을 눌러 옵션을 미리 살펴보세요.</p></section>
+        <section class="user-stage-options" data-user-stage="2" hidden><h4>키워드 옵션</h4>
+          <label class="user-option-row">키워드 개수<input id="userKeywordCount" type="number" min="1" max="5" step="1" value="3"></label>
+          <label class="user-option-row">AI 추천 키워드 사용<input id="userAiKeywords" type="checkbox" checked></label>
+          <label class="user-option-row">추천 대상 월<select id="userKeywordMonth"><option value="">이번 달 자동</option><option value="2026-10">2026년 10월 · 100개</option></select></label>
+          <p>대한민국 날짜·계절·행사 주제로 1~5개를 추천합니다. 실시간 축제 일정이나 인기 순위를 조회하는 기능은 아닙니다.</p>
+          <button class="flow-btn" id="userKeywordRecommend" type="button">AI 키워드 추천 받기</button>
+          <button class="flow-btn" id="userKeywordRefresh" type="button">새로 추천</button>
+          <p>월별 후보가 있으면 외부 API 없이 무작위로 추첨합니다. 이번 달 후보가 없으면 실제 AI API를 호출합니다.</p>
+          <div class="keyword-loading" id="userKeywordLoading" role="status" hidden><span class="keyword-loading-spinner" aria-hidden="true"></span><span>AI 추천 생성 중<small>결과가 도착하면 여기에 표시됩니다.</small></span></div>
+          <p id="userKeywordResultMessage" role="status" aria-live="polite">월별 후보는 API 호출 없이 추첨합니다.</p>
+          <div id="userKeywordResults"></div>
+        </section>
+        <section class="user-stage-options" data-user-stage="3" hidden><h4>대본 · 타임라인</h4><p>현재 별도 옵션이 없습니다. 기본 제작 설정을 사용합니다.</p></section>
+        <section class="user-stage-options" data-user-stage="3-1" hidden><h4>콘티 옵션</h4>
+          <p>이미지 · 음성 생성은 기본 포함됩니다.</p>
+          <div class="user-voice-option"><button class="user-voice-preview" id="userVoicePreview" type="button" aria-label="선택한 음성 샘플 듣기">▶ 듣기</button><label class="user-option-row" for="userVoiceProfile">나레이션 음성<select id="userVoiceProfile"><option value="warm_female">따뜻한 여성 · 기본</option><option value="bright_female">경쾌한 여성</option><option value="steady_male">차분한 남성</option><option value="qwen_narrator">복제음성 A · 내레이션</option><option value="qwen_etp">복제음성 B · ETP</option></select></label></div>
+          <p id="userVoicePreviewStatus" role="status" aria-live="polite">선택한 목소리를 먼저 들어볼 수 있습니다.</p>
+          <p>같은 내레이션에 연결된 씬은 음성을 한 번만 생성해 공유합니다.</p>
+          <label class="user-option-row">영상 변환 장면 수<input id="userVideoSceneCount" type="number" min="0" step="1" value="0"></label>
+          <p>GPT가 대본·이미지·동작을 검토해 설정한 개수의 장면을 선택하고, 선택된 장면만 Kling으로 변환합니다. 0개면 생략합니다.</p>
+        </section>
+        <section class="user-stage-options" data-user-stage="4" hidden><h4>영상 디자인 옵션</h4>
+          <label class="user-option-row">크롭 방식<select id="userCropMode"><option value="default">기본 크롭</option><option value="manual">사용자 지정</option><option value="ai">AI 사람 위치 · 좌우</option></select></label>
+          <p>AI는 사람 위치를 기준으로 9:16·4:5 좌우 크롭을 저장합니다. 상하·확대·움직임 추적은 없으며 판단이 어려운 장면은 확인을 위해 멈춥니다.</p>
+          <div class="user-brand-options" role="group" aria-label="브랜드 리소스 사용">
+            <label class="user-brand-option"><input id="userUseIntro" type="checkbox">인트로</label>
+            <label class="user-brand-option"><input id="userUseOutro" type="checkbox">아웃트로</label>
+            <label class="user-brand-option"><input id="userUseWatermark" type="checkbox">워터마크</label>
+          </div>
+          <p>선택한 개인 브랜드의 최신 활성 버전을 설정 저장 시 고정하여 적용합니다.</p>
+          <h4>제작 채널 · 출력 포맷</h4><p>채널별 영상을 어떤 비율로 제작할지 선택합니다. 채널 게시·배포는 실행하지 않습니다.</p>
+          <div id="userOutputChannels"></div>
+        </section>
+        <section class="user-stage-options" data-user-stage="5" hidden><h4>제작 캘린더</h4><p>기존처럼 제작 콘텐츠를 캘린더에 표시합니다. 배포·예약 게시 기능은 자동화 범위에 포함되지 않으며 추후 구현 예정입니다.</p></section>
+      </form>
+      <p>시작 확인 시 첫 콘텐츠를 제작하고, 한국 시간 기준 설정 간격으로 반복합니다. 오류 시 반복을 중지합니다. 월말에 해당 날짜가 없으면 말일에 실행합니다.</p>
+      <div id="userAutomationServerStatus" role="status" aria-live="polite"></div>
+      <div class="user-automation-runs" id="userAutomationRuns" aria-label="최근 자동화 실행"></div>
+    </section>
+  </div>
+  <footer class="user-settings-footer"><span id="userSettingsSaveStatus" role="status" aria-live="polite">서버에 저장합니다. 저장만으로는 실행되지 않습니다.</span><fieldset class="user-repeat" id="userAutomationRepeat" disabled hidden><legend>반복 간격</legend><div class="user-repeat-controls"><input id="userRepeatInterval" form="userStageOptionsForm" type="number" min="1" max="365" step="1" value="1" required aria-label="반복 간격 숫자"><div class="user-repeat-units"><label class="user-repeat-unit"><input form="userStageOptionsForm" type="radio" name="userRepeatUnit" value="day" checked><span>일</span></label><label class="user-repeat-unit"><input form="userStageOptionsForm" type="radio" name="userRepeatUnit" value="week"><span>주</span></label><label class="user-repeat-unit"><input form="userStageOptionsForm" type="radio" name="userRepeatUnit" value="month"><span>월</span></label><label class="user-repeat-unit"><input form="userStageOptionsForm" type="radio" name="userRepeatUnit" value="count"><span>회</span></label></div><span id="userRepeatSuffix">마다</span></div></fieldset><div class="user-settings-actions"><button class="flow-btn" id="userSettingsSave" type="button">저장</button><button class="flow-btn primary" id="userAutomationToggle" type="button">시작</button></div></footer>
+</dialog>
+
+<dialog class="user-settings-dialog user-channel-key-dialog" id="userChannelKeyDialog" aria-labelledby="userChannelKeyTitle" aria-describedby="userChannelKeyNote">
+  <header class="user-settings-head"><h2 id="userChannelKeyTitle">채널 API 키</h2><button class="user-settings-close" id="userChannelKeyClose" type="button" aria-label="채널 키 입력 닫기">×</button></header>
+  <form id="userChannelKeyForm" autocomplete="off">
+    <div class="user-settings-body">
+      <label class="user-channel-key-field">API 키 / 액세스 토큰<input id="userChannelKeyInput" type="password" autocomplete="new-password" spellcheck="false" autocapitalize="none" placeholder="테스트 입력 · 실제 키는 입력하지 마세요" aria-describedby="userChannelKeyNote"></label>
+      <p class="user-settings-note" id="userChannelKeyNote">입력 화면 미리보기입니다. 키 저장·인증은 아직 연결되지 않았으며, 닫으면 입력값이 지워집니다. 채널에 따라 별도 계정 인증이 필요합니다.</p>
+    </div>
+    <footer class="user-settings-footer"><button class="flow-btn" id="userChannelKeyCancel" type="button">닫기</button><button class="flow-btn" type="button" disabled>저장 · 연동 예정</button></footer>
+  </form>
+</dialog>

@@ -56,6 +56,7 @@ const candidateSelectionControllerPath = '01_app/assets/steps/step03/candidate-s
 const sceneVoicePlaybackControllerPath = '01_app/assets/steps/step03/scene-voice-playback-controller.js';
 const sceneVoiceControllerPath = '01_app/assets/steps/step03/scene-voice-controller.js';
 const voiceProfileControllerPath = '01_app/assets/steps/step03/voice-profile-controller.js';
+const userSettingsControllerPath = '01_app/assets/core/user-settings-controller.js';
 const storyboardGridRendererPath = '01_app/assets/steps/step03/storyboard-grid-renderer.js';
 const storyboardLookControllerPath = '01_app/assets/steps/step03/storyboard-look-controller.js';
 const storyboardFlowControllerPath = '01_app/assets/steps/step03/storyboard-flow-controller.js';
@@ -274,7 +275,8 @@ assert.match(html,/function setVoiceProfile\(profileId\)\{\s*return voiceProfile
 assert.match(html,/async function previewVoiceProfile\(button\)\{\s*return voiceProfileController\.preview\(button\);\s*\}/,'P1 keeps thin voice preview wrapper');
 assert.doesNotMatch(html,/async function previewVoiceProfile\(button\)\{\s*const profileId=|document\.querySelector\('\.voice-picker'\)\.addEventListener/,'P1 removes main voice profile body and listener');
 assert.match(fs.readFileSync(voiceProfileControllerPath,'utf8'),/\/api\/voice\/select[\s\S]*\/api\/voice\/sample\?profile=/,'voice profile controller owns select and sample requests');
-assert.match(html,/document\.querySelector\('#userVoicePreview'\)\.addEventListener/,'user settings voice preview remains in P1');
+assert.match(fs.readFileSync(userSettingsControllerPath,'utf8'),/listen\(document\.querySelector\('#userVoicePreview'\),'click'/,'user settings controller owns voice preview');
+assert.doesNotMatch(html,/document\.querySelector\('#userVoicePreview'\)\.addEventListener/,'P1 removes user settings voice preview listener');
 assert.match(html,/const storyboardGridRenderer=Step03StoryboardGridRenderer\.create\(/,'P1 wires storyboard grid renderer');
 assert.match(html,/const storyboardLookController=Step03StoryboardLookController\.create\(/,'P1 wires storyboard look controller');
 assert.match(html,/function applyStoryboardLook\(look\)\{\s*return storyboardLookController\.apply\(look\);\s*\}/,'P1 keeps thin storyboard look apply wrapper');
@@ -551,6 +553,7 @@ function createPrePartialContext() {
     ThinkCastProjectHydrationComposer: require('../01_app/assets/core/project-hydration-composer.js'),
     ThinkCastPromptLabController: require('../01_app/assets/core/prompt-lab-controller.js'),
     ThinkCastProviderSettingsController: require('../01_app/assets/core/provider-settings-controller.js'),
+    ThinkCastUserSettingsController: require('../01_app/assets/core/user-settings-controller.js'),
     Step03ScriptEditorController: require('../01_app/assets/steps/step03/step03-script-editor-controller.js'),
     Step02Keyword: require('../01_app/assets/steps/step02/step02-keyword.js'),
     Step02ScriptGenerationController: require('../01_app/assets/steps/step02/script-generation-controller.js'),
