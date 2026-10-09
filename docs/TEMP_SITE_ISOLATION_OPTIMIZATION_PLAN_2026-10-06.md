@@ -7,7 +7,7 @@
 
 ## 1. 현재 진단
 
-- `01_app/P1_title_design_preview.html`에 Step UI, 상태, 이벤트, 미리보기 로직이 집중되어 있다.
+- 작성 당시에는 `01_app/P1_title_design_preview.html`에 Step UI, 상태, 이벤트, 미리보기 로직이 집중되어 있었다. 2026-10-09의 프론트 shell 분절로 이 진단은 역사적 기준점이 되었으며, 현재 P1은 mount point와 공유 modal root를 제공하는 얇은 shell이다.
 - `01_app/render_server.py`에 HTTP, 인증, 저장, 외부 모델 호출, FFmpeg 로직이 혼재한다.
 - Step 간 DOM과 전역 상태를 직접 참조해 한 Step 수정이 다른 Step에 영향을 준다.
 - 아웃트로 비율별 파일이 하나의 논리 버전이 아니라 숨겨진 버전과 파일명 규칙으로 연결된다.
@@ -391,3 +391,23 @@ release-candidate
 - 코드 롤백과 DB 롤백은 별도로 검증한다.
 - 강제 push는 금지하고, 운영 롤백은 revert commit 또는 이전 태그 재배포로 수행한다.
 - 최종 승인 전까지 기존 안정 컨테이너 이미지를 삭제하지 않는다.
+
+## 11. 2026-10-09 P1 shell 5단계 분절 완료
+
+초기 2,153줄이던 `01_app/P1_title_design_preview.html`을 기능 계약을 유지한 채 204줄의 root shell로 축소했다. 현재 P1은 정적 자산 로드, Step/partial mount point, 여러 화면이 함께 쓰는 modal root만 소유한다. 앱 상태, controller composition, partial load와 boot 순서는 `01_app/assets/core/app-bootstrap.js`가 소유한다.
+
+완료된 경계:
+
+1. 인라인 CSS를 `01_app/assets/core/app-shell.css`로 이동 — 기준 커밋 `b3b6b48`
+2. 사용자 설정/서버 자동화 markup과 lifecycle을 partial/controller로 이동 — 기준 커밋 `6296a1b`
+3. AI workflow progress modal과 구성 책임을 partial/controller로 이동 — 기준 커밋 `4edd403`
+4. 남은 async IIFE, 상태, bridge, controller composition, boot를 `app-bootstrap.js`로 기계적 이동 — 기준 커밋 `9de6cce`
+5. shell 크기·mount point·공유 modal·외부 CSS/JS 진입점·금지 state marker를 architecture contract로 고정
+
+유지보수 원칙:
+
+- P1에는 기능 상태, API 호출, 이벤트 orchestration, controller 생성 코드를 다시 넣지 않는다.
+- Step별 화면은 `pages/steps`, 공통 modal은 `pages/components`, 동작은 `assets/core` 또는 `assets/steps`에서 소유한다.
+- `app-bootstrap.js`는 조립과 부팅 호환 경계이며, 각 기능 본체는 전용 controller에 둔다.
+- 변경 시 `test_app_shell_css_extraction.js`, `test_user_settings_partial.js`, `test_workflow_progress_partial.js`, `test_app_bootstrap_extraction.js`, strict pre-partial VM, pipeline contract, `tools/lint_project.py`를 유지한다.
+- 위 네 커밋은 단계별 rollback 기준점이며, 최종 통합 커밋 해시는 통합 리드가 병합 후 기록한다.
