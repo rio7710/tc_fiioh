@@ -26,7 +26,9 @@ assert.match(shell, /assets\/steps\/step05\/step05-calendar\.js/, 'shell loads i
 assert.equal((shell.match(/id="step5"/g) || []).length, 0, 'Step 5 markup is not duplicated inline');
 assert.equal((shell.match(/id="calendarSettingsModal"/g) || []).length, 0, 'Step 5 modals are not duplicated inline');
 assert.match(shell, /ThinkCastApiClient\.createApiClient\(\)/, 'shell delegates JSON requests to the shared API client');
-assert.match(shell, /path==='\/api\/brand-assets'.*brandSelections=result\.selections/, 'brand selection compatibility side effect remains in the shell adapter');
+assert.doesNotMatch(shell, /if\(path==='\/api\/brand-assets'&&Array\.isArray\(result\.selections\)\)/, 'shared API adapter has no hidden brand selection mutation');
+assert.match(shell, /brandSelectionController\.hydrate\(\{assets:result\.brand_assets\|\|\[\],selections:result\.brand_selections\|\|\[\]\}\);renderBrandChoices\(\)/, 'project content load explicitly hydrates brand selections');
+assert.match(shell, /refreshBrandLibrary\(\)[\s\S]*?brandSelectionController\.hydrate\(\{assets:result\.assets\|\|\[\],selections:result\.selections\|\|\[\]\}\)/, 'brand library refresh explicitly hydrates brand selections');
 assert.match(shell, /assets\/core\/project-store\.js/, 'project store is available for staged migration without duplicate writes');
 
 const Calendar = require('../01_app/assets/steps/step05/step05-calendar.js');

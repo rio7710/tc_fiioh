@@ -21,6 +21,7 @@
 <script src="/01_app/assets/video-editor/mobile-sync.js?v=20261007_v2"></script>
 <script src="/01_app/assets/video-editor/index.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step04/step04-brand-state.js?v=20261007_v5"></script>
+<script src="/01_app/assets/steps/step04/step04-brand-selection-controller.js?v=20261009_v28"></script>
 <script src="/01_app/assets/steps/step04/step04-outro-ratio-assets.js?v=20261009_v26"></script>
 <script src="/01_app/assets/steps/step04/step04-brand-stage-preview.js?v=20261009_v27"></script>
 <script src="/01_app/assets/steps/step04/step04-brand-overlay.js?v=20261008_v25"></script>
@@ -1140,8 +1141,6 @@ document.querySelectorAll('.page-date').forEach(item=>{
   item.textContent=`Date : ${todayParts.year}. ${todayParts.month}. ${todayParts.day}. ${todayParts.weekday}`;
 });
 let scenes=[];
-let brandAssets=[];
-let brandSelections=[];
 const brandOverlayState=Step04BrandState.create();
 const timelineBridge=Step04TimelineBridge.create({
   createAudio:src=>new Audio(src),
@@ -1384,7 +1383,6 @@ let frontendApi=null;
 async function api(path,options={}){
   if(!frontendApi)frontendApi=window.ThinkCastApiClient.createApiClient();
   const result=await frontendApi(path,options);
-  if(path==='/api/brand-assets'&&Array.isArray(result.selections))brandSelections=result.selections;
   return result;
 }
 
@@ -1737,7 +1735,7 @@ async function loadProjectContent(projectId,token){
   storedStoryboardVideos=new Map((result.storyboard_videos||[]).map(item=>[item.scene_id,item]));
   setStoryboardVideoCandidates(result.storyboard_video_candidates||[]);
   setVoiceProfile(result.voice_profile||'warm_female');
-  brandAssets=result.brand_assets||[];brandSelections=result.brand_selections||[];renderBrandChoices();
+  brandSelectionController.hydrate({assets:result.brand_assets||[],selections:result.brand_selections||[]});renderBrandChoices();
   if(Array.isArray(result.automation_editor?.channels)){
     const channels=result.automation_editor.channels.filter(channel=>platformButtons.some(button=>button.dataset.platform===channel));
     selectedPlatforms.clear();channels.forEach(channel=>selectedPlatforms.add(channel));
@@ -1750,29 +1748,15 @@ async function loadProjectContent(projectId,token){
   applyScript(result.script);
   return result;
 }
-const outroRatioAssets=Step04OutroRatioAssets.create({state:brandOverlayState,getAssets:()=>brandAssets});
+let outroRatioAssets=null;
+let brandStagePreview=null;
+const brandSelectionController=Step04BrandSelectionController.create({getRoot:()=>document,request:(...args)=>api(...args),state:brandOverlayState,isOutroRatioCompanion:item=>outroRatioAssets.isCompanion(item),ensureOutroRatioAssets:(...args)=>outroRatioAssets.ensure(...args),updateWatermarkPreview:()=>updateWatermarkPreview(),updateOutroPreview:()=>updateCommonOutroPreview(),getSceneCount:()=>scenes.length,renderSceneList:()=>renderSceneList(),escapeHtml});
+outroRatioAssets=Step04OutroRatioAssets.create({state:brandOverlayState,getAssets:()=>brandSelectionController.getAssets()});
 function isOutroRatioCompanion(item){return outroRatioAssets.isCompanion(item)}
 function ensureOutroRatioAssets(item,options){return outroRatioAssets.ensure(item,options)}
-const brandStagePreview=Step04BrandStagePreview.create({getRoot:()=>document,state:brandOverlayState,getAssets:()=>brandAssets,ensureOutroRatioAssets,getCurrentRatio:()=>{if(window.Step04VideoEditor?.currentCropFormat)return window.Step04VideoEditor.currentCropFormat();const stageCard=document.querySelector('#stageCard')||document.querySelector('.stage-card');if(!stageCard)return '16x9';return window.RatioProfiles?window.RatioProfiles.calculateCropFormat(stageCard.className):'16x9'}});
+brandStagePreview=Step04BrandStagePreview.create({getRoot:()=>document,state:brandOverlayState,getAssets:()=>brandSelectionController.getAssets(),ensureOutroRatioAssets,getCurrentRatio:()=>{if(window.Step04VideoEditor?.currentCropFormat)return window.Step04VideoEditor.currentCropFormat();const stageCard=document.querySelector('#stageCard')||document.querySelector('.stage-card');if(!stageCard)return '16x9';return window.RatioProfiles?window.RatioProfiles.calculateCropFormat(stageCard.className):'16x9'}});
 function brandRoleControls(role){return brandStagePreview.roleControls(role)}
-function renderBrandChoices(){
-  ['intro','outro','watermark'].forEach(role=>{
-    const controls=brandRoleControls(role);const items=brandAssets.filter(item=>item.role===role&&item.active&&!isOutroRatioCompanion(item));
-    controls.select.innerHTML=`<option value="">등록된 버전 없음</option>`+items.map(item=>`<option value="${escapeHtml(item.version_id)}">${escapeHtml(item.name)} · v${item.version}</option>`).join('');
-    const saved=brandSelections.find(item=>item.role===role);
-    const isValidSaved=saved?.version_id&&items.some(item=>item.version_id===saved.version_id);
-    if(isValidSaved){
-      controls.select.value=saved.version_id;
-    }else if(items.length){
-      controls.select.value=items[0].version_id;
-    }
-    controls.enabled.checked=Boolean(saved?.enabled&&controls.select.value);controls.enabled.disabled=!items.length;
-  });
-  const watermark=brandSelections.find(item=>item.role==='watermark');const watermarkSettings=watermark?.settings||{};document.querySelector('#brandWatermarkOpacity').value=watermarkSettings.opacity??.8;const outro=brandSelections.find(item=>item.role==='outro');brandOverlayState.hydrate({watermark:watermarkSettings,outro:outro?.settings||{}});const outroControls=brandRoleControls('outro');const selectedOutro=brandAssets.find(item=>item.version_id===outroControls.select.value);if(selectedOutro)ensureOutroRatioAssets(selectedOutro);
-  updateWatermarkPreview();
-  updateCommonOutroPreview();
-  if(scenes.length)renderSceneList();
-}
+function renderBrandChoices(){return brandSelectionController.renderChoices()}
 function applyWatermarkPosition(element,position){return brandStagePreview.applyPosition(element,position)}
 function currentCropFormat(){return brandStagePreview.currentRatio()}
 function activeWatermarkProfile(){return brandStagePreview.activeWatermarkProfile()}
@@ -1780,8 +1764,8 @@ function updateWatermarkPreview(){return brandStagePreview.updateWatermark()}
 function activeOutroProfile(){return brandStagePreview.activeOutroProfile()}
 function outroBackgroundColor(profile){return brandStagePreview.backgroundColor(profile)}
 function updateCommonOutroPreview(){return brandStagePreview.updateOutro()}
-function currentBrandSelections(){return ['intro','outro','watermark'].map(role=>{const controls=brandRoleControls(role);const settings=role==='watermark'?{opacity:Number(document.querySelector('#brandWatermarkOpacity').value),...brandOverlayState.serializeSettings('watermark')}:role==='outro'?brandOverlayState.serializeSettings('outro'):{};return {role,enabled:controls.enabled.checked,version_id:controls.select.value||null,settings}})}
-async function saveBrandSelections(){const result=await api('/api/content-brand-selection',{method:'POST',body:JSON.stringify({selections:currentBrandSelections()})});brandSelections=result.selections||[];if(scenes.length)renderSceneList()}
+function currentBrandSelections(){return brandSelectionController.serializeSelections()}
+function saveBrandSelections(){return brandSelectionController.saveSelections()}
 async function loadProjectState(projectId,token){
   const result=await api(`/api/project-state?project_id=${encodeURIComponent(projectId)}`);
   if(isStaleNav(token)||projectId!==activeProjectId)return result;
@@ -2945,10 +2929,10 @@ document.addEventListener('click',async event=>{
   try{await navigateProjectStep(button.dataset.go)}
   catch(error){const note=document.querySelector('#projectDetailNote')||document.querySelector('#contentIndexMessage');if(note)note.textContent=error.message}
 });
-const brandOverlayController=BrandOverlayController.create({state:brandOverlayState,getBrandAssets:()=>brandAssets,prepareOutroPreview:item=>ensureOutroRatioAssets(item,{force:true}),saveSelection:saveBrandSelections,applyPosition:applyWatermarkPosition,backgroundColor:outroBackgroundColor,updateWatermarkPreview,updateOutroPreview:updateCommonOutroPreview,onError:(feature,error)=>console.error(`[BrandOverlay:${feature}]`,error)});
+const brandOverlayController=BrandOverlayController.create({state:brandOverlayState,getBrandAssets:()=>brandSelectionController.getAssets(),prepareOutroPreview:item=>ensureOutroRatioAssets(item,{force:true}),saveSelection:saveBrandSelections,applyPosition:applyWatermarkPosition,backgroundColor:outroBackgroundColor,updateWatermarkPreview,updateOutroPreview:updateCommonOutroPreview,onError:(feature,error)=>console.error(`[BrandOverlay:${feature}]`,error)});
 function openWatermarkPreview(versionId){return brandOverlayController.openWatermarkPreview(versionId)}
 function openOutroPreview(versionId){return brandOverlayController.openOutroPreview(versionId)}
-async function refreshBrandLibrary(){const result=await api('/api/brand-assets');brandAssets=result.assets||[];const visibleAssets=brandAssets.filter(item=>!isOutroRatioCompanion(item));document.querySelector('#brandVersionCount').textContent=String(visibleAssets.length).padStart(2,'0');document.querySelector('#brandLibraryList').innerHTML=visibleAssets.map(item=>{const original=`/api/brand-asset?version_id=${encodeURIComponent(item.version_id)}`;const preview=item.role==='watermark'?`<i>|</i><button type="button" data-watermark-preview="${escapeHtml(item.version_id)}">적용 미리보기</button>`:item.role==='outro'?`<i>|</i><button type="button" data-outro-preview="${escapeHtml(item.version_id)}">적용 미리보기</button>`:'';return `<article class="brand-library-row"><strong>${escapeHtml({intro:'인트로',outro:'아웃트로',watermark:'워터마크'}[item.role])}</strong><span>${escapeHtml(item.name)} <small>v${item.version} · ${item.media_type==='video'?'영상':'이미지'}</small></span><span class="brand-library-actions"><a href="${original}" target="_blank">원본 보기</a>${preview}</span></article>`}).join('')||'<p class="flow-desc">등록된 개인 브랜드 리소스가 없습니다.</p>';renderBrandChoices()}
+async function refreshBrandLibrary(){const result=await api('/api/brand-assets');brandSelectionController.hydrate({assets:result.assets||[],selections:result.selections||[]});const visibleAssets=brandSelectionController.getAssets().filter(item=>!isOutroRatioCompanion(item));document.querySelector('#brandVersionCount').textContent=String(visibleAssets.length).padStart(2,'0');document.querySelector('#brandLibraryList').innerHTML=visibleAssets.map(item=>{const original=`/api/brand-asset?version_id=${encodeURIComponent(item.version_id)}`;const preview=item.role==='watermark'?`<i>|</i><button type="button" data-watermark-preview="${escapeHtml(item.version_id)}">적용 미리보기</button>`:item.role==='outro'?`<i>|</i><button type="button" data-outro-preview="${escapeHtml(item.version_id)}">적용 미리보기</button>`:'';return `<article class="brand-library-row"><strong>${escapeHtml({intro:'인트로',outro:'아웃트로',watermark:'워터마크'}[item.role])}</strong><span>${escapeHtml(item.name)} <small>v${item.version} · ${item.media_type==='video'?'영상':'이미지'}</small></span><span class="brand-library-actions"><a href="${original}" target="_blank">원본 보기</a>${preview}</span></article>`}).join('')||'<p class="flow-desc">등록된 개인 브랜드 리소스가 없습니다.</p>';renderBrandChoices()}
 function showBrandLibrary(show){document.querySelector('#contentIndex').hidden=show;document.querySelector('#brandLibraryPanel').hidden=!show;document.querySelector('#brandLibraryOpen').classList.toggle('active',show)}
 document.querySelector('#brandLibraryOpen').addEventListener('click',async()=>{showBrandLibrary(true);await refreshBrandLibrary()});
 document.querySelector('#brandLibraryClose').addEventListener('click',()=>showBrandLibrary(false));
@@ -3162,7 +3146,7 @@ Object.assign(window,{
   updateCommonOutroPreview,
   updateWatermarkPreview
 });
-Object.defineProperty(window,'brandAssets',{configurable:true,get:()=>brandAssets});
+Object.defineProperty(window,'brandAssets',{configurable:true,get:()=>brandSelectionController.getAssets()});
 
 document.querySelector('#calendarPrev').addEventListener('click',()=>moveCalendarPeriod(-1));
 document.querySelector('#calendarNext').addEventListener('click',()=>moveCalendarPeriod(1));
