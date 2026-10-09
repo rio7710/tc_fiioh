@@ -215,19 +215,22 @@ def _render_transition(
     duration: float,
     destination: Path,
 ) -> None:
-    frame = 1 / 30
-    trim_start = max(0.0, previous_duration - frame)
+    frozen = destination.with_name(destination.stem + "-previous.png")
+    freeze_args = _ffmpeg_prefix(dependencies) + [
+        "-sseof", "-1", "-i", str(previous), "-vf", "reverse",
+        "-frames:v", "1", str(frozen),
+    ]
+    _run(dependencies, freeze_args, "scene-transition-frame")
     graph = (
-        f"[0:v]trim=start={trim_start:.6f},setpts=PTS-STARTPTS,"
-        f"tpad=stop_mode=clone:stop_duration={duration:.6f},trim=duration={duration:.6f},"
-        f"format=yuva420p,fade=t=out:st=0:d={duration:.6f}:alpha=1[old];"
-        f"[1:v]trim=duration={duration:.6f},setpts=PTS-STARTPTS[new];"
-        "[new][old]overlay=0:0:shortest=1,format=yuv420p[v]"
+        f"[0:v]trim=duration={duration:.6f},setpts=PTS-STARTPTS,"
+        f"fps=30,settb=AVTB,format=yuv420p[old];"
+        f"[1:v]trim=duration={duration:.6f},setpts=PTS-STARTPTS,fps=30,settb=AVTB,format=yuv420p[new];"
+        f"[old][new]xfade=transition=fade:duration={duration:.6f}:offset=0,format=yuv420p[v]"
     )
     threads = 1 if dependencies.hosted_mode else max(1, dependencies.ffmpeg_threads)
     preset = "ultrafast" if dependencies.hosted_mode else dependencies.render_preset
     args = _ffmpeg_prefix(dependencies) + [
-        "-i", str(previous), "-i", str(current), "-filter_complex", graph,
+        "-loop", "1", "-i", str(frozen), "-i", str(current), "-filter_complex", graph,
         "-map", "[v]", "-t", f"{duration:.6f}",
     ] + _encoding_args(preset, threads) + [str(destination)]
     _run(dependencies, args, "scene-transition")

@@ -129,6 +129,7 @@ class StagedFfmpegRendererTests(unittest.TestCase):
         self.assertEqual(2, result["scene_count"])
         stages = [stage for stage, _ in self.runner.calls]
         self.assertEqual(2, stages.count("scene-001") + stages.count("scene-002"))
+        self.assertIn("scene-transition-frame", stages)
         self.assertIn("scene-transition", stages)
         self.assertIn("body-decoration-concat", stages)
         self.assertIn("brand-outro", stages)
@@ -136,7 +137,15 @@ class StagedFfmpegRendererTests(unittest.TestCase):
         visual_calls = [(stage, args) for stage, args in self.runner.calls if stage != "audio-mux"]
         self.assertTrue(all(args.count("-i") <= 2 for _, args in visual_calls))
         transition = next(args for stage, args in self.runner.calls if stage == "scene-transition")
-        self.assertIn("d=0.300000", transition[transition.index("-filter_complex") + 1])
+        freeze = next(args for stage, args in self.runner.calls if stage == "scene-transition-frame")
+        self.assertIn("-sseof", freeze)
+        self.assertIn("reverse", freeze)
+        self.assertIn("-loop", transition)
+        self.assertEqual("1", transition[transition.index("-loop") + 1])
+        transition_graph = transition[transition.index("-filter_complex") + 1]
+        self.assertEqual(2, transition_graph.count("fps=30"))
+        self.assertIn("settb=AVTB", transition_graph)
+        self.assertIn("xfade=transition=fade:duration=0.300000:offset=0", transition_graph)
         audio = self.runner.calls[-1][1]
         self.assertIn("4.000000", audio)
         self.assertIn("+faststart", audio)
