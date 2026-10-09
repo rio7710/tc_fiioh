@@ -79,6 +79,7 @@
 <script src="/01_app/assets/steps/step05/step05-calendar-drag-controller.js?v=20261009_v67"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-settings-controller.js?v=20261009_v68"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-preview-controller.js?v=20261009_v69"></script>
+<script src="/01_app/assets/steps/step05/step05-calendar-export-controller.js?v=20261009_v70"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css?v=20261007_v2">
@@ -1611,30 +1612,6 @@ function recordCurrentProduction(result){
   refreshProjectIndex();
 }
 function icsEscape(value){return Step05Calendar.icsEscape(value)}
-function exportCalendarIcs(){
-  const timestamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
-  const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Greenhill Content Studio//Content Calendar//KO','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:그린힐 콘텐츠 배포 캘린더'];
-  const groups=[];
-  calendarEntries.forEach(item=>{
-    let group=groups.find(candidate=>candidate.start===item.start&&candidate.title===item.title);
-    if(!group){group={start:item.start,title:item.title,items:[]};groups.push(group)}
-    group.items.push(item);
-  });
-  groups.forEach(group=>{
-    const statuses=group.items.map(item=>item.extendedProps?.status||'draft');
-    const icsStatus=statuses.every(status=>status==='published')?'CONFIRMED':statuses.every(status=>status==='deleted')?'CANCELLED':'TENTATIVE';
-    const platforms=group.items.map(item=>item.extendedProps?.platform||'미지정');
-    const platformStates=group.items.map(item=>`${item.extendedProps?.platform||'미지정'}: ${calendarStatusLabels[item.extendedProps?.status||'draft']}`).join('\n');
-    const start=group.start.replaceAll('-','');
-    const end=nextDateKey(group.start).replaceAll('-','');
-    lines.push('BEGIN:VEVENT',`UID:${icsEscape(group.items[0].id)}@greenhill-content-demo`,`DTSTAMP:${timestamp}`,`DTSTART;VALUE=DATE:${start}`,`DTEND;VALUE=DATE:${end}`,`SUMMARY:${icsEscape(group.title)}`,`STATUS:${icsStatus}`,`DESCRIPTION:${icsEscape(platformStates)}`,`CATEGORIES:GREENHILL,${platforms.map(item=>String(item).toUpperCase()).join(',')}`,`X-GREENHILL-PLATFORM-STATUS:${icsEscape(platformStates.replaceAll('\n',','))}`,'END:VEVENT');
-  });
-  lines.push('END:VCALENDAR');
-  const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/calendar;charset=utf-8'});
-  const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=`greenhill-content-calendar-${dateKey(new Date())}.ics`;link.click();
-  setTimeout(()=>URL.revokeObjectURL(link.href),1000);
-  calendarHelp.textContent='Google·Apple·Outlook 캘린더에서 가져올 수 있는 .ics 파일을 저장했습니다.';
-}
 function moveCalendarPeriod(direction){
   calendarViewController.move(direction);
   renderCalendar();
@@ -1885,7 +1862,6 @@ document.querySelectorAll('.calendar-view-btn').forEach(button=>button.addEventL
   calendarViewController.selectView(button.dataset.calendarView);
   renderCalendar();
 }));
-document.querySelector('#calendarExport').addEventListener('click',exportCalendarIcs);
 calendarGrid.addEventListener('click',event=>{
   if(calendarDragController.consumeDidDrag())return;
   if(calendarSettingsController.consumeLongPressOpened())return;
@@ -1912,6 +1888,8 @@ const calendarSettingsController=Step05CalendarSettingsController.create({grid:c
 calendarSettingsController.mount();
 const calendarPreviewController=Step05CalendarPreviewController.create({previewModal:calendarPreviewModal,previewMeta:calendarPreviewMeta,video:calendarPreviewVideo,title:calendarPreviewTitle,download:calendarPreviewDownload,count:calendarPreviewVersionCount,previousButton:calendarPreviewVersionPrev,nextButton:calendarPreviewVersionNext,previewCloseButton:document.querySelector('#calendarPreviewClose'),unavailableModal:contentUnavailableModal,unavailableCloseButton:document.querySelector('#contentUnavailableClose'),body:document.body,keyTarget:document,getEntries:()=>calendarEntries,contentIdentity:Step05Calendar.contentIdentity,contentVersions:Step05Calendar.calendarContentVersions,escapeHtml,platformFormats:window.VideoEditorRatioProfiles?.PLATFORM_PREVIEW_FORMATS||{},platformLabels:calendarPlatformLabels,onError:(feature,error)=>console.warn(`[CalendarPreview:${feature}]`,error)});
 calendarPreviewController.mount();
+const calendarExportController=Step05CalendarExportController.create({button:document.querySelector('#calendarExport'),getEntries:()=>calendarEntries,contentIdentity:Step05Calendar.contentIdentity,collapseDuplicates:Step05Calendar.collapseDuplicates,nextDateKey:Step05Calendar.nextDateKey,dateKey:Step05Calendar.dateKey,icsEscape:Step05Calendar.icsEscape,statusLabels:calendarStatusLabels,now:()=>new Date(),createBlob:(parts,options)=>new Blob(parts,options),createObjectURL:blob=>URL.createObjectURL(blob),revokeObjectURL:url=>URL.revokeObjectURL(url),createLink:()=>document.createElement('a'),setTimer:(callback,delay)=>setTimeout(callback,delay),setHelp:text=>{calendarHelp.textContent=text}});
+calendarExportController.mount();
 loadCalendarUi();
 loadCalendarEntries();
 loadLatestExport();
