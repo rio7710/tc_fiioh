@@ -5,8 +5,9 @@ const scriptPath = '01_app/pages/steps/step03-script.html';
 const storyboardPath = '01_app/pages/steps/step03-storyboard.html';
 const cssPath = '01_app/assets/steps/step03/step03-flow.css';
 const jsPath = '01_app/assets/steps/step03/step03-flow.js';
+const editorPath = '01_app/assets/steps/step03/step03-script-editor-controller.js';
 
-[scriptPath, storyboardPath, cssPath, jsPath].forEach(file => {
+[scriptPath, storyboardPath, cssPath, jsPath, editorPath].forEach(file => {
   assert.ok(fs.existsSync(file), `${file} must exist`);
 });
 
@@ -29,6 +30,11 @@ assert.match(shellHtml, /step03-storyboard\.html/, 'shell loads the storyboard f
 assert.doesNotMatch(shellHtml, /id="step3"|id="step31"/, 'step 3 markup is not duplicated inline');
 
 assert.doesNotMatch(scriptHtml + storyboardHtml, /<script\b|onclick=/i, 'fragments are safe to inject and do not duplicate script execution');
+assert.match(shellHtml, /step03-script-editor-controller\.js\?v=20261009_v38/, 'shell cache-busts the Step 3 script editor controller');
+assert.match(shellHtml, /const scriptEditorController=Step03ScriptEditorController\.create\(/, 'shell wires the Step 3 script editor controller');
+assert.match(shellHtml, /scriptEditorController\.mount\(document\)/, 'shell mounts Step 3 script editor interactions');
+for(const [name,method] of [['fillScript','fill'],['currentScriptPayload','payload'],['updateScriptDiff','updateDiff'],['loadSavedScript','loadSaved'],['saveScriptLocally','saveLocal'],['saveScriptChanges','save']]) assert.match(shellHtml,new RegExp(`function ${name}\\([^)]*\\)\\{\\s*return scriptEditorController\\.${method}\\(`),`${name} remains a thin wrapper`);
+assert.doesNotMatch(shellHtml, /let scriptBaselineLines=|document\.querySelector\('#scriptLines'\)\.addEventListener|document\.querySelector\('#scriptSaveBtn'\)\.addEventListener|\/api\/script\/save/, 'shell removes duplicate script editor state and handlers');
 
 const Step03Flow = require('../01_app/assets/steps/step03/step03-flow.js');
 const timeline = { scenes: [

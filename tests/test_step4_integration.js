@@ -37,6 +37,7 @@ const sessionBootstrapControllerPath = '01_app/assets/core/session-bootstrap-con
 const authUIControllerPath = '01_app/assets/core/auth-ui-controller.js';
 const projectHydrationControllerPath = '01_app/assets/core/project-hydration-controller.js';
 const promptLabControllerPath = '01_app/assets/core/prompt-lab-controller.js';
+const scriptEditorControllerPath = '01_app/assets/steps/step03/step03-script-editor-controller.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
@@ -69,6 +70,7 @@ assert.ok(fs.existsSync(sessionBootstrapControllerPath), 'session-bootstrap-cont
 assert.ok(fs.existsSync(authUIControllerPath), 'auth-ui-controller.js must exist');
 assert.ok(fs.existsSync(projectHydrationControllerPath), 'project-hydration-controller.js must exist');
 assert.ok(fs.existsSync(promptLabControllerPath), 'prompt-lab-controller.js must exist');
+assert.ok(fs.existsSync(scriptEditorControllerPath), 'step03-script-editor-controller.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
@@ -359,6 +361,7 @@ function createPrePartialContext() {
     ThinkCastAuthUIController: require('../01_app/assets/core/auth-ui-controller.js'),
     ThinkCastProjectHydrationController: require('../01_app/assets/core/project-hydration-controller.js'),
     ThinkCastPromptLabController: require('../01_app/assets/core/prompt-lab-controller.js'),
+    Step03ScriptEditorController: require('../01_app/assets/steps/step03/step03-script-editor-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),

@@ -30,9 +30,11 @@ class PipelineContractTests(unittest.TestCase):
         step4_js = (ROOT / "01_app" / "assets" / "steps" / "step04" / "step04-video.js").read_text(encoding="utf-8")
         cls.render_controller = (ROOT / "01_app" / "assets" / "steps" / "step04" / "step04-render-controller.js").read_text(encoding="utf-8")
         cls.session_bootstrap_controller = (ROOT / "01_app" / "assets" / "core" / "session-bootstrap-controller.js").read_text(encoding="utf-8")
+        cls.script_editor_controller = (ROOT / "01_app" / "assets" / "steps" / "step03" / "step03-script-editor-controller.js").read_text(encoding="utf-8")
         step5_html = (ROOT / "01_app" / "pages" / "steps" / "step05-calendar.html").read_text(encoding="utf-8")
         step5_css = (ROOT / "01_app" / "assets" / "steps" / "step05" / "step05-calendar.css").read_text(encoding="utf-8")
-        cls.html = "\n".join((HTML_PATH.read_text(encoding="utf-8"), step4_html, step4_js, step5_html, step5_css))
+        cls.shell = HTML_PATH.read_text(encoding="utf-8")
+        cls.html = "\n".join((cls.shell, step4_html, step4_js, step5_html, step5_css))
         cls.manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
         cls.demo_data = json.loads(DEMO_DATA_PATH.read_text(encoding="utf-8"))
         cls.server = load_render_server()
@@ -117,7 +119,8 @@ class PipelineContractTests(unittest.TestCase):
         self.assertIn("composite-platform-badge", self.html)
         self.assertNotIn("{name:'배포 규격 최적화'", self.html)
         self.assertIn("scenes.map(scene=>scene.id)", self.html)
-        self.assertIn("const sceneLabel=`S#${String(sceneIndex+1).padStart(2,'0')}`", self.html)
+        self.assertIn("const sceneLabel = `S#${String(sceneIndex + 1).padStart(2, '0')}`", self.script_editor_controller)
+        self.assertNotIn("const sceneLabel", self.shell)
 
     def test_composite_format_success_activates_only_selected_platform_icons(self):
         self.assertIn("[...selectedPlatforms].forEach(platform=>", self.html)

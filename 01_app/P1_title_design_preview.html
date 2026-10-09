@@ -22,6 +22,7 @@
 <script src="/01_app/assets/steps/step01/step01-content-index-controller.js?v=20261009_v30"></script>
 <script src="/01_app/assets/steps/step02/step02-keyword.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
+<script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
 <script src="/01_app/assets/video-editor/scene-navigation.js?v=20261007_v2"></script>
 <script src="/01_app/assets/video-editor/ratio-profiles.js?v=20261008_v24"></script>
 <script src="/01_app/assets/video-editor/brand-selection.js?v=20261007_v2"></script>
@@ -1292,7 +1293,6 @@ function resetProjectScopedState(){
 const keywordTilts=new Map();
 let visibleKeywordIds=[];
 let settingsReady=false;
-let scriptBaselineLines=[];
 function setLoginAccess(enabled,account=null){
   return authUIController.setAccess(enabled,account);
 }
@@ -1860,55 +1860,22 @@ function refreshKeywordBatch(){
   renderKeywords();
 }
 function fillScript(script){
-  document.querySelector('#scriptHeadline').textContent=script.headline||'';
-  document.querySelector('#scriptConcept').textContent=script.concept||'';
-  scriptBaselineLines=(script.lines||[]).map(line=>String(line).trim());
-  document.querySelector('#scriptLines').innerHTML=(script.lines||[]).map((line,index)=>{
-    const sceneIndex=scenes.findIndex(item=>item.scriptLineIndex===index);
-    const scene=scenes[sceneIndex];
-    const seconds=scene?Math.max(0,scene.cueEnd-scene.cueStart).toFixed(1):'0.0';
-    const sceneLabel=`S#${String(sceneIndex+1).padStart(2,'0')}`;
-    return `<label class="script-row" data-script-index="${index}"><span class="script-no" title="${escapeHtml(scene?.name||'장면')}">${sceneLabel}</span><input value="${escapeHtml(line)}" aria-label="${sceneLabel} 대본"><span class="script-duration" title="타이틀 노출 시간">#${seconds}s</span><small class="script-diff-old" hidden></small></label>`;
-  }).join('');
-  updateScriptDiff();
+  return scriptEditorController.fill(script);
 }
 function currentScriptPayload(){
-  return {headline:document.querySelector('#scriptHeadline').textContent,concept:document.querySelector('#scriptConcept').textContent,lines:[...document.querySelectorAll('#scriptLines input')].map(input=>input.value.trim())};
+  return scriptEditorController.payload();
 }
 function updateScriptDiff(){
-  let changedCount=0;
-  document.querySelectorAll('#scriptLines .script-row').forEach((row,index)=>{
-    const current=row.querySelector('input').value.trim();
-    const baseline=scriptBaselineLines[index]||'';
-    const changed=current!==baseline;
-    row.classList.toggle('changed',changed);
-    const old=row.querySelector('.script-diff-old');old.hidden=!changed;old.textContent=changed?`수정 전 · ${baseline}`:'';
-    if(changed)changedCount++;
-  });
-  const bar=document.querySelector('#scriptSaveBar');
-  bar.hidden=changedCount===0;
-  document.querySelector('#scriptDiffSummary').textContent=`수정된 문장 ${changedCount}개 · 아직 저장되지 않았습니다.`;
-  return changedCount;
+  return scriptEditorController.updateDiff();
 }
 function loadSavedScript(){
-  try{const saved=JSON.parse(localStorage.getItem(SCRIPT_STORAGE_KEY)||'null');return Array.isArray(saved?.lines)?saved:null}catch(error){return null}
+  return scriptEditorController.loadSaved();
 }
 function saveScriptLocally(script){
-  try{localStorage.setItem(SCRIPT_STORAGE_KEY,JSON.stringify(script))}catch(error){}
+  return scriptEditorController.saveLocal(script);
 }
 async function saveScriptChanges(){
-  const message=document.querySelector('#scriptMessage');
-  const button=document.querySelector('#scriptSaveBtn');
-  message.textContent='';button.disabled=true;button.textContent='저장 중…';
-  try{
-    const result=await api('/api/script/save',{method:'POST',body:JSON.stringify({project_id:activeProjectId,...currentScriptPayload()})});
-    if(result.timeline){demoData.timeline=result.timeline;applyTimeline(result.timeline)}
-    activeStoryboardDocument=result.document||activeStoryboardDocument;
-    demoData.state=result.state;saveScriptLocally(result.state.script);fillScript(result.state.script);applyScript(result.state.script);
-    await refreshProjectIndex();
-    message.textContent='수정한 대본을 저장했습니다.';
-    return result.state.script;
-  }finally{button.disabled=false;button.textContent='수정 내용 저장'}
+  return scriptEditorController.save();
 }
 function escapeHtml(value){
   return String(value).replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;').replaceAll('>','&gt;');
@@ -2636,6 +2603,8 @@ function refreshBrandLibrary(){return brandLibraryController.refresh()}
 function showBrandLibrary(show){return brandLibraryController.show(show)}
 brandLibraryController.mount(document);
 const brandOverlayMount=brandOverlayController.mount(document);if(!brandOverlayMount.watermark.ok)console.error('[BrandOverlay:watermark]',brandOverlayMount.watermark.error);if(!brandOverlayMount.outro.ok)console.error('[BrandOverlay:outro]',brandOverlayMount.outro.error);
+const scriptEditorController=Step03ScriptEditorController.create({getRoot:()=>document,storage:localStorage,storageKey:SCRIPT_STORAGE_KEY,request:(...args)=>api(...args),getScenes:()=>scenes,escapeHtml,getActiveProjectId:()=>activeProjectId,setDemoTimeline:timeline=>{demoData.timeline=timeline},applyTimeline,getActiveStoryboardDocument:()=>activeStoryboardDocument,setActiveStoryboardDocument:value=>{activeStoryboardDocument=value},setDemoState:state=>{demoData.state=state},applyScript,refreshProjectIndex});
+scriptEditorController.mount(document);
 const projectHydrationController=ThinkCastProjectHydrationController.create({request:(...args)=>api(...args),isStale:isStaleNav,getActiveProjectId:()=>activeProjectId,setSceneCropPositions:positions=>{sceneCropPositions=positions;if(window.Step04VideoEditor?.setSceneCropPositions)window.Step04VideoEditor.setSceneCropPositions(positions)},setDemoTimeline:timeline=>{demoData.timeline=timeline},mergeDemoState:values=>{demoData.state={...(demoData.state||{}),...values}},setSelectedKeywords:value=>{selectedKeywords=value},setActiveStoryboardDocument:value=>{activeStoryboardDocument=value},setKeywordStageLocked,setStoryboardImages:value=>{storedStoryboardImages=value},setStoryboardImageCandidates,setStoryboardVoiceClips:value=>{storedStoryboardVoiceClips=value},setStoryboardVideos:value=>{storedStoryboardVideos=value},setStoryboardVideoCandidates,setVoiceProfile,hydrateBrandSelections:value=>brandSelectionController.hydrate(value),renderBrandChoices,getPlatformButtons:()=>platformButtons,getSelectedPlatforms:()=>selectedPlatforms,setPlatformPreview,applyTimeline,connectStoryboardAssetsToEditor,fillScript,applyScript,getDemoKeywords:()=>demoData.keywords,setDemoKeywords:value=>{demoData.keywords=value},setSeasonalKeywordIds:value=>{seasonalKeywordIds=value},setVisibleKeywordIds:value=>{visibleKeywordIds=value},renderKeywords});
 const projectIndexController=Step01ProjectIndexController.create({getRoot:()=>document,projectsIndex:indexProjects,getCalendarEntries:()=>calendarEntries,calendarContentVersions,getRememberedProjectId:()=>localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY),getActiveProjectId:()=>activeProjectId,setActiveProjectId,request:(...args)=>api(...args),refreshBrandLibrary,escapeHtml,projectDate,automationStageLabel,setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),onPollError:error=>console.error('[ProjectIndex:poll]',error)});
 projectIndexController.startPolling();
@@ -2768,13 +2737,7 @@ document.querySelector('#storyboardVideoBulkGenerate').addEventListener('click',
 document.querySelector('#storyboardLookToolbar').addEventListener('click',event=>{
   const button=event.target.closest('[data-look]');if(button)applyStoryboardLook(button.dataset.look);
 });
-document.querySelector('#scriptLines').addEventListener('input',()=>{
-  updateScriptDiff();document.querySelector('#scriptMessage').textContent='';
-});
 document.querySelector('.voice-picker').addEventListener('click',async event=>{const button=event.target.closest('[data-voice-profile]');if(!button)return;try{await previewVoiceProfile(button)}catch(error){document.querySelector('#scriptMessage').textContent=error.message}});
-document.querySelector('#scriptSaveBtn').addEventListener('click',async()=>{
-  try{await saveScriptChanges()}catch(error){document.querySelector('#scriptMessage').textContent=error.message}
-});
 
 
 // Thin Adapter Bridge for Step 04 Video Editor
