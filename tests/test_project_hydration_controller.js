@@ -4,6 +4,7 @@ const Hydration = require('../01_app/assets/core/project-hydration-controller.js
 (async () => {
   function harness(overrides = {}) {
     const calls = [];
+    let demoKeywords = overrides.demoKeywords || [{id: 'base-1'}, {id: 'base-2'}, {id: 'old-ai', seasonal: true}];
     const selectedPlatforms = new Set(['old']);
     const buttons = (overrides.platforms || ['youtube', 'instagram']).map(platform => ({
       dataset: {platform},
@@ -37,9 +38,13 @@ const Hydration = require('../01_app/assets/core/project-hydration-controller.js
       getPlatformButtons: () => { calls.push(['platformButtons']); return buttons; },
       getSelectedPlatforms: () => { calls.push(['selectedPlatforms']); return selectedPlatforms; },
       setPlatformPreview: record('platformPreview'), applyTimeline: record('applyTimeline'),
-      connectStoryboardAssetsToEditor: () => calls.push(['connect']), fillScript: record('fillScript'), applyScript: record('applyScript')
+      connectStoryboardAssetsToEditor: () => calls.push(['connect']), fillScript: record('fillScript'), applyScript: record('applyScript'),
+      getDemoKeywords: () => { calls.push(['getDemoKeywords']); return demoKeywords; },
+      setDemoKeywords: value => { calls.push(['setDemoKeywords', value]); demoKeywords = value; },
+      setSeasonalKeywordIds: record('seasonalKeywords'), setVisibleKeywordIds: record('visibleKeywords'),
+      renderKeywords: () => { calls.push(['renderKeywords']); if (overrides.throwAt === 'renderKeywords') throw new Error('failed renderKeywords'); }
     };
-    return {controller: Hydration.create(deps), calls, result, selectedPlatforms, buttons};
+    return {controller: Hydration.create(deps), calls, result, selectedPlatforms, buttons, getDemoKeywords: () => demoKeywords};
   }
 
   assert.throws(() => Hydration.create(), /requires request/);
@@ -49,7 +54,8 @@ const Hydration = require('../01_app/assets/core/project-hydration-controller.js
     setStoryboardImages() {}, setStoryboardImageCandidates() {}, setStoryboardVoiceClips() {}, setStoryboardVideos() {},
     setStoryboardVideoCandidates() {}, setVoiceProfile() {}, hydrateBrandSelections() {}, renderBrandChoices() {},
     getPlatformButtons() {}, getSelectedPlatforms() {}, setPlatformPreview() {}, applyTimeline() {},
-    connectStoryboardAssetsToEditor() {}, fillScript() {}, applyScript() {}
+    connectStoryboardAssetsToEditor() {}, fillScript() {}, applyScript() {}, getDemoKeywords() {},
+    setDemoKeywords() {}, setSeasonalKeywordIds() {}, setVisibleKeywordIds() {}, renderKeywords() {}
   };
   for (const name of Object.keys(required)) {
     const deps = {...required}; delete deps[name];
@@ -107,6 +113,63 @@ const Hydration = require('../01_app/assets/core/project-hydration-controller.js
   assert.equal(h.calls.some(call => call[0] === 'brandHydrate'), true);
   assert.equal(h.calls.some(call => call[0] === 'platformButtons'), false);
   assert.equal(h.calls.some(call => call[0] === 'applyTimeline'), false, 'callback errors retain partial application and stop later work');
+
+  const stateResult = {
+    scene_crop_positions: {},
+    storyboard_images: [{scene_id: 's1'}, {scene_id: 's2'}],
+    storyboard_image_candidates: [{scene_id: 's1', candidate: 1}],
+    storyboard_voice_clips: [
+      {scene_id: 's1', profile_id: 'qwen_narrator'}, {scene_id: 's2'}, {scene_id: 's3', profile_id: 'warm_female'}
+    ],
+    storyboard_videos: [{scene_id: 's2'}], storyboard_video_candidates: [{scene_id: 's2', candidate: 1}],
+    keywords: {selected_keyword_ids: ['base-2', 'ai-1', 'missing'], selected_keywords: ['기본', '계절', '복원']},
+    seasonal_keywords: [{id: 'ai-1', label: '계절', seasonal: true}],
+    content: {voice_profile: 'qwen_narrator', document: {production: {}}, timeline: {scenes: [{id: 's1'}]}, script: {lines: ['line']}}
+  };
+  h = harness({result: stateResult});
+  assert.equal(await h.controller.loadState('project / 한글', 9), stateResult);
+  assert.deepEqual(h.calls[0], ['request', '/api/project-state?project_id=project%20%2F%20%ED%95%9C%EA%B8%80']);
+  assert.deepEqual(h.calls.map(call => call[0]), [
+    'request','stale','crop','images','imageCandidates','voices','videos','videoCandidates',
+    'getDemoKeywords','setDemoKeywords','keywords','seasonalKeywords','visibleKeywords','renderKeywords',
+    'lock','document','voiceProfile','timeline','state','applyTimeline','fillScript','applyScript'
+  ]);
+  assert.deepEqual([...h.calls.find(call => call[0] === 'voices')[1].keys()], ['s1','s2'], 'state voice filter uses content voice profile');
+  assert.deepEqual(h.getDemoKeywords(), [
+    {id:'base-1'}, {id:'base-2'}, {id:'ai-1',label:'계절',seasonal:true},
+    {id:'missing',label:'복원',description:'저장된 AI 추천 키워드',image:'warmth',seasonal:true}
+  ]);
+  assert.deepEqual([...h.calls.find(call => call[0] === 'keywords')[1]], ['base-2','ai-1','missing']);
+  assert.deepEqual([...h.calls.find(call => call[0] === 'seasonalKeywords')[1]], ['ai-1','missing']);
+  assert.deepEqual(h.calls.find(call => call[0] === 'visibleKeywords')[1], ['base-2','base-1','ai-1','missing']);
+  assert.deepEqual(h.calls.find(call => call[0] === 'state')[1], {script: stateResult.content.script, selected_keywords: ['base-2','ai-1','missing']});
+
+  for (const options of [{stale: true}, {activeProjectId: 'other'}]) {
+    h = harness({...options, result: stateResult});
+    assert.equal(await h.controller.loadState('project / 한글', 4), stateResult);
+    assert.deepEqual(h.calls.map(call => call[0]), ['request','stale']);
+  }
+
+  h = harness({requestError: new Error('state offline')});
+  await assert.rejects(h.controller.loadState('project / 한글', 1), /state offline/);
+  assert.deepEqual(h.calls.map(call => call[0]), ['request']);
+
+  const stateWithoutContent = {
+    keywords: null, seasonal_keywords: {}, storyboard_voice_clips: [{scene_id:'s1'},{scene_id:'s2',profile_id:'other'}]
+  };
+  h = harness({result: stateWithoutContent});
+  await h.controller.loadState('project / 한글', 2);
+  assert.equal(h.calls.some(call => call[0] === 'crop'), false, 'missing state crop preserves existing crop');
+  assert.deepEqual([...h.calls.find(call => call[0] === 'voices')[1].keys()], ['s1'], 'missing content uses warm_female default filter');
+  assert.deepEqual(h.getDemoKeywords(), [{id:'base-1'},{id:'base-2'}], 'non-array seasonal data removes old seasonal items without adding replacements');
+  assert.deepEqual(h.calls.find(call => call[0] === 'visibleKeywords')[1], ['base-1','base-2']);
+  assert.deepEqual(h.calls.at(-1), ['lock', false]);
+  assert.equal(h.calls.some(call => ['document','voiceProfile','timeline','state','applyTimeline','fillScript','applyScript'].includes(call[0])), false, 'content-falsy state only unlocks after keyword render');
+
+  h = harness({result: stateResult, throwAt: 'renderKeywords'});
+  await assert.rejects(h.controller.loadState('project / 한글', 3), /failed renderKeywords/);
+  assert.equal(h.calls.some(call => call[0] === 'visibleKeywords'), true);
+  assert.equal(h.calls.some(call => call[0] === 'lock'), false, 'callback failure preserves partial state and stops later work');
 
   console.log('Project hydration controller tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

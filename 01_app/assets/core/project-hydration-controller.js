@@ -15,7 +15,9 @@
       'setStoryboardVideos', 'setStoryboardVideoCandidates', 'setVoiceProfile',
       'hydrateBrandSelections', 'renderBrandChoices', 'getPlatformButtons',
       'getSelectedPlatforms', 'setPlatformPreview', 'applyTimeline',
-      'connectStoryboardAssetsToEditor', 'fillScript', 'applyScript'
+      'connectStoryboardAssetsToEditor', 'fillScript', 'applyScript',
+      'getDemoKeywords', 'setDemoKeywords', 'setSeasonalKeywordIds',
+      'setVisibleKeywordIds', 'renderKeywords'
     ]) if (typeof deps[name] !== 'function') throw new TypeError(`ThinkCastProjectHydrationController requires ${name}`);
 
     async function loadContent(projectId, token) {
@@ -54,7 +56,56 @@
       return result;
     }
 
-    return Object.freeze({loadContent});
+    async function loadState(projectId, token) {
+      const result = await deps.request(`/api/project-state?project_id=${encodeURIComponent(projectId)}`);
+      if (deps.isStale(token) || projectId !== deps.getActiveProjectId()) return result;
+      if (result.scene_crop_positions) deps.setSceneCropPositions(result.scene_crop_positions);
+      deps.setStoryboardImages(new Map((result.storyboard_images || []).map(item => [item.scene_id, item])));
+      deps.setStoryboardImageCandidates(result.storyboard_image_candidates || []);
+      const voiceProfile = result.content?.voice_profile || 'warm_female';
+      deps.setStoryboardVoiceClips(new Map((result.storyboard_voice_clips || [])
+        .filter(item => !item.profile_id || item.profile_id === voiceProfile)
+        .map(item => [item.scene_id, item])));
+      deps.setStoryboardVideos(new Map((result.storyboard_videos || []).map(item => [item.scene_id, item])));
+      deps.setStoryboardVideoCandidates(result.storyboard_video_candidates || []);
+      const keywordState = result.keywords || {};
+      const ids = keywordState.selected_keyword_ids || [];
+      const labels = keywordState.selected_keywords || [];
+      const savedAi = Array.isArray(result.seasonal_keywords) ? result.seasonal_keywords : [];
+      const keywords = [...deps.getDemoKeywords().filter(item => !item.seasonal), ...savedAi];
+      ids.forEach((id, index) => {
+        if (!keywords.some(item => item.id === id)) keywords.push({
+          id, label: labels[index] || id, description: '저장된 AI 추천 키워드', image: 'warmth', seasonal: true
+        });
+      });
+      deps.setDemoKeywords(keywords);
+      const selectedKeywords = new Set(ids);
+      deps.setSelectedKeywords(selectedKeywords);
+      const aiItems = keywords.filter(item => item.seasonal);
+      const aiIds = new Set(aiItems.map(item => item.id));
+      const selectedAi = aiItems.filter(item => selectedKeywords.has(item.id));
+      deps.setSeasonalKeywordIds(new Set(selectedAi.map(item => item.id)));
+      const selectedBase = ids.filter(id => !aiIds.has(id));
+      const basePool = [...new Set([...selectedBase, ...keywords.filter(item => !item.seasonal).map(item => item.id)])];
+      deps.setVisibleKeywordIds([
+        ...basePool.slice(0, Math.max(0, 8 - selectedAi.length)),
+        ...selectedAi.map(item => item.id)
+      ]);
+      deps.renderKeywords();
+      if (result.content) {
+        deps.setKeywordStageLocked(true);
+        deps.setActiveStoryboardDocument(result.content.document || null);
+        deps.setVoiceProfile(voiceProfile);
+        deps.setDemoTimeline(result.content.timeline);
+        deps.mergeDemoState({script: result.content.script, selected_keywords: ids});
+        deps.applyTimeline(result.content.timeline);
+        deps.fillScript(result.content.script);
+        deps.applyScript(result.content.script);
+      } else deps.setKeywordStageLocked(false);
+      return result;
+    }
+
+    return Object.freeze({loadContent, loadState});
   }
 
   return Object.freeze({create});
