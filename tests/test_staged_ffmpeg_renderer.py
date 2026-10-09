@@ -70,7 +70,7 @@ class StagedFfmpegRendererTests(unittest.TestCase):
             },
             music={"none": None, "satie": self.music},
             narration_tracks=[],
-            render_defaults={"scene_dissolve_seconds": 0.3, "music_start_offset_seconds": 3.0, "music_fade_in_seconds": 2.0, "music_fade_out_seconds": 2.0, "still_image_pan_enabled": True, "still_image_pan_travel_ratio": 0.175},
+            render_defaults={"scene_dissolve_seconds": 0.3, "music_start_offset_seconds": 3.0, "music_fade_in_seconds": 2.0, "music_fade_out_seconds": 2.0, "outro_dissolve_seconds": 2.0, "still_image_pan_enabled": True, "still_image_pan_travel_ratio": 0.175},
             timeline_from_data=self.timeline,
             timed_script_scenes=self.title_scenes,
             storyboard_image_path=lambda uri: self.image if uri else None,
@@ -159,6 +159,7 @@ class StagedFfmpegRendererTests(unittest.TestCase):
         graph = outro[outro.index("-filter_complex") + 1]
         self.assertIn("scale=756:-1", graph)
         self.assertIn("color=white@0.400", graph)
+        self.assertIn("xfade=transition=fade:duration=2.000000:offset=0", graph)
 
     def test_cropped_still_images_pan_within_bounds_but_landscape_stays_fixed(self):
         render_video_staged(self.config("instagram"), "still-pan", dependencies=self.dependencies())
@@ -192,6 +193,7 @@ class StagedFfmpegRendererTests(unittest.TestCase):
         graph = audio[audio.index("-filter_complex") + 1]
         self.assertIn("atrim=start=3.000000", graph)
         self.assertIn("afade=t=in:st=0:d=2.000000", graph)
+        self.assertIn("afade=t=out:st=2.000000:d=2.000000", graph)
 
     def test_job_output_is_idempotent_and_work_directory_is_cleaned(self):
         dependencies = self.dependencies()

@@ -411,8 +411,14 @@ def _render_outro(
     if background not in {"none", "white", "black"}:
         background = "none"
     opacity = max(0.0, min(1.0, float(merged.get("background_opacity", 0.8))))
-    background_filter = f",drawbox=color={background}@{opacity:.3f}:t=fill" if background != "none" and opacity > 0 else ""
     duration = float(outro["duration"])
+    dissolve_duration = min(duration, max(0.0, float(
+        dependencies.render_defaults.get("outro_dissolve_seconds", 2.0)
+    )))
+    background_filter = (
+        f"drawbox=color={background}@{opacity:.3f}:t=fill"
+        if background != "none" and opacity > 0 else "null"
+    )
     args = _ffmpeg_prefix(dependencies) + [
         "-ss", f"{max(0.0, body_duration - 1 / 30):.6f}", "-i", str(body),
     ]
@@ -421,10 +427,14 @@ def _render_outro(
     args += ["-i", str(outro["path"])]
     graph = (
         f"[0:v]trim=duration={1 / 30:.6f},setpts=PTS-STARTPTS,"
-        f"tpad=stop_mode=clone:stop_duration={duration:.6f},trim=duration={duration:.6f}"
-        f"{background_filter}[bg];"
+        f"tpad=stop_mode=clone:stop_duration={duration:.6f},trim=duration={duration:.6f},"
+        f"fps=30,settb=AVTB,format=yuv420p,split=2[hold][bg-source];"
+        f"[bg-source]{background_filter}[bg];"
         f"[1:v]scale={logo_width}:-1,format=rgba,fps=30,trim=duration={duration:.6f},"
-        f"setpts=PTS-STARTPTS[layer];[bg][layer]overlay={x}:{y}:shortest=1,format=yuv420p[v]"
+        f"setpts=PTS-STARTPTS,settb=AVTB[layer];"
+        f"[bg][layer]overlay={x}:{y}:shortest=1,fps=30,settb=AVTB,format=yuv420p[outro];"
+        f"[hold][outro]xfade=transition=fade:duration={dissolve_duration:.6f}:offset=0,"
+        f"format=yuv420p[v]"
     )
     threads = 1 if dependencies.hosted_mode else max(1, dependencies.ffmpeg_threads)
     preset = "ultrafast" if dependencies.hosted_mode else dependencies.render_preset
@@ -464,6 +474,7 @@ def _mux_audio(
     silent_video: Path,
     narration: Sequence[tuple[float, float, Path]],
     intro_duration: float,
+    outro_duration: float,
     output_duration: float,
     output: Path,
     progress_line: Callable[[str], None],
@@ -477,7 +488,8 @@ def _mux_audio(
         args += ["-stream_loop", "-1", "-i", str(music_path)]
         music_start = max(0.0, float(dependencies.render_defaults.get("music_start_offset_seconds", 3.0)))
         fadein_duration = max(0.0, float(dependencies.render_defaults.get("music_fade_in_seconds", 2.0)))
-        fadeout_duration = max(0.0, float(dependencies.render_defaults.get("music_fade_out_seconds", 2.0)))
+        configured_fadeout = max(0.0, float(dependencies.render_defaults.get("music_fade_out_seconds", 2.0)))
+        fadeout_duration = outro_duration if outro_duration > 0 else min(output_duration, configured_fadeout)
         fadeout_start = max(0.0, output_duration - fadeout_duration)
         filters.append(
             f"[{input_index}:a:0]atrim=start={music_start:.6f}:duration={output_duration:.6f},asetpts=PTS-STARTPTS,"
@@ -648,7 +660,7 @@ def render_video_staged(
             staged_output = work / "final-output.mp4"
             _mux_audio(
                 dependencies, config, silent, narration, intro_duration,
-                output_duration, staged_output, progress_line,
+                outro_duration, output_duration, staged_output, progress_line,
             )
             if not _valid_output(staged_output, output_duration, dependencies):
                 raise StagedRenderError("출력 MP4가 정상적으로 생성되지 않았습니다.")

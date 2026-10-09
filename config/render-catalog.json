@@ -51,6 +51,7 @@
     "music_start_offset_seconds": 3.0,
     "music_fade_in_seconds": 2.0,
     "music_fade_out_seconds": 2.0,
+    "outro_dissolve_seconds": 2.0,
     "narration": true,
     "caption_size": 0,
     "video_pan_x": 0.5,
