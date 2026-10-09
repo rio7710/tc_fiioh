@@ -24,6 +24,7 @@ assert.match(shell, /<div id="step05Container"><\/div>/, 'shell provides the Ste
 assert.match(shell, /container:'#step05Container',path:'\/01_app\/pages\/steps\/step05-calendar\.html'/, 'Step 5 loads with the other partials before binding');
 assert.match(shell, /assets\/steps\/step05\/step05-calendar\.css/, 'shell loads isolated Step 5 styles');
 assert.match(shell, /assets\/steps\/step05\/step05-calendar\.js/, 'shell loads isolated Step 5 helpers');
+assert.match(shell, /step05-calendar\.js\?v=20261009_v63/, 'shell cache-busts Step 5 calendar helpers');
 assert.equal((shell.match(/id="step5"/g) || []).length, 0, 'Step 5 markup is not duplicated inline');
 assert.equal((shell.match(/id="calendarSettingsModal"/g) || []).length, 0, 'Step 5 modals are not duplicated inline');
 assert.match(shell, /ThinkCastApiClient\.createApiClient\(\)/, 'shell delegates JSON requests to the shared API client');
@@ -66,5 +67,18 @@ const versions = Calendar.contentVersions(entry('versions', 'project-a', '2026-1
 assert.deepEqual(versions.map(item => item.url), ['/exports/v1.mp4', '/exports/v2.mp4'], 'artifact versions remain immutable and de-duplicated');
 assert.equal(Calendar.groupByContent(moved).length, 2, 'calendar groups by stable content identity');
 assert.equal(Calendar.nextDateKey('2026-12-31'), '2027-01-01');
+assert.equal(Calendar.dateKey(new Date(2026, 0, 2, 12)), '2026-01-02');
+const rawVersions=[{url:'/v1.mp4'},null];
+assert.deepEqual(Calendar.calendarContentVersions({extendedProps:{contentVersions:rawVersions,contentUrl:'/v2.mp4',filename:'v2.mp4'}}).map(item=>item.url),['/v1.mp4','/v2.mp4']);
+const uncollapsed=Calendar.groupCalendarEntries([duplicateOld,duplicateNew,secondPlatform]);
+assert.equal(uncollapsed.length,1);assert.equal(uncollapsed[0].items.length,3,'UI grouping preserves input entries without duplicate collapse');
+const statusItem={extendedProps:{status:'scheduled',createdAt:'2026-10-07T01:00:00+09:00',scheduledAt:'2026-10-07T11:30:00+09:00'}};
+assert.equal(Calendar.calendarStatusTimestamp(statusItem),statusItem.extendedProps.scheduledAt);
+assert.equal(Calendar.formatCalendarTime(statusItem.extendedProps.scheduledAt),'11:30');
+assert.equal(Calendar.formatCalendarTime('invalid'),'--:--');assert.equal(Calendar.formatCalendarTime(null),'--:--');
+assert.equal(Calendar.calendarTimeInputValue(statusItem),'11:30');assert.equal(Calendar.calendarMinuteOfDay(statusItem),11*60+30);assert.equal(Calendar.calendarMinuteOfDay({extendedProps:{}}),9*60);
+assert.equal(Calendar.icsEscape('a\\b;c,d\ne'),'a\\\\b\\;c\\,d\\ne');
+for(const name of ['dateKey','nextDateKey','calendarContentVersions','groupCalendarEntries','calendarStatusTimestamp','formatCalendarTime','calendarTimeInputValue','calendarMinuteOfDay','icsEscape'])assert.match(shell,new RegExp(`function ${name}\\([^)]*\\)\\{\\s*return Step05Calendar\\.${name}\\(`),`${name} remains a thin shell delegate`);
+assert.doesNotMatch(shell,/function groupCalendarEntries\(entries\)\{\s*const groups=|function formatCalendarTime\(value\)\{\s*if\(!value\)|function icsEscape\(value\)\{return String/,'shell has no duplicate calendar helper bodies');
 
 console.log('Step 5 fragment and calendar contract tests passed.');

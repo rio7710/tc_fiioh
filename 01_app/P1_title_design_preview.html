@@ -72,7 +72,7 @@
 <script src="/01_app/assets/steps/step04/step04-navigation-controller.js?v=20261007_v7"></script>
 <script src="/01_app/assets/steps/step04/step04-ui-bindings.js?v=20261007_v7"></script>
 <script src="/01_app/assets/steps/step04/step04-video.js?v=20261008_v22"></script>
-<script src="/01_app/assets/steps/step05/step05-calendar.js?v=20261007_v2"></script>
+<script src="/01_app/assets/steps/step05/step05-calendar.js?v=20261009_v63"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css?v=20261007_v2">
@@ -1493,8 +1493,8 @@ function escapeHtml(value){
 const calendarStatusLabels={published:'배포 완료',scheduled:'배포 예약',draft:'미배포',deleted:'삭제·제거'};
 const calendarPlatformLabels={youtube:'YouTube',instagram:'Instagram',facebook:'Facebook',tiktok:'TikTok',naver:'네이버 블로그',kakaotalk:'카카오톡 채널',threads:'Threads',x:'X',linkedin:'LinkedIn'};
 const calendarTimeLabels={published:'배포',scheduled:'예약',draft:'제작',deleted:'삭제'};
-function dateKey(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
-function nextDateKey(value){const date=new Date(`${value}T12:00:00`);date.setDate(date.getDate()+1);return dateKey(date)}
+function dateKey(date){return Step05Calendar.dateKey(date)}
+function nextDateKey(value){return Step05Calendar.nextDateKey(value)}
 function calendarId(){return globalThis.crypto?.randomUUID?.()||`content-${Date.now()}-${Math.random().toString(16).slice(2)}`}
 function makeCalendarEntry(day,title,status,platform,index){
   const now=new Date();
@@ -1553,10 +1553,7 @@ async function hydrateCalendarEntries(){
   renderCalendar({preserveScroll:true});
 }
 function calendarContentVersions(entry){
-  const props=entry?.extendedProps||{};
-  const versions=Array.isArray(props.contentVersions)?props.contentVersions.filter(item=>item?.url):[];
-  if(props.contentUrl&&!versions.some(item=>item.url===props.contentUrl))versions.push({url:props.contentUrl,filename:props.filename||'',createdAt:props.createdAt||null});
-  return versions;
+  return Step05Calendar.calendarContentVersions(entry);
 }
 function saveCalendarEntries(){
   try{localStorage.setItem(CALENDAR_STORAGE_KEY,JSON.stringify(calendarEntries))}catch(error){}
@@ -1599,26 +1596,15 @@ function loadLatestExport(){
   try{showLatestExport(JSON.parse(localStorage.getItem(LATEST_EXPORT_STORAGE_KEY)||'null'))}catch(error){}
 }
 function groupCalendarEntries(entries){
-  const groups=[];
-  entries.forEach(item=>{
-    const contentKey=item.extendedProps?.projectId||item.title;
-    let group=groups.find(candidate=>candidate.contentKey===contentKey);
-    if(!group){group={contentKey,title:item.title,items:[]};groups.push(group)}
-    group.items.push(item);
-  });
-  return groups;
+  return Step05Calendar.groupCalendarEntries(entries);
 }
 function calendarStatusTimestamp(item){
-  const props=item.extendedProps||{};
-  const status=props.status||'draft';
-  return status==='published'?(props.distributedAt||props.createdAt):status==='scheduled'?(props.scheduledAt||props.createdAt):status==='deleted'?(props.deletedAt||props.createdAt):props.createdAt;
+  return Step05Calendar.calendarStatusTimestamp(item);
 }
 function formatCalendarTime(value){
-  if(!value)return '--:--';
-  const date=new Date(value);if(Number.isNaN(date.getTime()))return '--:--';
-  return new Intl.DateTimeFormat('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Seoul'}).format(date);
+  return Step05Calendar.formatCalendarTime(value);
 }
-function calendarTimeInputValue(item){return formatCalendarTime(calendarStatusTimestamp(item)).replace('24:','00:')}
+function calendarTimeInputValue(item){return Step05Calendar.calendarTimeInputValue(item)}
 function renderCalendarStickers(entries,limit=Infinity){
   const groups=groupCalendarEntries(entries);
   const visible=groups.slice(0,limit);
@@ -1647,11 +1633,7 @@ function calendarDayMarkup(date,{outside=false,limit=Infinity}={}){
   return `<div class="calendar-day ${outside?'outside':''} ${key===dateKey(new Date())?'today':''}" data-date="${key}"><span class="calendar-day-number">${date.getDate()}</span><div class="calendar-events">${rendered.html}${more}</div></div>`;
 }
 function calendarMinuteOfDay(item){
-  const value=calendarStatusTimestamp(item);if(!value)return 9*60;
-  const parts=new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Seoul'}).formatToParts(new Date(value));
-  const hour=Number(parts.find(part=>part.type==='hour')?.value||9)%24;
-  const minute=Number(parts.find(part=>part.type==='minute')?.value||0);
-  return hour*60+minute;
+  return Step05Calendar.calendarMinuteOfDay(item);
 }
 function renderCalendarTimeGrid(dates){
   const headers=dates.map(date=>`<span>${date.toLocaleDateString('ko-KR',{month:'numeric',day:'numeric',weekday:'short'})}</span>`).join('');
@@ -1771,7 +1753,7 @@ function recordCurrentProduction(result){
   renderCalendar();
   refreshProjectIndex();
 }
-function icsEscape(value){return String(value).replaceAll('\\','\\\\').replaceAll(';','\\;').replaceAll(',','\\,').replaceAll(/\r?\n/g,'\\n')}
+function icsEscape(value){return Step05Calendar.icsEscape(value)}
 function exportCalendarIcs(){
   const timestamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
   const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Greenhill Content Studio//Content Calendar//KO','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:그린힐 콘텐츠 배포 캘린더'];

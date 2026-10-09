@@ -7,6 +7,10 @@
 
   const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+  function dateKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
   function entryProps(entry) {
     return entry && typeof entry.extendedProps === 'object' && entry.extendedProps
       ? entry.extendedProps : {};
@@ -89,6 +93,45 @@
     return versions;
   }
 
+  function calendarContentVersions(entry) {
+    const props = entry?.extendedProps || {};
+    const versions = Array.isArray(props.contentVersions) ? props.contentVersions.filter(item => item?.url) : [];
+    if (props.contentUrl && !versions.some(item => item.url === props.contentUrl)) versions.push({url: props.contentUrl, filename: props.filename || '', createdAt: props.createdAt || null});
+    return versions;
+  }
+
+  function groupCalendarEntries(entries) {
+    const groups = [];
+    entries.forEach(item => {
+      const contentKey = item.extendedProps?.projectId || item.title;
+      let group = groups.find(candidate => candidate.contentKey === contentKey);
+      if (!group) { group = {contentKey, title: item.title, items: []}; groups.push(group); }
+      group.items.push(item);
+    });
+    return groups;
+  }
+
+  function calendarStatusTimestamp(item) {
+    const props = item.extendedProps || {}, status = props.status || 'draft';
+    return status === 'published' ? (props.distributedAt || props.createdAt) : status === 'scheduled' ? (props.scheduledAt || props.createdAt) : status === 'deleted' ? (props.deletedAt || props.createdAt) : props.createdAt;
+  }
+
+  function formatCalendarTime(value) {
+    if (!value) return '--:--';
+    const date = new Date(value); if (Number.isNaN(date.getTime())) return '--:--';
+    return new Intl.DateTimeFormat('ko-KR', {hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul'}).format(date);
+  }
+
+  function calendarTimeInputValue(item) { return formatCalendarTime(calendarStatusTimestamp(item)).replace('24:', '00:'); }
+  function calendarMinuteOfDay(item) {
+    const value = calendarStatusTimestamp(item); if (!value) return 9 * 60;
+    const parts = new Intl.DateTimeFormat('en-GB', {hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul'}).formatToParts(new Date(value));
+    const hour = Number(parts.find(part => part.type === 'hour')?.value || 9) % 24;
+    const minute = Number(parts.find(part => part.type === 'minute')?.value || 0);
+    return hour * 60 + minute;
+  }
+  function icsEscape(value) { return String(value).replaceAll('\\', '\\\\').replaceAll(';', '\\;').replaceAll(',', '\\,').replaceAll(/\r?\n/g, '\\n'); }
+
   function groupByContent(entries) {
     const groups = new Map();
     collapseDuplicates(entries).forEach(entry => {
@@ -99,5 +142,5 @@
     return [...groups.values()];
   }
 
-  return { contentIdentity, uniquenessKey, collapseDuplicates, nextDateKey, shiftTimestampDate, moveContentGroup, contentVersions, groupByContent };
+  return {dateKey, contentIdentity, uniquenessKey, collapseDuplicates, nextDateKey, shiftTimestampDate, moveContentGroup, contentVersions, groupByContent, calendarContentVersions, groupCalendarEntries, calendarStatusTimestamp, formatCalendarTime, calendarTimeInputValue, calendarMinuteOfDay, icsEscape};
 }));

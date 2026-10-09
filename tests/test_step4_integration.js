@@ -564,6 +564,7 @@ function createPrePartialContext() {
     Step03StoryboardLookController: require('../01_app/assets/steps/step03/storyboard-look-controller.js'),
     Step03StoryboardFlowController: require('../01_app/assets/steps/step03/storyboard-flow-controller.js'),
     Step03StoryboardProjectStateController: require('../01_app/assets/steps/step03/storyboard-project-state-controller.js'),
+    Step05Calendar: require('../01_app/assets/steps/step05/step05-calendar.js'),
     Step02TrendKeywordController: require('../01_app/assets/steps/step02/trend-keyword-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ContentIndexView: require('../01_app/assets/steps/step01/step01-content-index-view.js'),
