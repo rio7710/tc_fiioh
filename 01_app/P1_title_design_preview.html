@@ -26,6 +26,7 @@
 <script src="/01_app/assets/steps/step02/trend-keyword-controller.js?v=20261009_v40"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
+<script src="/01_app/assets/steps/step03/scene-voice-controller.js?v=20261009_v47"></script>
 <script src="/01_app/assets/steps/step03/candidate-selection-controller.js?v=20261009_v46"></script>
 <script src="/01_app/assets/steps/step03/scene-image-controller.js?v=20261009_v45"></script>
 <script src="/01_app/assets/steps/step03/scene-video-controller.js?v=20261009_v44"></script>
@@ -1498,25 +1499,10 @@ function setVoiceProfile(profileId){
   document.querySelectorAll('[data-voice-profile]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.voiceProfile===selectedVoiceProfile)));
 }
 function sceneVoiceContext(sceneId){
-  const list=activeStoryboardDocument?.production?.timeline?.scenes||[];
-  const scene=list.find(item=>item.id===sceneId),cueId=scene?.narration_cue_ids?.[0];
-  const owner=list.find(item=>cueId&&item.narration_cue_ids?.includes(cueId))||scene;
-  const validVoice=item=>item&&(!item.profile_id||item.profile_id===selectedVoiceProfile);
-  const fallback=storedStoryboardVoiceClips.get(owner?.id);
-  const voice=[...storedStoryboardVoiceClips.values()].find(item=>cueId&&item.cue_id===cueId&&validVoice(item))||(validVoice(fallback)?fallback:null);
-  return {cueId,ownerId:owner?.id||sceneId,shared:Boolean(owner&&owner.id!==sceneId),voice,
-    ownerLabel:`S#${String(list.findIndex(item=>item.id===owner?.id)+1).padStart(2,'0')}`};
+  return sceneVoiceController.context(sceneId);
 }
 function updateStoryboardVoiceControls(){
-  document.querySelectorAll('.storyboard-card').forEach(card=>{
-    const context=sceneVoiceContext(card.dataset.scene),button=card.querySelector('.storyboard-speaker');
-    const title=context.voice?'저장된 음성 재생':context.shared?`${context.ownerLabel} 음성 이어 사용 · 첫 씬에서 생성`:'이 내레이션 음성 생성';
-    button.disabled=context.shared&&!context.voice;button.title=title;button.setAttribute('aria-label',title);button.classList.toggle('has-audio',Boolean(context.voice));
-    const usage=card.querySelector('.storyboard-voice-usage');
-    const tokens=Number(context.voice?.usage?.total_tokens||0);
-    usage.textContent=context.shared?`${context.ownerLabel} 음성 이어 사용 · 추가 생성 없음`:tokens?`음성 사용 토큰 ${tokens.toLocaleString()}`:'';
-    usage.hidden=!usage.textContent;
-  });
+  return sceneVoiceController.updateControls();
 }
 function renderStoryboardGrid(){
   applyStoryboardLook(localStorage.getItem(`thinkcast-storyboard-look-${activeProjectId}`)||storyboardLook);
@@ -1560,41 +1546,10 @@ async function generateMissingStoryboardImages(){
   return sceneImageController.generateMissing();
 }
 async function generateOrPlaySceneVoice(button,autoplay=true){
-  const card=button.closest('.storyboard-card');const sceneId=card.dataset.scene,projectId=activeProjectId;
-  const context=sceneVoiceContext(sceneId),saved=context.voice;
-  const audio=document.querySelector('#storyboardVoiceAudio');
-  if(saved?.uri){if(autoplay){audio.pause();audio.src=saved.uri;await audio.play()}return}
-  if(context.shared){document.querySelector('#storyboardMessage').textContent=`${context.ownerLabel}에서 음성을 생성하면 이 씬도 함께 사용합니다.`;return}
-  button.disabled=true;button.title='음성을 생성하고 있습니다.';
-  try{
-    const result=await api('/api/voice/generate-scene',{method:'POST',body:JSON.stringify({project_id:projectId,scene_id:sceneId})});
-    if(activeProjectId!==projectId)return;
-    const voice=result.voice||{};if(!voice.uri)throw new Error('생성된 음성 주소를 받지 못했습니다.');
-    storedStoryboardVoiceClips.set(context.ownerId,{scene_id:context.ownerId,...voice});
-    if(result.timeline){demoData.timeline=result.timeline;applyTimeline(result.timeline)}
-    button.classList.add('has-audio');button.title='저장된 음성 재생';button.setAttribute('aria-label','저장된 음성 재생');
-    const usage=voice.usage||{};const usageNode=card.querySelector('.storyboard-voice-usage');
-    usageNode.textContent=`음성 사용 토큰 ${Number(usage.total_tokens||0).toLocaleString()} (입력 ${Number(usage.input_tokens||0).toLocaleString()} / 출력 ${Number(usage.output_tokens||0).toLocaleString()})`;usageNode.hidden=false;
-    if(autoplay){audio.src=voice.uri;await audio.play()}
-    updateStoryboardVoiceControls();
-    document.querySelector('#storyboardMessage').textContent='내레이션 음성을 저장했습니다. 연결된 씬은 같은 음성을 이어 사용합니다.';
-  }finally{button.disabled=false}
+  return sceneVoiceController.generateOrPlay(button,autoplay);
 }
 async function generateMissingSceneVoices(){
-  const bulkButton=document.querySelector('#storyboardVoiceBulkGenerate');
-  const projectId=activeProjectId;
-  const missing=[...document.querySelectorAll('.storyboard-card')].filter(card=>{const c=sceneVoiceContext(card.dataset.scene);return !c.shared&&!c.voice});
-  if(!missing.length){document.querySelector('#storyboardMessage').textContent='모든 내레이션 음성이 준비되어 있습니다. 연결된 씬은 공유 음성을 사용합니다.';return}
-  bulkButton.disabled=true;
-  try{
-    for(let index=0;index<missing.length;index+=1){
-      if(activeProjectId!==projectId)return;
-      bulkButton.textContent=`미생성 음성 생성 중 ${index+1}/${missing.length}`;
-      await generateOrPlaySceneVoice(missing[index].querySelector('.storyboard-speaker'),false);
-    }
-    document.querySelector('#storyboardVoiceAudio').pause();
-    document.querySelector('#storyboardMessage').textContent=`미생성 내레이션 ${missing.length}개를 생성했습니다. 연결된 씬의 중복 생성은 생략했습니다.`;
-  }finally{bulkButton.disabled=false;bulkButton.textContent='미생성 음성 일괄 생성'}
+  return sceneVoiceController.generateMissing();
 }
 async function pollSceneVideo(card,taskId){
   return sceneVideoController.poll(card,taskId);
@@ -2205,6 +2160,8 @@ const contentIndexController=Step01ContentIndexController.create({request:(...ar
 contentIndexController.mount(document);
 const scriptGenerationController=Step02ScriptGenerationController.create({getRoot:()=>document,configureWorkflowModal,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getSelectedKeywordLabels:selectedKeywordLabels,now:()=>Date.now(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),sleep,setGeneratedState:state=>{demoData.state=state},setGeneratedTimeline:timeline=>{demoData.timeline=timeline},setGeneratedDocument:value=>{activeStoryboardDocument=value},setKeywordLocked:setKeywordStageLocked,setVoiceProfile,applyTimeline,removeStoredScript:()=>localStorage.removeItem(SCRIPT_STORAGE_KEY),fillScript,applyScript,refreshProjectIndex,showStep});
 scriptGenerationController.mount(document);
+const sceneVoiceController=Step03SceneVoiceController.create({getRoot:()=>document,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getStoryboardDocument:()=>activeStoryboardDocument,getVoiceClips:()=>storedStoryboardVoiceClips,getSelectedVoiceProfile:()=>selectedVoiceProfile,setDemoTimeline:timeline=>{demoData.timeline=timeline},applyTimeline,onError:(feature,error)=>console.error(`[SceneVoice:${feature}]`,error)});
+sceneVoiceController.mount(document);
 const candidateSelectionController=Step03CandidateSelectionController.create({getRoot:()=>document,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getImages:()=>storedStoryboardImages,getImageCandidates:()=>storedStoryboardImageCandidates,getVideos:()=>storedStoryboardVideos,getVideoCandidates:()=>storedStoryboardVideoCandidates,renderStoryboardGrid,escapeSelector:value=>CSS.escape(value),onError:(feature,error)=>console.error(`[CandidateSelection:${feature}]`,error)});
 candidateSelectionController.mount(document);
 const sceneImageController=Step03SceneImageController.create({getRoot:()=>document,request:(...args)=>api(...args),sleep,getActiveProjectId:()=>activeProjectId,getImages:()=>storedStoryboardImages,getImageCandidates:()=>storedStoryboardImageCandidates,getVideos:()=>storedStoryboardVideos,escapeHtml,onError:(feature,error)=>console.error(`[SceneImage:${feature}]`,error)});
@@ -2235,13 +2192,6 @@ document.querySelector('#storyboardNext').addEventListener('click',async()=>{
     connectStoryboardAssetsToEditor();
     showStep(4);
   }catch(error){message.textContent=error.message}
-});
-document.querySelector('#storyboardGrid').addEventListener('click',async event=>{
-  const button=event.target.closest('.storyboard-speaker');if(!button)return;
-  try{await generateOrPlaySceneVoice(button)}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
-});
-document.querySelector('#storyboardVoiceBulkGenerate').addEventListener('click',async()=>{
-  try{await generateMissingSceneVoices()}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
 });
 document.querySelector('#storyboardLookToolbar').addEventListener('click',event=>{
   const button=event.target.closest('[data-look]');if(button)applyStoryboardLook(button.dataset.look);
