@@ -49,6 +49,7 @@ const sceneVoiceControllerPath = '01_app/assets/steps/step03/scene-voice-control
 const voiceProfileControllerPath = '01_app/assets/steps/step03/voice-profile-controller.js';
 const storyboardGridRendererPath = '01_app/assets/steps/step03/storyboard-grid-renderer.js';
 const storyboardLookControllerPath = '01_app/assets/steps/step03/storyboard-look-controller.js';
+const storyboardFlowControllerPath = '01_app/assets/steps/step03/storyboard-flow-controller.js';
 const storyboardProjectStateControllerPath = '01_app/assets/steps/step03/storyboard-project-state-controller.js';
 const imageRegenerationControllerPath = '01_app/assets/steps/step04/step04-image-regeneration-controller.js';
 
@@ -95,6 +96,7 @@ assert.ok(fs.existsSync(sceneVoiceControllerPath), 'scene-voice-controller.js mu
 assert.ok(fs.existsSync(voiceProfileControllerPath), 'voice-profile-controller.js must exist');
 assert.ok(fs.existsSync(storyboardGridRendererPath), 'storyboard-grid-renderer.js must exist');
 assert.ok(fs.existsSync(storyboardLookControllerPath), 'storyboard-look-controller.js must exist');
+assert.ok(fs.existsSync(storyboardFlowControllerPath), 'storyboard-flow-controller.js must exist');
 assert.ok(fs.existsSync(storyboardProjectStateControllerPath), 'storyboard-project-state-controller.js must exist');
 assert.ok(fs.existsSync(imageRegenerationControllerPath), 'step04-image-regeneration-controller.js must exist');
 
@@ -128,6 +130,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-voice-controller
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/voice-profile-controller\.js\?v=20261009_v48"/, 'HTML cache-busts voice profile controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-look-controller\.js\?v=20261009_v52"/, 'HTML cache-busts storyboard look controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-grid-renderer\.js\?v=20261009_v52"/, 'HTML cache-busts storyboard grid renderer');
+assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-flow-controller\.js\?v=20261009_v53"/, 'HTML cache-busts storyboard flow controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-project-state-controller\.js\?v=20261009_v51"/, 'HTML cache-busts storyboard project state controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('trend-keyword-controller.js'), 'base Step 2 module loads before trend keyword controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('script-generation-controller.js') && html.indexOf('script-generation-controller.js') < html.indexOf('trend-keyword-controller.js'), 'script generation loads between Step 2 keyword controllers');
@@ -499,6 +502,7 @@ function createPrePartialContext() {
     Step03VoiceProfileController: require('../01_app/assets/steps/step03/voice-profile-controller.js'),
     Step03StoryboardGridRenderer: require('../01_app/assets/steps/step03/storyboard-grid-renderer.js'),
     Step03StoryboardLookController: require('../01_app/assets/steps/step03/storyboard-look-controller.js'),
+    Step03StoryboardFlowController: require('../01_app/assets/steps/step03/storyboard-flow-controller.js'),
     Step03StoryboardProjectStateController: require('../01_app/assets/steps/step03/storyboard-project-state-controller.js'),
     Step02TrendKeywordController: require('../01_app/assets/steps/step02/trend-keyword-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),

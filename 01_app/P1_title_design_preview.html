@@ -28,6 +28,7 @@
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
 <script src="/01_app/assets/steps/step03/storyboard-look-controller.js?v=20261009_v52"></script>
 <script src="/01_app/assets/steps/step03/storyboard-grid-renderer.js?v=20261009_v52"></script>
+<script src="/01_app/assets/steps/step03/storyboard-flow-controller.js?v=20261009_v53"></script>
 <script src="/01_app/assets/steps/step03/storyboard-project-state-controller.js?v=20261009_v51"></script>
 <script src="/01_app/assets/steps/step03/voice-profile-controller.js?v=20261009_v48"></script>
 <script src="/01_app/assets/steps/step03/scene-voice-controller.js?v=20261009_v47"></script>
@@ -2037,6 +2038,8 @@ const scriptGenerationController=Step02ScriptGenerationController.create({getRoo
 scriptGenerationController.mount(document);
 const storyboardLookController=Step03StoryboardLookController.create({getRoot:()=>document,storage:localStorage,getActiveProjectId:()=>activeProjectId,setCurrentLook:value=>{storyboardLook=value}});
 const storyboardGridRenderer=Step03StoryboardGridRenderer.create({getRoot:()=>document,restoreStoryboardLook,getStoryboardDocument:()=>activeStoryboardDocument,getCurrentScriptLines:()=>currentScriptPayload().lines,getImages:()=>storedStoryboardImages,getImageCandidates:()=>storedStoryboardImageCandidates,getVoiceContext:sceneVoiceContext,getVideos:()=>storedStoryboardVideos,getVideoCandidates:()=>storedStoryboardVideoCandidates,escapeHtml,updateVoiceControls:updateStoryboardVoiceControls,resumePendingVideos:resumePendingSceneVideos});
+const storyboardFlowController=Step03StoryboardFlowController.create({getRoot:()=>document,renderStoryboardGrid,showStep,updateScriptDiff,saveScriptChanges,connectStoryboardAssetsToEditor,applyStoryboardLook});
+storyboardFlowController.mount(document);
 const imageRegenerationController=Step04ImageRegenerationController.create({getRoot:()=>document,request:(...args)=>api(...args),sleep,now:()=>Date.now(),getActiveProjectId:()=>activeProjectId,getScenes:()=>scenes,getCurrentScene:()=>currentScene,getImageCandidates:()=>storedStoryboardImageCandidates,getRegenerationRequests:()=>demoData?.state?.image_regeneration_requests||[],setDemoState:state=>{demoData.state=state},getMainVideo:()=>document.querySelector('#video'),getBody:()=>document.body,onError:(feature,error)=>console.error(`[ImageRegeneration:${feature}]`,error)});
 const voiceProfileController=Step03VoiceProfileController.create({getRoot:()=>document,request:(...args)=>api(...args),fetch:(...args)=>fetch(...args),createObjectURL:blob=>URL.createObjectURL(blob),revokeObjectURL:url=>URL.revokeObjectURL(url),getActiveProjectId:()=>activeProjectId,getSelectedProfile:()=>selectedVoiceProfile,setSelectedProfile:value=>{selectedVoiceProfile=value},onError:(feature,error)=>console.error(`[VoiceProfile:${feature}]`,error)});
 voiceProfileController.mount(document);
@@ -2057,27 +2060,6 @@ trendKeywordController.mount(document);
 function setAuthMode(mode){
   return authUIController.setMode(mode);
 }
-document.querySelector('#scriptNext').addEventListener('click',async()=>{
-  const message=document.querySelector('#scriptMessage');
-  message.textContent='';
-  try{
-    renderStoryboardGrid();
-    showStep('3-1');
-  }catch(error){message.textContent=error.message}
-});
-document.querySelector('#storyboardNext').addEventListener('click',async()=>{
-  const message=document.querySelector('#storyboardMessage');message.textContent='';
-  try{
-    if(updateScriptDiff()>0)await saveScriptChanges();
-    connectStoryboardAssetsToEditor();
-    showStep(4);
-  }catch(error){message.textContent=error.message}
-});
-document.querySelector('#storyboardLookToolbar').addEventListener('click',event=>{
-  const button=event.target.closest('[data-look]');if(button)applyStoryboardLook(button.dataset.look);
-});
-
-
 // Thin Adapter Bridge for Step 04 Video Editor
 function sync(){return window.Step04VideoEditor?.sync();}
 function seekScene(idx){return window.Step04VideoEditor?.seekScene(idx);}
