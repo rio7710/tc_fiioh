@@ -8,7 +8,7 @@ const jsPath = '01_app/assets/steps/step05/step05-calendar.js';
 
 const html = fs.readFileSync(partialPath, 'utf8');
 const shell = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
-const projectHydration = fs.readFileSync('01_app/assets/core/project-hydration-applier.js', 'utf8');
+const projectHydration = fs.readFileSync('01_app/assets/core/project-brand-platform-hydrator.js', 'utf8');
 [
   'step5', 'latestExport', 'latestExportList', 'calendarPrev', 'calendarMonthTitle',
   'calendarNext', 'calendarExport', 'calendarGrid', 'calendarHelp', 'calendarSettingsModal',
