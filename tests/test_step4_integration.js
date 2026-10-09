@@ -43,6 +43,7 @@ const trendKeywordControllerPath = '01_app/assets/steps/step02/trend-keyword-con
 const scriptGenerationControllerPath = '01_app/assets/steps/step02/script-generation-controller.js';
 const productionWorkflowControllerPath = '01_app/assets/steps/step03/production-workflow-controller.js';
 const sceneVideoControllerPath = '01_app/assets/steps/step03/scene-video-controller.js';
+const sceneImageControllerPath = '01_app/assets/steps/step03/scene-image-controller.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
@@ -81,6 +82,7 @@ assert.ok(fs.existsSync(trendKeywordControllerPath), 'trend-keyword-controller.j
 assert.ok(fs.existsSync(scriptGenerationControllerPath), 'script-generation-controller.js must exist');
 assert.ok(fs.existsSync(productionWorkflowControllerPath), 'production-workflow-controller.js must exist');
 assert.ok(fs.existsSync(sceneVideoControllerPath), 'scene-video-controller.js must exist');
+assert.ok(fs.existsSync(sceneImageControllerPath), 'scene-image-controller.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
@@ -106,10 +108,12 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step02\/step02-keyword\.js\?v=
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/script-generation-controller\.js\?v=20261009_v42"/, 'HTML cache-busts script generation controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/production-workflow-controller\.js\?v=20261009_v43"/, 'HTML cache-busts production workflow controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-video-controller\.js\?v=20261009_v44"/, 'HTML cache-busts scene video controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-image-controller\.js\?v=20261009_v45"/, 'HTML cache-busts scene image controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('trend-keyword-controller.js'), 'base Step 2 module loads before trend keyword controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('script-generation-controller.js') && html.indexOf('script-generation-controller.js') < html.indexOf('trend-keyword-controller.js'), 'script generation loads between Step 2 keyword controllers');
 assert.ok(html.indexOf('step03-script-editor-controller.js') < html.indexOf('production-workflow-controller.js'), 'production workflow loads after Step 3 script editor');
 assert.ok(html.indexOf('scene-video-controller.js') < html.indexOf('production-workflow-controller.js'), 'scene video controller loads before production workflow');
+assert.ok(html.indexOf('scene-image-controller.js') < html.indexOf('scene-video-controller.js'), 'scene image controller loads before scene video controller');
 assert.ok(html.indexOf('content-route.js') < html.indexOf('shell-navigation-controller.js'), 'content route helper loads before shell navigation');
 assert.ok(html.indexOf('shell-navigation-controller.js') < html.indexOf('session-bootstrap-controller.js'), 'shell navigation loads before session bootstrap');
 assert.ok(html.indexOf('session-bootstrap-controller.js') < html.indexOf('auth-ui-controller.js'), 'session bootstrap loads before auth UI controller');
@@ -174,6 +178,11 @@ assert.match(html, /const sceneVideoController=Step03SceneVideoController\.creat
 assert.match(html, /sceneVideoController\.mount\(document\)/, 'P1 mounts scene video interactions');
 for(const contract of [/async function pollSceneVideo\(card,taskId\)\{\s*return sceneVideoController\.poll\(card,taskId\);\s*\}/,/async function resumePendingSceneVideos\(\)\{\s*return sceneVideoController\.resume\(\);\s*\}/,/async function generateSceneVideo\(button,force=true\)\{\s*return sceneVideoController\.generate\(button,force\);\s*\}/,/async function generateMissingSceneVideos\(\)\{\s*return sceneVideoController\.generateMissing\(\);\s*\}/])assert.match(html,contract,'P1 keeps thin scene video wrappers');
 assert.doesNotMatch(html,/resumedKlingTaskIds|pendingVideoResumeBusy|\/api\/storyboard\/video-status\?task_id=|document\.querySelector\('#storyboardVideoBulkGenerate'\)\.addEventListener/, 'P1 removes scene video state, API body, and listeners');
+assert.match(html,/const sceneImageController=Step03SceneImageController\.create\(/,'P1 wires scene image controller');
+assert.match(html,/sceneImageController\.mount\(document\)/,'P1 mounts scene image interactions');
+assert.match(html,/async function generateStoryboardImage\(button,force=true\)\{\s*return sceneImageController\.generate\(button,force\);\s*\}/,'P1 keeps thin scene image wrapper');
+assert.match(html,/async function generateMissingStoryboardImages\(\)\{\s*return sceneImageController\.generateMissing\(\);\s*\}/,'P1 keeps thin bulk image wrapper');
+assert.doesNotMatch(html,/\/api\/storyboard\/image-generate|document\.querySelector\('#storyboardBulkGenerate'\)\.addEventListener/,'P1 removes scene image API body and listeners');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v31"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
@@ -420,6 +429,7 @@ function createPrePartialContext() {
     Step02ScriptGenerationController: require('../01_app/assets/steps/step02/script-generation-controller.js'),
     Step03ProductionWorkflowController: require('../01_app/assets/steps/step03/production-workflow-controller.js'),
     Step03SceneVideoController: require('../01_app/assets/steps/step03/scene-video-controller.js'),
+    Step03SceneImageController: require('../01_app/assets/steps/step03/scene-image-controller.js'),
     Step02TrendKeywordController: require('../01_app/assets/steps/step02/trend-keyword-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),

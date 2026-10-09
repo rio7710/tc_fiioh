@@ -26,6 +26,7 @@
 <script src="/01_app/assets/steps/step02/trend-keyword-controller.js?v=20261009_v40"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
+<script src="/01_app/assets/steps/step03/scene-image-controller.js?v=20261009_v45"></script>
 <script src="/01_app/assets/steps/step03/scene-video-controller.js?v=20261009_v44"></script>
 <script src="/01_app/assets/steps/step03/production-workflow-controller.js?v=20261009_v43"></script>
 <script src="/01_app/assets/video-editor/scene-navigation.js?v=20261007_v2"></script>
@@ -1575,66 +1576,10 @@ async function cycleStoryboardVideoCandidate(button){
   document.querySelector('#storyboardMessage').textContent='선택한 영상 버전이 콘텐츠에 저장되었습니다.';
 }
 async function generateStoryboardImage(button,force=true){
-  if(!activeProjectId)throw new Error('콘텐츠 프로젝트를 먼저 열어 주세요.');
-  const card=button.closest('.storyboard-card');
-  const [provider,model]=document.querySelector('#storyboardModel').value.split(':');
-  const resultBox=card.querySelector('.storyboard-result');
-  button.disabled=true;button.textContent='생성 중…';
-  resultBox.hidden=false;resultBox.innerHTML='<small>저장된 캐릭터·장소 레퍼런스를 적용해 이미지를 생성하고 있습니다.</small>';
-  try{
-    const result=await api('/api/storyboard/image-generate',{method:'POST',body:JSON.stringify({project_id:activeProjectId,scene_id:card.dataset.scene,provider,model,force})});
-    const generated=result.image||{};
-    if(generated.status!=='succeeded'||!generated.uri)throw new Error('생성 이미지 주소를 받지 못했습니다.');
-    const usage=generated.usage||{};
-    const tokenLabel=Number.isFinite(Number(usage.total_tokens))?` · 사용 토큰 ${Number(usage.total_tokens).toLocaleString()} (입력 ${Number(usage.input_tokens||0).toLocaleString()} / 출력 ${Number(usage.output_tokens||0).toLocaleString()})`:'';
-    resultBox.innerHTML=`<a href="${escapeHtml(generated.uri)}" target="_blank" rel="noopener" title="원본 이미지 새 창에서 보기"><img src="${escapeHtml(generated.uri)}" alt="생성된 씬 이미지"></a><small>${escapeHtml(generated.model||model)} · 캐릭터·장소 레퍼런스 적용${escapeHtml(tokenLabel)}</small>`;
-    storedStoryboardImages.set(card.dataset.scene,{scene_id:card.dataset.scene,...generated});
-    const candidates=storedStoryboardImageCandidates.get(card.dataset.scene)||[];
-    candidates.forEach(item=>item.selected=false);
-    candidates.push({scene_id:card.dataset.scene,artifact_id:generated.artifact_id,uri:generated.uri,model:generated.model,selected:true});
-    storedStoryboardImageCandidates.set(card.dataset.scene,candidates);
-    document.querySelector('#storyboardMessage').textContent='씬 이미지가 생성되어 이 콘텐츠에 저장되었습니다.';
-  }catch(error){resultBox.innerHTML=`<small>${escapeHtml(error.message)}</small>`;throw error}
-  finally{button.disabled=false;button.textContent=storedStoryboardImages.has(card.dataset.scene)?'다시 생성':'이미지 생성'}
+  return sceneImageController.generate(button,force);
 }
 async function generateMissingStoryboardImages(){
-  const bulkButton=document.querySelector('#storyboardBulkGenerate');
-  const missing=[...document.querySelectorAll('.storyboard-card')].filter(card=>!storedStoryboardImages.has(card.dataset.scene));
-  if(!missing.length){document.querySelector('#storyboardMessage').textContent='모든 씬 이미지가 이미 생성되어 있습니다.';return}
-  bulkButton.disabled=true;
-  const message=document.querySelector('#storyboardMessage');
-  const failures=[];
-  let nextIndex=0;
-  let completed=0;
-  const workerCount=Math.min(4,missing.length);
-  const generateWithRetry=async card=>{
-    const maxAttempts=3;
-    for(let attempt=1;attempt<=maxAttempts;attempt+=1){
-      try{return await generateStoryboardImage(card.querySelector('.storyboard-generate'),false)}
-      catch(error){
-        if(!error.transient||attempt===maxAttempts)throw error;
-        const delayMs=1500*(2**(attempt-1));
-        message.textContent=`일시적인 생성 오류로 재시도 대기 중 (${attempt}/${maxAttempts-1})`;
-        await new Promise(resolve=>setTimeout(resolve,delayMs));
-      }
-    }
-  };
-  const worker=async()=>{
-    while(nextIndex<missing.length){
-      const card=missing[nextIndex++];
-      try{await generateWithRetry(card)}
-      catch(error){failures.push(`${card.querySelector('.storyboard-card-head b').textContent}: ${error.message}`)}
-      completed+=1;
-      bulkButton.textContent=`미생성 씬 처리 중 ${completed}/${missing.length}`;
-      message.textContent=`이미지 ${completed}/${missing.length}장 처리 · 성공 ${completed-failures.length} · 실패 ${failures.length} · 동시 최대 ${workerCount}장`;
-    }
-  };
-  try{
-    await Promise.all(Array.from({length:workerCount},worker));
-    message.textContent=failures.length
-      ?`성공 ${completed-failures.length}/${missing.length}장 · 실패 ${failures.length}장 (${failures.join(' / ')}). 다시 누르면 미생성 씬만 재시도합니다.`
-      :`미생성 씬 ${missing.length}장의 생성을 완료했습니다.`;
-  }finally{bulkButton.disabled=false;bulkButton.textContent='미생성 씬 일괄 생성'}
+  return sceneImageController.generateMissing();
 }
 async function generateOrPlaySceneVoice(button,autoplay=true){
   const card=button.closest('.storyboard-card');const sceneId=card.dataset.scene,projectId=activeProjectId;
@@ -2282,6 +2227,8 @@ const contentIndexController=Step01ContentIndexController.create({request:(...ar
 contentIndexController.mount(document);
 const scriptGenerationController=Step02ScriptGenerationController.create({getRoot:()=>document,configureWorkflowModal,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getSelectedKeywordLabels:selectedKeywordLabels,now:()=>Date.now(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),sleep,setGeneratedState:state=>{demoData.state=state},setGeneratedTimeline:timeline=>{demoData.timeline=timeline},setGeneratedDocument:value=>{activeStoryboardDocument=value},setKeywordLocked:setKeywordStageLocked,setVoiceProfile,applyTimeline,removeStoredScript:()=>localStorage.removeItem(SCRIPT_STORAGE_KEY),fillScript,applyScript,refreshProjectIndex,showStep});
 scriptGenerationController.mount(document);
+const sceneImageController=Step03SceneImageController.create({getRoot:()=>document,request:(...args)=>api(...args),sleep,getActiveProjectId:()=>activeProjectId,getImages:()=>storedStoryboardImages,getImageCandidates:()=>storedStoryboardImageCandidates,getVideos:()=>storedStoryboardVideos,escapeHtml,onError:(feature,error)=>console.error(`[SceneImage:${feature}]`,error)});
+sceneImageController.mount(document);
 const sceneVideoController=Step03SceneVideoController.create({getRoot:()=>document,request:(...args)=>api(...args),sleep,getActiveProjectId:()=>activeProjectId,getImages:()=>storedStoryboardImages,getVideos:()=>storedStoryboardVideos,getVideoCandidates:()=>storedStoryboardVideoCandidates,renderStoryboardGrid,escapeSelector:value=>CSS.escape(value),onError:(feature,error)=>console.error(`[SceneVideo:${feature}]`,error)});
 sceneVideoController.mount(document);
 const productionWorkflowController=Step03ProductionWorkflowController.create({getRoot:()=>document,configureWorkflowModal,generateMissingSceneVideos,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,sleep,setupSceneProgressBadges,runDemoSceneProgress,showStep});
@@ -2320,15 +2267,8 @@ document.querySelector('#storyboardGrid').addEventListener('click',async event=>
   try{await cycleStoryboardVideoCandidate(candidateButton)}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
 });
 document.querySelector('#storyboardGrid').addEventListener('click',async event=>{
-  const button=event.target.closest('.storyboard-generate');if(!button)return;
-  try{await generateStoryboardImage(button)}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
-});
-document.querySelector('#storyboardGrid').addEventListener('click',async event=>{
   const button=event.target.closest('.storyboard-speaker');if(!button)return;
   try{await generateOrPlaySceneVoice(button)}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
-});
-document.querySelector('#storyboardBulkGenerate').addEventListener('click',async()=>{
-  try{await generateMissingStoryboardImages()}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
 });
 document.querySelector('#storyboardVoiceBulkGenerate').addEventListener('click',async()=>{
   try{await generateMissingSceneVoices()}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
