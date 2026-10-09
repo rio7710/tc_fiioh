@@ -16,6 +16,7 @@
 <script src="/01_app/assets/core/auth-ui-controller.js?v=20261009_v34"></script>
 <script src="/01_app/assets/core/project-hydration-controller.js?v=20261009_v36"></script>
 <script src="/01_app/assets/core/prompt-lab-controller.js?v=20261009_v37"></script>
+<script src="/01_app/assets/core/provider-settings-controller.js?v=20261009_v39"></script>
 <script src="/01_app/assets/core/project-store.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step-partial-loader.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step01/step01-project-index-controller.js?v=20261009_v31"></script>
@@ -1181,16 +1182,6 @@ function applyTimeline(timeline){
 }
 
 const SETTINGS_STORAGE_KEY='greenhill-p1-editor-settings-v1';
-let apiConnectionConfig=null;
-let activeApiStep=1;
-const apiStepCopy={
-  0:['전역 API 연결','공급자 인증을 한 곳에서 관리합니다. 각 STEP은 여기서 연결된 API를 필요한 작업에 가져갑니다.'],
-  1:['로그인 및 프로젝트','외부 API 호출 없이 프로젝트 담당자 정보를 확인합니다.'],
-  2:['키워드 · 스토리보드','OpenAI 또는 Anthropic 중 하나의 텍스트 API 연결이 필요합니다.'],
-  3:['대본 · 이미지 제작','Gemini(Nano Banana) 또는 OpenAI 이미지 연결이 필요합니다.'],
-  4:['영상 디자인 · 출력','BytePlus Seedance 또는 Kling 중 하나의 영상 API 연결이 필요합니다.'],
-  5:['콘텐츠 캘린더','플랫폼 게시 연결은 OAuth 워커 도입 시 이 화면에서 관리합니다. 현재 캘린더·ICS에는 키가 필요하지 않습니다.']
-};
 const SCRIPT_STORAGE_KEY='greenhill-script-saved-v1';
 const CALENDAR_STORAGE_KEY='greenhill-content-calendar-v2';
 const CALENDAR_UI_STORAGE_KEY='greenhill-content-calendar-ui-v1';
@@ -1386,84 +1377,18 @@ async function api(path,options={}){
   return result;
 }
 
-async function refreshApiConnections(){
-  apiConnectionConfig=await api('/api/provider-settings');
-  const button=document.querySelector('#globalApiSettings');
-  const providerIds=Object.keys(apiConnectionConfig.providers);const connected=providerIds.filter(id=>apiConnectionConfig.statuses[id]?.configured).length;
-  const requiredSteps=['2','3','4'];const ready=requiredSteps.every(step=>(apiConnectionConfig.steps[step]||[]).some(id=>apiConnectionConfig.statuses[id]?.configured));
-  button.classList.toggle('ready',ready);button.classList.toggle('needs-config',!ready);
-  button.textContent=`API 연결 설정 · ${connected}/${providerIds.length}`;
-  button.title=`전역 공급자 ${providerIds.length}개 중 ${connected}개 연결됨`;
-  return apiConnectionConfig;
-}
-
-function closeApiSettings(){
-  document.querySelector('#apiSettingsModal').hidden=true;
-  document.body.classList.remove('modal-open');
-  document.querySelector('#apiSettingsForm').reset();
-}
-
-async function openApiSettings(step){
-  activeApiStep=Number(step)||1;
-  const modal=document.querySelector('#apiSettingsModal');
-  const container=document.querySelector('#apiSettingsProviders');
-  const message=document.querySelector('#apiSettingsMessage');
-  message.textContent='';message.classList.remove('success');
-  try{await refreshApiConnections()}catch(error){message.textContent=error.message;apiConnectionConfig=null}
-  const copy=apiStepCopy[activeApiStep];
-  document.querySelector('#apiSettingsTitle').textContent=`STEP ${String(activeApiStep).padStart(2,'0')} · ${copy[0]}`;
-  document.querySelector('#apiSettingsDescription').textContent=copy[1];
-  const providerIds=apiConnectionConfig?Object.keys(apiConnectionConfig.providers):[];
-  const requiredIds=new Set(apiConnectionConfig?.steps[String(activeApiStep)]||[]);
-  if(!providerIds.length){
-    container.innerHTML=`<div class="api-provider"><div class="api-provider-head"><strong>별도 API 키 없음</strong><span class="api-provider-status connected">준비됨</span></div><p class="api-provider-guide">${escapeHtml(copy[1])}</p></div>`;
-  }else{
-    container.innerHTML=providerIds.map(id=>{
-      const provider=apiConnectionConfig.providers[id];const status=apiConnectionConfig.statuses[id];
-      const fields=provider.fields.map(field=>`<label class="api-provider-field">${escapeHtml(field.label)} · <code>${escapeHtml(field.env)}</code><input type="${field.secret?'password':'text'}" autocomplete="new-password" data-provider="${id}" data-field="${field.id}" placeholder="${status.configured?'연결됨 · 변경할 때만 새 값 입력':'서버로만 전송됩니다'}" ${apiConnectionConfig.hosted?'disabled':''}></label>`).join('');
-      const usedBy=Object.entries(apiConnectionConfig.steps).filter(([,ids])=>ids.includes(id)).map(([step])=>`STEP ${String(step).padStart(2,'0')}`).join(' · ');
-      return `<section class="api-provider${activeApiStep&&requiredIds.has(id)?' required-now':''}" data-provider-card="${id}"><div class="api-provider-head"><strong>${escapeHtml(provider.label)}</strong><span class="api-provider-status ${status.configured?'connected':''}">${status.configured?`연결됨 · ${status.source==='environment'?'환경변수':'현재 세션'}`:'연결 필요'}</span></div><p class="api-provider-guide">사용 단계 · ${escapeHtml(usedBy||'선택 연결')}</p><div class="api-provider-fields">${fields}</div><p class="api-provider-guide"><a href="${provider.docs}" target="_blank" rel="noopener">공식 API 키·인증 가이드 열기 ↗</a></p></section>`;
-    }).join('');
-  }
-  document.querySelector('#apiSettingsSave').hidden=!providerIds.length||Boolean(apiConnectionConfig?.hosted);
-  if(apiConnectionConfig?.hosted)message.textContent='공개 사이트에서는 키 노출 방지를 위해 입력이 잠겨 있습니다. Render Dashboard → Environment에 표시된 환경변수 이름으로 등록한 뒤 재배포하세요.';
-  modal.hidden=false;document.body.classList.add('modal-open');
-}
-
-async function ensureStepApiReady(step){
-  const config=await refreshApiConnections();
-  const providers=config.steps[String(step)]||[];
-  if(!providers.length||providers.some(provider=>config.statuses[provider]?.configured))return true;
-  await openApiSettings(step);return false;
-}
-
-document.querySelector('#globalApiSettings').addEventListener('click',()=>openApiSettings(0));
+const providerSettingsController=ThinkCastProviderSettingsController.create({getRoot:()=>document,request:(...args)=>api(...args),escapeHtml,setTimeout:(...args)=>setTimeout(...args)});
+providerSettingsController.mount(document);
+function refreshApiConnections(){return providerSettingsController.refresh()}
+function closeApiSettings(){return providerSettingsController.close()}
+function openApiSettings(step){return providerSettingsController.open(step)}
+function ensureStepApiReady(step){return providerSettingsController.ensureStepReady(step)}
 const promptLabController=ThinkCastPromptLabController.create({getRoot:()=>document,request:(...args)=>api(...args),fetch:(...args)=>fetch(...args),createTextDecoder:()=>new TextDecoder(),createEmptyBytes:()=>new Uint8Array()});
 promptLabController.mount(document);
 const platformGuideModal=document.querySelector('#platformGuideModal');
 function closePlatformGuide(){platformGuideModal.hidden=true;document.body.classList.remove('modal-open')}
 document.querySelector('#platformGuideClose').addEventListener('click',closePlatformGuide);
 platformGuideModal.addEventListener('pointerdown',event=>{if(event.target===platformGuideModal)closePlatformGuide()});
-document.querySelector('#apiSettingsClose').addEventListener('click',closeApiSettings);
-document.querySelector('#apiSettingsModal').addEventListener('pointerdown',event=>{if(event.target===event.currentTarget)closeApiSettings()});
-document.querySelector('#apiSettingsForm').addEventListener('submit',async event=>{
-  event.preventDefault();const message=document.querySelector('#apiSettingsMessage');const save=document.querySelector('#apiSettingsSave');
-  message.textContent='';message.classList.remove('success');save.disabled=true;
-  try{
-    const cards=[...document.querySelectorAll('[data-provider-card]')];let attempted=0;let latest='';
-    for(const card of cards){
-      const provider=card.dataset.providerCard;const inputs=[...card.querySelectorAll('[data-field]')];
-      if(!inputs.some(input=>input.value.trim()))continue;
-      if(inputs.some(input=>!input.value.trim()))throw new Error(`${card.querySelector('strong').textContent}: 필수 인증값을 모두 입력해 주세요.`);
-      const credentials=Object.fromEntries(inputs.map(input=>[input.dataset.field,input.value.trim()]));
-      const result=await api('/api/provider-settings',{method:'POST',body:JSON.stringify({provider,credentials})});
-      inputs.forEach(input=>input.value='');attempted++;latest=result.message;
-    }
-    if(!attempted)throw new Error('연결할 공급자의 인증값을 입력해 주세요. 이미 연결됐다면 닫기를 눌러 진행하세요.');
-    await refreshApiConnections();message.textContent=latest;message.classList.add('success');
-    setTimeout(()=>openApiSettings(activeApiStep),700);
-  }catch(error){message.textContent=error.message}finally{save.disabled=false}
-});
 function readContentRoute(){
   return shellNavigationController.readRoute();
 }
