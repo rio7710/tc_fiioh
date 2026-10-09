@@ -24,9 +24,10 @@
 <script src="/01_app/assets/steps/step02/step02-keyword.js?v=20261009_v41"></script>
 <script src="/01_app/assets/steps/step02/script-generation-controller.js?v=20261009_v42"></script>
 <script src="/01_app/assets/steps/step02/trend-keyword-controller.js?v=20261009_v40"></script>
-<script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
+<script src="/01_app/assets/steps/step03/step03-flow.js?v=20261009_v52"></script>
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
-<script src="/01_app/assets/steps/step03/storyboard-grid-renderer.js?v=20261009_v49"></script>
+<script src="/01_app/assets/steps/step03/storyboard-look-controller.js?v=20261009_v52"></script>
+<script src="/01_app/assets/steps/step03/storyboard-grid-renderer.js?v=20261009_v52"></script>
 <script src="/01_app/assets/steps/step03/storyboard-project-state-controller.js?v=20261009_v51"></script>
 <script src="/01_app/assets/steps/step03/voice-profile-controller.js?v=20261009_v48"></script>
 <script src="/01_app/assets/steps/step03/scene-voice-controller.js?v=20261009_v47"></script>
@@ -1246,11 +1247,9 @@ let storedStoryboardVideos=new Map();
 let storedStoryboardVideoCandidates=new Map();
 let storyboardLook='original';
 function applyStoryboardLook(look){
-  storyboardLook=['original','warm','cool','realistic'].includes(look)?look:'original';
-  document.querySelector('#storyboardGrid').dataset.look=storyboardLook;
-  document.querySelectorAll('.storyboard-look-btn').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.look===storyboardLook)));
-  if(activeProjectId)localStorage.setItem(`thinkcast-storyboard-look-${activeProjectId}`,storyboardLook);
+  return storyboardLookController.apply(look);
 }
+function restoreStoryboardLook(){return storyboardLookController.restore()}
 function setStoryboardImageCandidates(items){
   return storyboardProjectStateController.setImageCandidates(items||[]);
 }
@@ -2036,7 +2035,8 @@ const contentIndexController=Step01ContentIndexController.create({request:(...ar
 contentIndexController.mount(document);
 const scriptGenerationController=Step02ScriptGenerationController.create({getRoot:()=>document,configureWorkflowModal,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getSelectedKeywordLabels:selectedKeywordLabels,now:()=>Date.now(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),sleep,setGeneratedState:state=>{demoData.state=state},setGeneratedTimeline:timeline=>{demoData.timeline=timeline},setGeneratedDocument:value=>{activeStoryboardDocument=value},setKeywordLocked:setKeywordStageLocked,setVoiceProfile,applyTimeline,removeStoredScript:()=>localStorage.removeItem(SCRIPT_STORAGE_KEY),fillScript,applyScript,refreshProjectIndex,showStep});
 scriptGenerationController.mount(document);
-const storyboardGridRenderer=Step03StoryboardGridRenderer.create({getRoot:()=>document,storage:localStorage,getActiveProjectId:()=>activeProjectId,getStoryboardLook:()=>storyboardLook,applyStoryboardLook,getStoryboardDocument:()=>activeStoryboardDocument,getCurrentScriptLines:()=>currentScriptPayload().lines,getImages:()=>storedStoryboardImages,getImageCandidates:()=>storedStoryboardImageCandidates,getVoiceContext:sceneVoiceContext,getVideos:()=>storedStoryboardVideos,getVideoCandidates:()=>storedStoryboardVideoCandidates,escapeHtml,updateVoiceControls:updateStoryboardVoiceControls,resumePendingVideos:resumePendingSceneVideos});
+const storyboardLookController=Step03StoryboardLookController.create({getRoot:()=>document,storage:localStorage,getActiveProjectId:()=>activeProjectId,setCurrentLook:value=>{storyboardLook=value}});
+const storyboardGridRenderer=Step03StoryboardGridRenderer.create({getRoot:()=>document,restoreStoryboardLook,getStoryboardDocument:()=>activeStoryboardDocument,getCurrentScriptLines:()=>currentScriptPayload().lines,getImages:()=>storedStoryboardImages,getImageCandidates:()=>storedStoryboardImageCandidates,getVoiceContext:sceneVoiceContext,getVideos:()=>storedStoryboardVideos,getVideoCandidates:()=>storedStoryboardVideoCandidates,escapeHtml,updateVoiceControls:updateStoryboardVoiceControls,resumePendingVideos:resumePendingSceneVideos});
 const imageRegenerationController=Step04ImageRegenerationController.create({getRoot:()=>document,request:(...args)=>api(...args),sleep,now:()=>Date.now(),getActiveProjectId:()=>activeProjectId,getScenes:()=>scenes,getCurrentScene:()=>currentScene,getImageCandidates:()=>storedStoryboardImageCandidates,getRegenerationRequests:()=>demoData?.state?.image_regeneration_requests||[],setDemoState:state=>{demoData.state=state},getMainVideo:()=>document.querySelector('#video'),getBody:()=>document.body,onError:(feature,error)=>console.error(`[ImageRegeneration:${feature}]`,error)});
 const voiceProfileController=Step03VoiceProfileController.create({getRoot:()=>document,request:(...args)=>api(...args),fetch:(...args)=>fetch(...args),createObjectURL:blob=>URL.createObjectURL(blob),revokeObjectURL:url=>URL.revokeObjectURL(url),getActiveProjectId:()=>activeProjectId,getSelectedProfile:()=>selectedVoiceProfile,setSelectedProfile:value=>{selectedVoiceProfile=value},onError:(feature,error)=>console.error(`[VoiceProfile:${feature}]`,error)});
 voiceProfileController.mount(document);

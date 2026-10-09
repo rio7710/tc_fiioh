@@ -30,6 +30,7 @@ assert.match(shellHtml, /step03-storyboard\.html/, 'shell loads the storyboard f
 assert.doesNotMatch(shellHtml, /id="step3"|id="step31"/, 'step 3 markup is not duplicated inline');
 
 assert.doesNotMatch(scriptHtml + storyboardHtml, /<script\b|onclick=/i, 'fragments are safe to inject and do not duplicate script execution');
+assert.match(shellHtml, /step03-flow\.js\?v=20261009_v52/, 'shell cache-busts the Step 3 flow helper');
 assert.match(shellHtml, /step03-script-editor-controller\.js\?v=20261009_v38/, 'shell cache-busts the Step 3 script editor controller');
 assert.match(shellHtml, /const scriptEditorController=Step03ScriptEditorController\.create\(/, 'shell wires the Step 3 script editor controller');
 assert.match(shellHtml, /scriptEditorController\.mount\(document\)/, 'shell mounts Step 3 script editor interactions');
@@ -49,12 +50,6 @@ assert.equal(Step03Flow.duration(timeline), 13.25, 'duration is read from the fi
 assert.equal(Step03Flow.storyboardRows({ scenes: [] }).length, 0, 'scene count is data-driven');
 assert.equal(Step03Flow.duration({ scenes: [] }), 0, 'empty timeline has no invented timing');
 
-const buttons = ['original', 'warm', 'cool', 'realistic'].map(look => ({ dataset: { look }, pressed: '', setAttribute(name, value) { if (name === 'aria-pressed') this.pressed = value; } }));
-const grid = { dataset: {} };
-const root = { querySelector: selector => selector === '#storyboardGrid' ? grid : null, querySelectorAll: () => buttons };
-assert.equal(Step03Flow.setLook(root, 'cool'), 'cool');
-assert.equal(grid.dataset.look, 'cool');
-assert.equal(buttons.find(button => button.dataset.look === 'cool').pressed, 'true');
-assert.equal(Step03Flow.setLook(root, 'unknown'), 'original', 'invalid looks use the existing original default');
+assert.equal('setLook' in Step03Flow, false, 'storyboard look state is not duplicated in Step03Flow');
 
 console.log('Step 3 fragment and data-driven behavior tests passed.');

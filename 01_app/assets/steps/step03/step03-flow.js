@@ -25,17 +25,5 @@
     return scenes.length ? Number(scenes[scenes.length - 1].end) || 0 : 0;
   }
 
-  function setLook(rootElement, requestedLook) {
-    const allowed = ['original', 'warm', 'cool', 'realistic'];
-    const look = allowed.includes(requestedLook) ? requestedLook : 'original';
-    if (!rootElement) return look;
-    const grid = rootElement.querySelector('#storyboardGrid');
-    if (grid) grid.dataset.look = look;
-    rootElement.querySelectorAll('.storyboard-look-btn').forEach(button => {
-      button.setAttribute('aria-pressed', String(button.dataset.look === look));
-    });
-    return look;
-  }
-
-  return { timelineScenes, scriptRows, storyboardRows, duration, setLook };
+  return { timelineScenes, scriptRows, storyboardRows, duration };
 }));
