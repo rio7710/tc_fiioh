@@ -48,6 +48,7 @@ const candidateSelectionControllerPath = '01_app/assets/steps/step03/candidate-s
 const sceneVoiceControllerPath = '01_app/assets/steps/step03/scene-voice-controller.js';
 const voiceProfileControllerPath = '01_app/assets/steps/step03/voice-profile-controller.js';
 const storyboardGridRendererPath = '01_app/assets/steps/step03/storyboard-grid-renderer.js';
+const imageRegenerationControllerPath = '01_app/assets/steps/step04/step04-image-regeneration-controller.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
@@ -91,6 +92,7 @@ assert.ok(fs.existsSync(candidateSelectionControllerPath), 'candidate-selection-
 assert.ok(fs.existsSync(sceneVoiceControllerPath), 'scene-voice-controller.js must exist');
 assert.ok(fs.existsSync(voiceProfileControllerPath), 'voice-profile-controller.js must exist');
 assert.ok(fs.existsSync(storyboardGridRendererPath), 'storyboard-grid-renderer.js must exist');
+assert.ok(fs.existsSync(imageRegenerationControllerPath), 'step04-image-regeneration-controller.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
@@ -256,6 +258,7 @@ const step04SettingsScript = html.indexOf('/01_app/assets/steps/step04/step04-se
 const step04StyleScript = html.indexOf('/01_app/assets/steps/step04/step04-style-controller.js');
 const step04TimelineOrchestratorScript = html.indexOf('/01_app/assets/steps/step04/step04-timeline-orchestrator.js');
 const step04LifecycleScript = html.indexOf('/01_app/assets/steps/step04/step04-lifecycle-controller.js');
+const step04ImageRegenerationScript = html.indexOf('/01_app/assets/steps/step04/step04-image-regeneration-controller.js');
 const step04UIActionsScript = html.indexOf('/01_app/assets/steps/step04/step04-ui-actions-controller.js');
 const step04RenderScript = html.indexOf('/01_app/assets/steps/step04/step04-render-controller.js');
 const step04NavigationScript = html.indexOf('/01_app/assets/steps/step04/step04-navigation-controller.js');
@@ -279,7 +282,7 @@ assert.ok(step04PlaybackScript < step04SettingsScript && step04SettingsScript < 
 assert.ok(step04SettingsScript < step04StyleScript && step04StyleScript < step04NavigationScript, 'style controller loads before Step 4 controllers');
 assert.ok(step04StyleScript < step04TimelineOrchestratorScript && step04TimelineOrchestratorScript < step04NavigationScript, 'timeline orchestrator loads before Step 4 controllers');
 assert.ok(step04TimelineOrchestratorScript < step04LifecycleScript && step04LifecycleScript < step04NavigationScript, 'lifecycle controller loads before Step 4 controllers');
-assert.ok(step04LifecycleScript < step04UIActionsScript && step04UIActionsScript < step04NavigationScript, 'UI actions controller loads before Step 4 controllers');
+assert.ok(step04LifecycleScript < step04ImageRegenerationScript && step04ImageRegenerationScript < step04UIActionsScript && step04UIActionsScript < step04NavigationScript, 'image regeneration loads before UI actions and Step 4 controllers');
 assert.ok(step04PlaybackScript < step04RenderScript && step04RenderScript < step04NavigationScript, 'render controller loads before Step 4 controllers');
 assert.ok(step04NavigationScript < step04BindingsScript, 'Step 4 navigation controller loads before UI bindings');
 assert.ok(videoEditorIndexScript < step04StoreScript, 'Step 4 store loads after video editor dependencies');
@@ -309,6 +312,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-settings-contro
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-style-controller\.js\?v=20261008_v15"/, 'HTML cache-busts style controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-orchestrator\.js\?v=20261008_v22"/, 'HTML cache-busts timeline orchestrator');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-lifecycle-controller\.js\?v=20261008_v18"/, 'HTML cache-busts lifecycle controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-image-regeneration-controller\.js\?v=20261009_v50"/, 'HTML cache-busts image regeneration controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-actions-controller\.js\?v=20261008_v25"/, 'HTML cache-busts UI actions controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-render-controller\.js\?v=20261008_v13"/, 'HTML cache-busts render controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261008_v22"/, 'HTML cache-busts Step 4 controller');
@@ -334,9 +338,11 @@ assert.ok(html.indexOf(brandStateDeclaration) > 0 && html.indexOf(brandStateDecl
 assert.doesNotMatch(html, /let (?:watermarkPosition|watermarkWidthRatio|watermarkProfiles|outroPosition|outroWidthRatio|outroBackground|outroBackgroundOpacity|outroProfiles)=/, 'brand overlay state must not be duplicated in P1 globals');
 assert.doesNotMatch(html, /window\.startRenderWorkflow=async function/, 'P1 does not retain the large render workflow implementation');
 assert.match(html, /window\.startRenderWorkflow=\(\)=>renderController\.start\(\);/, 'P1 keeps a thin render workflow compatibility wrapper');
-for (const shellAction of ['openImageRegeneration','closeImageRegeneration','requestImageRegeneration']) {
-  assert.match(html, new RegExp(`(?:async )?function ${shellAction}\\(`), `P1 retains the real ${shellAction} shell implementation`);
-}
+assert.match(html, /function openImageRegeneration\(\)\{\s*return imageRegenerationController\.open\(\);\s*\}/, 'P1 keeps thin image regeneration open wrapper');
+assert.match(html, /function closeImageRegeneration\(resetCreate=true\)\{\s*return imageRegenerationController\.close\(resetCreate\);\s*\}/, 'P1 keeps thin image regeneration close wrapper');
+assert.match(html, /async function requestImageRegeneration\(\)\{\s*return imageRegenerationController\.request\(\);\s*\}/, 'P1 keeps thin image regeneration request wrapper');
+assert.doesNotMatch(html, /const additionalPrompt=imageAdditionalPrompt\.value\.trim\(\)|imageRegenerationSceneNo\.textContent=/, 'P1 removes legacy image regeneration implementation');
+assert.match(fs.readFileSync(imageRegenerationControllerPath, 'utf8'), /\/api\/image\/regenerate[\s\S]*preserve_existing: true/, 'image regeneration controller owns exact request contract');
 assert.match(step04Source, /hasShellFeature:\s*name\s*=>\s*typeof window !== 'undefined'\s*&&\s*typeof window\[name\] === 'function'/, 'Step 4 wires explicit shell feature detection');
 assert.match(step04Source, /callShellFeature:\s*\(name, \.\.\.args\)\s*=>\s*callShellFeature\(name, \.\.\.args\)/, 'Step 4 wires the shell feature adapter');
 assert.equal((html.match(/function renderSceneList\(\)/g) || []).length, 1, 'P1 keeps only the final Step04VideoEditor renderSceneList compatibility wrapper');
@@ -482,6 +488,7 @@ function createPrePartialContext() {
     Step04BrandStagePreview: require('../01_app/assets/steps/step04/step04-brand-stage-preview.js'),
     BrandOverlayController: require('../01_app/assets/steps/step04/step04-brand-overlay.js'),
     Step04TimelineBridge: require('../01_app/assets/steps/step04/step04-timeline-bridge.js'),
+    Step04ImageRegenerationController: require('../01_app/assets/steps/step04/step04-image-regeneration-controller.js'),
     Step04RenderController: require('../01_app/assets/steps/step04/step04-render-controller.js'),
     Step04NavigationController: require('../01_app/assets/steps/step04/step04-navigation-controller.js'),
     setInterval: () => 1,

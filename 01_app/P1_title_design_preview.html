@@ -54,6 +54,7 @@
 <script src="/01_app/assets/steps/step04/step04-style-controller.js?v=20261008_v15"></script>
 <script src="/01_app/assets/steps/step04/step04-timeline-orchestrator.js?v=20261008_v22"></script>
 <script src="/01_app/assets/steps/step04/step04-lifecycle-controller.js?v=20261008_v18"></script>
+<script src="/01_app/assets/steps/step04/step04-image-regeneration-controller.js?v=20261009_v50"></script>
 <script src="/01_app/assets/steps/step04/step04-ui-actions-controller.js?v=20261008_v25"></script>
 <script src="/01_app/assets/steps/step04/step04-render-controller.js?v=20261008_v13"></script>
 <script src="/01_app/assets/steps/step04/step04-navigation-controller.js?v=20261007_v7"></script>
@@ -1296,85 +1297,22 @@ function setLoginAccess(enabled,account=null){
 
 const fmt=s=>{const n=Math.max(0,Math.floor(s||0));return `${String(Math.floor(n/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`};
 function sceneImageRequests(sceneIndex){
-  return (demoData?.state?.image_regeneration_requests||[]).filter(item=>Number(item.scene_index)===sceneIndex);
+  return imageRegenerationController.requestsForScene(sceneIndex);
 }
 function updateImageVariantCount(){
-  const sceneIndex=Math.max(0,currentScene);
-  const candidates=storedStoryboardImageCandidates.get(scenes[sceneIndex]?.id)||[];
-  if(candidates.length){
-    const selectedIndex=Math.max(0,candidates.findIndex(item=>item.uri===scenes[sceneIndex]?.image));
-    imageVariantCount.textContent=`후보 ${selectedIndex+1} / ${candidates.length}`;
-    return;
-  }
-  const requests=sceneImageRequests(sceneIndex).length;
-  imageVariantCount.textContent=requests?`후보 1 + 요청 ${requests}`:'후보 1';
+  return imageRegenerationController.updateVariantCount();
 }
 function sceneBaseGuide(scene){
-  const narration=scene.text?` 내레이션 “${scene.text.replace(/\n/g,' ')}”의 의미와 감정 흐름을 반영합니다.`:' 타이틀이 없는 연결 장면의 자연스러운 흐름을 유지합니다.';
-  return `“${scene.name}” 장면의 기존 캐릭터, 공간, 구도, 조명과 그린힐의 따뜻하고 안정적인 브랜드 톤을 변경하지 않습니다.${narration}`;
+  return imageRegenerationController.baseGuide(scene);
 }
 function openImageRegeneration(){
-  const sceneIndex=Math.max(0,currentScene);
-  const scene=scenes[sceneIndex];
-  const mainVideo=typeof video!=='undefined'&&video?video:document.querySelector('#video');
-  if(mainVideo&&typeof mainVideo.pause==='function'){try{mainVideo.pause()}catch(e){}}
-  imageRegenerationSceneNo.textContent=`SCENE ${String(sceneIndex+1).padStart(2,'0')} · IMAGE VARIATION`;
-  document.querySelector('#imageRegenerationTitle').textContent=`${scene.name} · 후보 추가`;
-  imageBaseGuide.textContent=sceneBaseGuide(scene);
-  imageAdditionalPrompt.value='';
-  imageRegenerationFeedback.textContent='';
-  imageRegenerationModal.dataset.sceneIndex=String(sceneIndex);
-  imageRegenerationModal.hidden=false;
-  document.body.classList.add('modal-open');
-  imageAdditionalPrompt.focus();
+  return imageRegenerationController.open();
 }
 function closeImageRegeneration(resetCreate=true){
-  imageRegenerationModal.hidden=true;
-  if(resetCreate)imageRegenerationCreate.disabled=false;
-  document.body.classList.remove('modal-open');
+  return imageRegenerationController.close(resetCreate);
 }
 async function requestImageRegeneration(){
-  const additionalPrompt=imageAdditionalPrompt.value.trim();
-  if(!additionalPrompt){imageRegenerationFeedback.textContent='추가하고 싶은 내용을 입력해 주세요.';imageAdditionalPrompt.focus();return}
-  const sceneIndex=Number(imageRegenerationModal.dataset.sceneIndex||0);
-  imageRegenerationCreate.disabled=true;
-  imageRegenerationFeedback.textContent='';
-  closeImageRegeneration(false);
-  imageRegenerateBtn.disabled=true;
-  imageVariantCount.textContent='새 후보 생성 중…';
-  stage.classList.add('is-image-generating');
-  imageGenerationMosaic.classList.remove('is-complete');
-  imageGenerationMosaic.hidden=false;
-  imageGenerationStatus.classList.remove('is-complete');
-  imageGenerationStatusText.textContent='생성 중입니다.';
-  imageGenerationStatus.hidden=false;
-  const demoStartedAt=Date.now();
-  try{
-    const result=await api('/api/image/regenerate',{method:'POST',body:JSON.stringify({scene_index:sceneIndex,additional_prompt:additionalPrompt,preserve_existing:true})});
-    await sleep(Math.max(0,1600-(Date.now()-demoStartedAt)));
-    demoData.state=result.state;
-    imageAdditionalPrompt.value='';
-    updateImageVariantCount();
-    imageGenerationMosaic.classList.add('is-complete');
-    imageGenerationStatus.classList.add('is-complete');
-    imageGenerationStatusText.textContent='생성이 완료되었습니다.';
-    stage.classList.remove('is-image-generating');
-    await sleep(1000);
-    imageGenerationMosaic.hidden=true;
-    imageGenerationStatus.hidden=true;
-  }catch(error){
-    imageGenerationMosaic.hidden=true;
-    imageGenerationStatus.hidden=true;
-    stage.classList.remove('is-image-generating');
-    imageRegenerationFeedback.textContent=error.message;
-    imageRegenerationModal.hidden=false;
-    document.body.classList.add('modal-open');
-    imageAdditionalPrompt.focus();
-  }finally{
-    imageRegenerationCreate.disabled=false;
-    imageRegenerateBtn.disabled=false;
-    if(imageRegenerationModal.hidden)updateImageVariantCount();
-  }
+  return imageRegenerationController.request();
 }
 let frontendApi=null;
 async function api(path,options={}){
@@ -2123,6 +2061,7 @@ contentIndexController.mount(document);
 const scriptGenerationController=Step02ScriptGenerationController.create({getRoot:()=>document,configureWorkflowModal,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getSelectedKeywordLabels:selectedKeywordLabels,now:()=>Date.now(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),sleep,setGeneratedState:state=>{demoData.state=state},setGeneratedTimeline:timeline=>{demoData.timeline=timeline},setGeneratedDocument:value=>{activeStoryboardDocument=value},setKeywordLocked:setKeywordStageLocked,setVoiceProfile,applyTimeline,removeStoredScript:()=>localStorage.removeItem(SCRIPT_STORAGE_KEY),fillScript,applyScript,refreshProjectIndex,showStep});
 scriptGenerationController.mount(document);
 const storyboardGridRenderer=Step03StoryboardGridRenderer.create({getRoot:()=>document,storage:localStorage,getActiveProjectId:()=>activeProjectId,getStoryboardLook:()=>storyboardLook,applyStoryboardLook,getStoryboardDocument:()=>activeStoryboardDocument,getCurrentScriptLines:()=>currentScriptPayload().lines,getImages:()=>storedStoryboardImages,getImageCandidates:()=>storedStoryboardImageCandidates,getVoiceContext:sceneVoiceContext,getVideos:()=>storedStoryboardVideos,getVideoCandidates:()=>storedStoryboardVideoCandidates,escapeHtml,updateVoiceControls:updateStoryboardVoiceControls,resumePendingVideos:resumePendingSceneVideos});
+const imageRegenerationController=Step04ImageRegenerationController.create({getRoot:()=>document,request:(...args)=>api(...args),sleep,now:()=>Date.now(),getActiveProjectId:()=>activeProjectId,getScenes:()=>scenes,getCurrentScene:()=>currentScene,getImageCandidates:()=>storedStoryboardImageCandidates,getRegenerationRequests:()=>demoData?.state?.image_regeneration_requests||[],setDemoState:state=>{demoData.state=state},getMainVideo:()=>document.querySelector('#video'),getBody:()=>document.body,onError:(feature,error)=>console.error(`[ImageRegeneration:${feature}]`,error)});
 const voiceProfileController=Step03VoiceProfileController.create({getRoot:()=>document,request:(...args)=>api(...args),fetch:(...args)=>fetch(...args),createObjectURL:blob=>URL.createObjectURL(blob),revokeObjectURL:url=>URL.revokeObjectURL(url),getActiveProjectId:()=>activeProjectId,getSelectedProfile:()=>selectedVoiceProfile,setSelectedProfile:value=>{selectedVoiceProfile=value},onError:(feature,error)=>console.error(`[VoiceProfile:${feature}]`,error)});
 voiceProfileController.mount(document);
 const sceneVoiceController=Step03SceneVoiceController.create({getRoot:()=>document,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getStoryboardDocument:()=>activeStoryboardDocument,getVoiceClips:()=>storedStoryboardVoiceClips,getSelectedVoiceProfile:()=>selectedVoiceProfile,setDemoTimeline:timeline=>{demoData.timeline=timeline},applyTimeline,onError:(feature,error)=>console.error(`[SceneVoice:${feature}]`,error)});
