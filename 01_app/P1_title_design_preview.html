@@ -74,6 +74,7 @@
 <script src="/01_app/assets/steps/step04/step04-video.js?v=20261008_v22"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar.js?v=20261009_v63"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-store.js?v=20261009_v64"></script>
+<script src="/01_app/assets/steps/step05/step05-calendar-view-controller.js?v=20261009_v65"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css?v=20261007_v2">
@@ -1230,8 +1231,6 @@ const calendarPreviewVersionNext=document.querySelector('#calendarPreviewVersion
 const calendarPreviewVersionCount=document.querySelector('#calendarPreviewVersionCount');
 let calendarPreviewVersions=[];
 let calendarPreviewVersionIndex=0;
-let calendarCursor=new Date();
-let calendarView='month';
 let calendarEntries=[];
 let calendarSettingsGroup=[];
 let calendarLongPressTimer=null;
@@ -1531,14 +1530,10 @@ function saveCalendarEntries(){
   return calendarStore.save(calendarEntries);
 }
 function loadCalendarUi(){
-  try{
-    const saved=JSON.parse(localStorage.getItem(CALENDAR_UI_STORAGE_KEY)||'null')||{};
-    if(['month','week','day'].includes(saved.view))calendarView=saved.view;
-    if(/^\d{4}-\d{2}-\d{2}$/.test(saved.cursor||''))calendarCursor=new Date(`${saved.cursor}T12:00:00`);
-  }catch(error){}
+  return calendarViewController.load();
 }
 function saveCalendarUi(){
-  try{localStorage.setItem(CALENDAR_UI_STORAGE_KEY,JSON.stringify({view:calendarView,cursor:dateKey(calendarCursor)}))}catch(error){}
+  return calendarViewController.save();
 }
 function exportPreviewClass(item){
   const width=Number(item?.width);const height=Number(item?.height);
@@ -1623,6 +1618,7 @@ function renderCalendarTimeGrid(dates){
   return `<div class="calendar-time-head"><span class="time-zone">24H</span>${headers}</div><div class="calendar-time-body"><div class="calendar-hour-axis">${hours}</div><div class="calendar-time-columns">${columns}</div></div>`;
 }
 function renderCalendar({preserveScroll=false}={}){
+  const {view:calendarView,cursor:calendarCursor}=calendarViewController.snapshot();
   const scroller=calendarGrid.parentElement;
   const previousScroll={top:scroller.scrollTop,left:scroller.scrollLeft,pageX:window.scrollX,pageY:window.scrollY};
   const year=calendarCursor.getFullYear();
@@ -1805,8 +1801,7 @@ function openCalendarSettings(groupId){
   calendarSettingsDate.focus();
 }
 function moveCalendarPeriod(direction){
-  if(calendarView==='month')calendarCursor=new Date(calendarCursor.getFullYear(),calendarCursor.getMonth()+direction,1);
-  else{const date=new Date(calendarCursor);date.setDate(date.getDate()+direction*(calendarView==='week'?7:1));calendarCursor=date}
+  calendarViewController.move(direction);
   renderCalendar();
 }
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -2052,8 +2047,7 @@ Object.defineProperty(window,'brandAssets',{configurable:true,get:()=>brandSelec
 document.querySelector('#calendarPrev').addEventListener('click',()=>moveCalendarPeriod(-1));
 document.querySelector('#calendarNext').addEventListener('click',()=>moveCalendarPeriod(1));
 document.querySelectorAll('.calendar-view-btn').forEach(button=>button.addEventListener('click',()=>{
-  calendarView=button.dataset.calendarView;
-  if(calendarView==='day')calendarCursor=new Date();
+  calendarViewController.selectView(button.dataset.calendarView);
   renderCalendar();
 }));
 document.querySelector('#calendarExport').addEventListener('click',exportCalendarIcs);
@@ -2062,8 +2056,8 @@ calendarGrid.addEventListener('click',event=>{
   if(calendarLongPressOpened){calendarLongPressOpened=false;return}
   const sticker=event.target.closest('.calendar-sticker');
   if(sticker){openCalendarPreview(sticker.dataset.groupId);return}
-  const day=event.target.closest('.calendar-day,.calendar-time-column');if(!day||calendarView==='day')return;
-  calendarCursor=new Date(`${day.dataset.date}T12:00:00`);calendarView='day';renderCalendar();
+  const day=event.target.closest('.calendar-day,.calendar-time-column');if(!day||calendarViewController.snapshot().view==='day')return;
+  calendarViewController.selectDate(day.dataset.date);renderCalendar();
 });
 calendarGrid.addEventListener('dragstart',event=>{
   const sticker=event.target.closest('.calendar-sticker');if(!sticker)return;
@@ -2142,7 +2136,7 @@ document.querySelector('#calendarSettingsSave').addEventListener('click',()=>{
     if(status==='published')item.extendedProps.distributedAt=timestamp;
     if(status==='deleted')item.extendedProps.deletedAt=timestamp;
   });
-  calendarCursor=new Date(`${nextDate}T12:00:00`);
+  calendarViewController.setCursor(nextDate);
   saveCalendarEntries();closeCalendarSettings();renderCalendar();
   calendarHelp.textContent='스티커의 날짜와 플랫폼별 파이프라인 시간을 저장했습니다.';
 });
@@ -2150,6 +2144,7 @@ calendarSettingsModal.addEventListener('pointerdown',event=>{if(event.target===c
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!calendarSettingsModal.hidden)closeCalendarSettings()});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!platformGuideModal.hidden)closePlatformGuide()});
 const calendarStore=Step05CalendarStore.create({storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:(...args)=>api(...args),collapseDuplicates:Step05Calendar.collapseDuplicates,uniquenessKey:Step05Calendar.uniquenessKey});
+const calendarViewController=Step05CalendarViewController.create({storage:localStorage,storageKey:CALENDAR_UI_STORAGE_KEY,now:()=>new Date(),isDateKey:value=>/^\d{4}-\d{2}-\d{2}$/.test(value||''),dateKey:Step05Calendar.dateKey});
 loadCalendarUi();
 loadCalendarEntries();
 loadLatestExport();
