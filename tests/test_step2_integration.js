@@ -4,8 +4,9 @@ const fs = require('node:fs');
 const partialPath = '01_app/pages/steps/step02-keyword.html';
 const cssPath = '01_app/assets/steps/step02/step02-keyword.css';
 const jsPath = '01_app/assets/steps/step02/step02-keyword.js';
+const trendControllerPath = '01_app/assets/steps/step02/trend-keyword-controller.js';
 
-for (const path of [partialPath, cssPath, jsPath]) assert.ok(fs.existsSync(path), `${path} must exist`);
+for (const path of [partialPath, cssPath, jsPath, trendControllerPath]) assert.ok(fs.existsSync(path), `${path} must exist`);
 
 const html = fs.readFileSync(partialPath, 'utf8');
 const ids = ['step2', 'keywordGrid', 'trendKeywordMonth', 'selectionCount', 'trendKeywordOpen', 'tokenUsage', 'keywordRefresh', 'keywordMessage', 'keywordNext'];
@@ -14,11 +15,15 @@ assert.match(html, /data-go="index"/, 'back-navigation contract is preserved');
 assert.match(html, /role="status" aria-live="polite"/, 'save errors remain accessible');
 
 const source = fs.readFileSync(jsPath, 'utf8');
+const trendSource = fs.readFileSync(trendControllerPath, 'utf8');
 assert.match(source, /root\.Step02Keyword = factory\(\)/, 'browser global adapter is exported');
 assert.match(source, /['"]\/api\/keywords['"]/, 'existing keyword save endpoint is preserved');
 assert.doesNotMatch(source, /greenhill-demo-v1/, 'project identity is never hardcoded');
 assert.doesNotMatch(source, /const\s+keywords\s*=\s*\[/, 'keyword content is supplied by the shell');
 assert.doesNotMatch(html, /value="20\d\d-\d\d"/, 'available keyword months are supplied by configuration');
+assert.match(trendSource, /root\.Step02TrendKeywordController = api/, 'trend keyword browser controller is exported');
+assert.match(trendSource, /['"]\/api\/season-keywords['"]/, 'trend keyword endpoint is owned by its controller');
+assert.doesNotMatch(trendSource, /document\.|window\./, 'trend controller has no direct browser global dependency');
 
 const Step02Keyword = require('../01_app/assets/steps/step02/step02-keyword.js');
 assert.equal(Step02Keyword.MAX_SELECTION, 5);

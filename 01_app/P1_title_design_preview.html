@@ -22,6 +22,7 @@
 <script src="/01_app/assets/steps/step01/step01-project-index-controller.js?v=20261009_v31"></script>
 <script src="/01_app/assets/steps/step01/step01-content-index-controller.js?v=20261009_v30"></script>
 <script src="/01_app/assets/steps/step02/step02-keyword.js?v=20261007_v2"></script>
+<script src="/01_app/assets/steps/step02/trend-keyword-controller.js?v=20261009_v40"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
 <script src="/01_app/assets/video-editor/scene-navigation.js?v=20261007_v2"></script>
@@ -1436,8 +1437,6 @@ function beginNav(){return shellNavigationController.begin()}
 function isStaleNav(token){return shellNavigationController.isStale(token)}
 let selectedVoiceProfile='warm_female';
 let seasonalKeywordIds=new Set();
-let trendKeywordChoices=[];
-let trendKeywordSelection=new Set();
 let keywordStageLocked=false;
 function setKeywordStageLocked(locked){
   keywordStageLocked=Boolean(locked);
@@ -1461,7 +1460,6 @@ function updateContentUuidLabels(){
   });
 }
 function showTokenUsage(usage){document.querySelector('#tokenUsage').textContent=`API ${(Number(usage?.total_tokens)||0).toLocaleString('ko-KR')} tokens · ${Number(usage?.requests)||0}회`}
-function renderTrendKeywords(){const grid=document.querySelector('#trendKeywordGrid');grid.innerHTML=trendKeywordChoices.length?trendKeywordChoices.map(item=>`<button class="trend-keyword-card ${trendKeywordSelection.has(item.id)?'selected':''}" type="button" data-trend-keyword="${escapeHtml(item.id)}"><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.description)}</small></button>`).join(''):'<p class="trend-keyword-empty">추천 키워드가 없습니다.</p>'}
 function projectDate(value){return value?new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value)).replace(/\. /g,'.').replace(/\.$/,''):'—'}
 function automationStageLabel(stage){if(!stage||stage==='create_project')return '콘텐츠 생성';if(stage.startsWith('keywords_'))return '키워드 선정';if(stage.startsWith('script_'))return '대본·타임라인';if(stage.startsWith('voice_'))return '음성 준비';if(stage==='video_scene_selection')return '영상 장면 선택';if(stage.startsWith('image_'))return '장면 이미지 생성';if(stage.startsWith('video_submit_')||stage.startsWith('video_complete_'))return '장면 영상 변환';if(stage.startsWith('crop_'))return '사람 위치 조정';if(stage==='video_design')return '영상 디자인';if(stage==='final_export_calendar')return '영상 제작·캘린더';return stage}
 function projectCreatedDate(value){if(!value)return '날짜 미정';const parts=Object.fromEntries(new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'}).formatToParts(new Date(value)).map(part=>[part.type,part.value]));return `${parts.year}년 ${parts.month}월 ${parts.day}일 ${parts.weekday}`}
@@ -2540,37 +2538,8 @@ shellNavigationController.mount(document);
 const sessionBootstrapController=ThinkCastSessionBootstrapController.create({request:(...args)=>api(...args),navigation:shellNavigationController,setLoginAccess,refreshProjectIndex,hydrateCalendarEntries,getActiveProjectId:()=>activeProjectId,openIndexProject,loadProjectState,loadProjectContent,setContentIndexError});
 const contentIndexController=Step01ContentIndexController.create({request:(...args)=>api(...args),getProjects:()=>indexProjects,getActiveProjectId:()=>activeProjectId,beginNav,setActiveProjectId,showStep,showBrandLibrary,navigateProjectStep,resetProjectScopedState,setKeywordStageLocked,setVoiceProfile,getKeywords:()=>demoData.keywords,setVisibleKeywordIds:ids=>{visibleKeywordIds=ids},renderKeywords,refreshProjectIndex,confirm:message=>confirm(message),alert:message=>alert(message),escapeHtml,projectCreatedDate});
 contentIndexController.mount(document);
-let trendRequestVersion=0;
-function setTrendKeywordLoading(loading){
-  document.querySelector('#trendKeywordLoading').hidden=!loading;
-  document.querySelector('#trendKeywordGrid').hidden=loading;
-  document.querySelector('#trendKeywordGrid').setAttribute('aria-busy',String(loading));
-  document.querySelector('#trendKeywordOpen').textContent=loading?'AI 추천 생성 중…':'AI 트렌드 추천';
-}
-document.querySelector('#trendKeywordOpen').addEventListener('click',async()=>{
-  const message=document.querySelector('#keywordMessage');
-  if(!activeProjectId||keywordStageLocked){message.textContent='키워드를 편집할 콘텐츠를 먼저 선택해 주세요.';return}
-  if(selectedKeywords.size>=5){const warning=document.querySelector('#trendKeywordLimitModal');if(warning){warning.hidden=false;document.body.classList.add('modal-open')}return}
-  const projectId=activeProjectId, version=++trendRequestVersion;
-  const button=document.querySelector('#trendKeywordOpen'), apply=document.querySelector('#trendKeywordApply');
-  const modal=document.querySelector('#trendKeywordModal'), status=document.querySelector('#trendKeywordMessage');
-  button.disabled=true;apply.disabled=true;modal.hidden=false;document.body.classList.add('modal-open');
-  status.textContent='요양원 계절·행사 추천 후보를 불러오고 있습니다…';
-  trendKeywordChoices=[];trendKeywordSelection.clear();renderTrendKeywords();setTrendKeywordLoading(true);
-  try{
-    const result=await api('/api/season-keywords',{method:'POST',body:JSON.stringify({project_id:projectId,refresh:true,month:document.querySelector('#trendKeywordMonth').value})});
-    if(version!==trendRequestVersion||projectId!==activeProjectId||modal.hidden)return;
-    trendKeywordChoices=result.keywords||[];showTokenUsage(result.usage);
-    document.querySelector('#trendTokenUsage').textContent=document.querySelector('#tokenUsage').textContent;
-    status.textContent=result.source==='monthly_pool'?`${result.month} 요양원 후보 ${result.pool_size}개에서 무작위 추천 · 남은 후보 ${result.remaining}개 · 외부 API 호출 없음${result.cycled?' · 후보를 한 바퀴 돌아 다시 섞었습니다.':''}`:'기존 추천과 다른 키워드를 실제 API로 받았습니다. 닫고 다시 추천하면 새로 요청합니다.';
-    renderTrendKeywords();apply.disabled=false;
-  }catch(error){if(version===trendRequestVersion&&projectId===activeProjectId&&!modal.hidden){status.textContent=error.message;renderTrendKeywords()}}
-  finally{if(version===trendRequestVersion){setTrendKeywordLoading(false);button.disabled=keywordStageLocked}}
-});
-document.querySelector('#trendKeywordGrid').addEventListener('click',event=>{const card=event.target.closest('[data-trend-keyword]');if(!card)return;const id=card.dataset.trendKeyword;const trendIds=new Set(trendKeywordChoices.map(item=>item.id));const baseCount=[...selectedKeywords].filter(item=>!trendIds.has(item)).length;if(trendKeywordSelection.has(id))trendKeywordSelection.delete(id);else if(baseCount+trendKeywordSelection.size<5)trendKeywordSelection.add(id);else{document.querySelector('#trendKeywordMessage').textContent='기존 선택을 포함해 키워드는 최대 5개입니다.';return}renderTrendKeywords()});
-document.querySelector('#trendKeywordClose').addEventListener('click',()=>{document.querySelector('#trendKeywordModal').hidden=true;setTrendKeywordLoading(false);document.body.classList.remove('modal-open')});
-document.querySelector('#trendKeywordLimitClose')?.addEventListener('click',()=>{document.querySelector('#trendKeywordLimitModal').hidden=true;document.body.classList.remove('modal-open')});
-document.querySelector('#trendKeywordApply').addEventListener('click',()=>{const applied=trendKeywordChoices.filter(item=>trendKeywordSelection.has(item.id));seasonalKeywordIds.forEach(id=>selectedKeywords.delete(id));seasonalKeywordIds=new Set(applied.map(item=>item.id));demoData.keywords=[...demoData.keywords.filter(item=>!item.seasonal),...applied];const baseIds=visibleKeywordIds.filter(id=>!demoData.keywords.find(item=>item.id===id)?.seasonal).slice(0,8);const refill=demoData.keywords.filter(item=>!item.seasonal&&!baseIds.includes(item.id)).map(item=>item.id);while(baseIds.length<8&&refill.length)baseIds.push(refill.shift());const targetCount=8-applied.length;for(let index=baseIds.length-1;baseIds.length>targetCount&&index>=0;index--){if(!selectedKeywords.has(baseIds[index]))baseIds.splice(index,1)}applied.forEach(item=>selectedKeywords.add(item.id));visibleKeywordIds=[...baseIds.slice(0,targetCount),...applied.map(item=>item.id)];document.querySelector('#trendKeywordModal').hidden=true;document.body.classList.remove('modal-open');document.querySelector('#keywordMessage').textContent=`AI 추천 ${applied.length}개를 뒤쪽 카드에 반영했습니다.`;renderKeywords()});
+const trendKeywordController=Step02TrendKeywordController.create({getRoot:()=>document,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,isKeywordLocked:()=>keywordStageLocked,getSelectedKeywords:()=>selectedKeywords,getSeasonalKeywordIds:()=>seasonalKeywordIds,setSeasonalKeywordIds:value=>{seasonalKeywordIds=value},getVisibleKeywordIds:()=>visibleKeywordIds,setVisibleKeywordIds:value=>{visibleKeywordIds=value},getKeywords:()=>demoData.keywords,setKeywords:value=>{demoData.keywords=value},renderKeywords,showTokenUsage,escapeHtml});
+trendKeywordController.mount(document);
 function setAuthMode(mode){
   return authUIController.setMode(mode);
 }

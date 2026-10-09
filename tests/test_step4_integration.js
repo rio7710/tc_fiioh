@@ -39,6 +39,7 @@ const projectHydrationControllerPath = '01_app/assets/core/project-hydration-con
 const promptLabControllerPath = '01_app/assets/core/prompt-lab-controller.js';
 const providerSettingsControllerPath = '01_app/assets/core/provider-settings-controller.js';
 const scriptEditorControllerPath = '01_app/assets/steps/step03/step03-script-editor-controller.js';
+const trendKeywordControllerPath = '01_app/assets/steps/step02/trend-keyword-controller.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
@@ -73,6 +74,7 @@ assert.ok(fs.existsSync(projectHydrationControllerPath), 'project-hydration-cont
 assert.ok(fs.existsSync(promptLabControllerPath), 'prompt-lab-controller.js must exist');
 assert.ok(fs.existsSync(providerSettingsControllerPath), 'provider-settings-controller.js must exist');
 assert.ok(fs.existsSync(scriptEditorControllerPath), 'step03-script-editor-controller.js must exist');
+assert.ok(fs.existsSync(trendKeywordControllerPath), 'trend-keyword-controller.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
@@ -93,6 +95,8 @@ assert.match(html, /src="\/01_app\/assets\/core\/auth-ui-controller\.js\?v=20261
 assert.match(html, /src="\/01_app\/assets\/core\/project-hydration-controller\.js\?v=20261009_v36"/, 'HTML cache-busts project hydration controller');
 assert.match(html, /src="\/01_app\/assets\/core\/prompt-lab-controller\.js\?v=20261009_v37"/, 'HTML cache-busts prompt lab controller');
 assert.match(html, /src="\/01_app\/assets\/core\/provider-settings-controller\.js\?v=20261009_v39"/, 'HTML cache-busts provider settings controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step02\/trend-keyword-controller\.js\?v=20261009_v40"/, 'HTML cache-busts trend keyword controller');
+assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('trend-keyword-controller.js'), 'base Step 2 module loads before trend keyword controller');
 assert.ok(html.indexOf('content-route.js') < html.indexOf('shell-navigation-controller.js'), 'content route helper loads before shell navigation');
 assert.ok(html.indexOf('shell-navigation-controller.js') < html.indexOf('session-bootstrap-controller.js'), 'shell navigation loads before session bootstrap');
 assert.ok(html.indexOf('session-bootstrap-controller.js') < html.indexOf('auth-ui-controller.js'), 'session bootstrap loads before auth UI controller');
@@ -132,6 +136,9 @@ assert.match(html, /function closeApiSettings\(\)\{return providerSettingsContro
 assert.match(html, /function openApiSettings\(step\)\{return providerSettingsController\.open\(step\)\}/, 'P1 keeps a thin provider open wrapper');
 assert.match(html, /function ensureStepApiReady\(step\)\{return providerSettingsController\.ensureStepReady\(step\)\}/, 'P1 keeps a thin provider readiness wrapper');
 assert.doesNotMatch(html, /let apiConnectionConfig=|let activeApiStep=|const apiStepCopy=|document\.querySelector\('#apiSettingsForm'\)\.addEventListener/, 'P1 removes provider settings state and inline event implementation');
+assert.match(html, /const trendKeywordController=Step02TrendKeywordController\.create\(/, 'P1 wires the trend keyword controller');
+assert.match(html, /trendKeywordController\.mount\(document\)/, 'P1 mounts trend keyword interactions');
+assert.doesNotMatch(html, /let trendKeywordChoices=|let trendKeywordSelection=|let trendRequestVersion=|function setTrendKeywordLoading\(|function renderTrendKeywords\(|document\.querySelector\('#trendKeywordOpen'\)\.addEventListener/, 'P1 removes trend keyword state and inline event implementation');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v31"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
@@ -374,6 +381,7 @@ function createPrePartialContext() {
     ThinkCastPromptLabController: require('../01_app/assets/core/prompt-lab-controller.js'),
     ThinkCastProviderSettingsController: require('../01_app/assets/core/provider-settings-controller.js'),
     Step03ScriptEditorController: require('../01_app/assets/steps/step03/step03-script-editor-controller.js'),
+    Step02TrendKeywordController: require('../01_app/assets/steps/step02/trend-keyword-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),
