@@ -4,7 +4,6 @@ const Applier = require('../01_app/assets/core/project-hydration-applier.js');
 (async () => {
   function harness(overrides = {}) {
     const calls = [];
-    let demoKeywords = overrides.demoKeywords || [{id: 'base-1'}, {id: 'base-2'}, {id: 'old-ai', seasonal: true}];
     const selectedPlatforms = new Set(['old']);
     const buttons = (overrides.platforms || ['youtube', 'instagram']).map(platform => ({
       dataset: {platform},
@@ -39,23 +38,19 @@ const Applier = require('../01_app/assets/core/project-hydration-applier.js');
       getSelectedPlatforms: () => { calls.push(['selectedPlatforms']); return selectedPlatforms; },
       setPlatformPreview: record('platformPreview'), applyTimeline: record('applyTimeline'),
       connectStoryboardAssetsToEditor: () => calls.push(['connect']), fillScript: record('fillScript'), applyScript: record('applyScript'),
-      getDemoKeywords: () => { calls.push(['getDemoKeywords']); return demoKeywords; },
-      setDemoKeywords: value => { calls.push(['setDemoKeywords', value]); demoKeywords = value; },
-      setSeasonalKeywordIds: record('seasonalKeywords'), setVisibleKeywordIds: record('visibleKeywords'),
-      renderKeywords: () => { calls.push(['renderKeywords']); if (overrides.throwAt === 'renderKeywords') throw new Error('failed renderKeywords'); }
+      keywordHydrator:{applyContent:ids=>{calls.push(['keywordContent',ids||[]]);if(overrides.throwAt==='keywordContent')throw new Error('failed keywordContent');return ids||[]},restoreState:(state,seasonal)=>{calls.push(['keywordState',state,seasonal]);if(overrides.throwAt==='keywordState')throw new Error('failed keywordState');return state?.selected_keyword_ids||[]}}
     };
-    return {applier:Applier.create(deps),calls,result,selectedPlatforms,buttons,getDemoKeywords:()=>demoKeywords};
+    return {applier:Applier.create(deps),calls,result,selectedPlatforms,buttons};
   }
 
   assert.throws(() => Applier.create(), /requires setSceneCropPositions/);
   const required = {
     setSceneCropPositions() {}, setDemoTimeline() {},
-    mergeDemoState() {}, setSelectedKeywords() {}, setActiveStoryboardDocument() {}, setKeywordStageLocked() {},
+    mergeDemoState() {}, setActiveStoryboardDocument() {}, setKeywordStageLocked() {},
     setStoryboardImages() {}, setStoryboardImageCandidates() {}, setStoryboardVoiceClips() {}, setStoryboardVideos() {},
     setStoryboardVideoCandidates() {}, setVoiceProfile() {}, hydrateBrandSelections() {}, renderBrandChoices() {},
     getPlatformButtons() {}, getSelectedPlatforms() {}, setPlatformPreview() {}, applyTimeline() {},
-    connectStoryboardAssetsToEditor() {}, fillScript() {}, applyScript() {}, getDemoKeywords() {},
-    setDemoKeywords() {}, setSeasonalKeywordIds() {}, setVisibleKeywordIds() {}, renderKeywords() {}
+    connectStoryboardAssetsToEditor() {}, fillScript() {}, applyScript() {},keywordHydrator:{applyContent(){},restoreState(){}}
   };
   for (const name of Object.keys(required)) {
     const deps = {...required}; delete deps[name];
@@ -67,12 +62,12 @@ const Applier = require('../01_app/assets/core/project-hydration-applier.js');
   const returned = h.applier.applyContent(h.result);
   assert.equal(returned, h.result);
   assert.deepEqual(h.calls.map(call => call[0]), [
-    'crop','timeline','state','keywords','document','lock','images','imageCandidates',
+    'crop','timeline','state','keywordContent','document','lock','images','imageCandidates',
     'voices','videos','videoCandidates','voiceProfile','brandHydrate','brandRender','platformButtons',
     'selectedPlatforms','aria','aria','platformPreview','applyTimeline','connect','fillScript','applyScript'
   ]);
   assert.deepEqual(h.calls.find(call => call[0] === 'state')[1], {script: h.result.script, selected_keywords: ['k1']});
-  assert.deepEqual([...h.calls.find(call => call[0] === 'keywords')[1]], ['k1']);
+  assert.deepEqual(h.calls.find(call => call[0] === 'keywordContent')[1], ['k1']);
   assert.deepEqual([...h.calls.find(call => call[0] === 'images')[1].keys()], ['s1','s2']);
   assert.deepEqual([...h.calls.find(call => call[0] === 'voices')[1].keys()], ['s1','s2']);
   assert.deepEqual([...h.calls.find(call => call[0] === 'videos')[1].keys()], ['s2']);
@@ -118,18 +113,11 @@ const Applier = require('../01_app/assets/core/project-hydration-applier.js');
   h = harness({result: stateResult});
   assert.equal(h.applier.applyState(stateResult), stateResult);
   assert.deepEqual(h.calls.map(call => call[0]), [
-    'crop','images','imageCandidates','voices','videos','videoCandidates',
-    'getDemoKeywords','setDemoKeywords','keywords','seasonalKeywords','visibleKeywords','renderKeywords',
+    'crop','images','imageCandidates','voices','videos','videoCandidates','keywordState',
     'lock','document','voiceProfile','timeline','state','applyTimeline','fillScript','applyScript'
   ]);
   assert.deepEqual([...h.calls.find(call => call[0] === 'voices')[1].keys()], ['s1','s2'], 'state voice filter uses content voice profile');
-  assert.deepEqual(h.getDemoKeywords(), [
-    {id:'base-1'}, {id:'base-2'}, {id:'ai-1',label:'계절',seasonal:true},
-    {id:'missing',label:'복원',description:'저장된 AI 추천 키워드',image:'warmth',seasonal:true}
-  ]);
-  assert.deepEqual([...h.calls.find(call => call[0] === 'keywords')[1]], ['base-2','ai-1','missing']);
-  assert.deepEqual([...h.calls.find(call => call[0] === 'seasonalKeywords')[1]], ['ai-1','missing']);
-  assert.deepEqual(h.calls.find(call => call[0] === 'visibleKeywords')[1], ['base-2','base-1','ai-1','missing']);
+  assert.deepEqual(h.calls.find(call=>call[0]==='keywordState').slice(1),[stateResult.keywords,stateResult.seasonal_keywords]);
   assert.deepEqual(h.calls.find(call => call[0] === 'state')[1], {script: stateResult.content.script, selected_keywords: ['base-2','ai-1','missing']});
 
   const stateWithoutContent = {
@@ -139,14 +127,12 @@ const Applier = require('../01_app/assets/core/project-hydration-applier.js');
   h.applier.applyState(h.result);
   assert.equal(h.calls.some(call => call[0] === 'crop'), false, 'missing state crop preserves existing crop');
   assert.deepEqual([...h.calls.find(call => call[0] === 'voices')[1].keys()], ['s1'], 'missing content uses warm_female default filter');
-  assert.deepEqual(h.getDemoKeywords(), [{id:'base-1'},{id:'base-2'}], 'non-array seasonal data removes old seasonal items without adding replacements');
-  assert.deepEqual(h.calls.find(call => call[0] === 'visibleKeywords')[1], ['base-1','base-2']);
   assert.deepEqual(h.calls.at(-1), ['lock', false]);
   assert.equal(h.calls.some(call => ['document','voiceProfile','timeline','state','applyTimeline','fillScript','applyScript'].includes(call[0])), false, 'content-falsy state only unlocks after keyword render');
 
-  h = harness({result: stateResult, throwAt: 'renderKeywords'});
-  assert.throws(()=>h.applier.applyState(h.result),/failed renderKeywords/);
-  assert.equal(h.calls.some(call => call[0] === 'visibleKeywords'), true);
+  h = harness({result: stateResult, throwAt: 'keywordState'});
+  assert.throws(()=>h.applier.applyState(h.result),/failed keywordState/);
+  assert.equal(h.calls.some(call => call[0] === 'keywordState'), true);
   assert.equal(h.calls.some(call => call[0] === 'lock'), false, 'callback failure preserves partial state and stops later work');
 
   console.log('Project hydration applier tests passed');
