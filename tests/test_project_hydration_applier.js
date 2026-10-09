@@ -38,19 +38,17 @@ const Applier = require('../01_app/assets/core/project-hydration-applier.js');
       getSelectedPlatforms: () => { calls.push(['selectedPlatforms']); return selectedPlatforms; },
       setPlatformPreview: record('platformPreview'), applyTimeline: record('applyTimeline'),
       connectStoryboardAssetsToEditor: () => calls.push(['connect']), fillScript: record('fillScript'), applyScript: record('applyScript'),
-      keywordHydrator:{applyContent:ids=>{calls.push(['keywordContent',ids||[]]);if(overrides.throwAt==='keywordContent')throw new Error('failed keywordContent');return ids||[]},restoreState:(state,seasonal)=>{calls.push(['keywordState',state,seasonal]);if(overrides.throwAt==='keywordState')throw new Error('failed keywordState');return state?.selected_keyword_ids||[]}}
+      keywordHydrator:{applyContent:ids=>{calls.push(['keywordContent',ids||[]]);if(overrides.throwAt==='keywordContent')throw new Error('failed keywordContent');return ids||[]},restoreState:(state,seasonal)=>{calls.push(['keywordState',state,seasonal]);if(overrides.throwAt==='keywordState')throw new Error('failed keywordState');return state?.selected_keyword_ids||[]}},
+      mediaHydrator:{contentProfile:value=>value.voice_profile||'warm_female',stateProfile:value=>value.content?.voice_profile||'warm_female',applyCropPositions:value=>{if(value.scene_crop_positions)record('crop')(value.scene_crop_positions)},applyMedia:(value,profile)=>{record('images')(new Map((value.storyboard_images||[]).map(item=>[item.scene_id,item])));record('imageCandidates')(value.storyboard_image_candidates||[]);record('voices')(new Map((value.storyboard_voice_clips||[]).filter(item=>!item.profile_id||item.profile_id===profile).map(item=>[item.scene_id,item])));record('videos')(new Map((value.storyboard_videos||[]).map(item=>[item.scene_id,item])));record('videoCandidates')(value.storyboard_video_candidates||[])},applyVoiceProfile:record('voiceProfile')}
     };
     return {applier:Applier.create(deps),calls,result,selectedPlatforms,buttons};
   }
 
-  assert.throws(() => Applier.create(), /requires setSceneCropPositions/);
+  assert.throws(() => Applier.create(), /requires setDemoTimeline/);
   const required = {
-    setSceneCropPositions() {}, setDemoTimeline() {},
-    mergeDemoState() {}, setActiveStoryboardDocument() {}, setKeywordStageLocked() {},
-    setStoryboardImages() {}, setStoryboardImageCandidates() {}, setStoryboardVoiceClips() {}, setStoryboardVideos() {},
-    setStoryboardVideoCandidates() {}, setVoiceProfile() {}, hydrateBrandSelections() {}, renderBrandChoices() {},
+    setDemoTimeline() {},mergeDemoState() {}, setActiveStoryboardDocument() {}, setKeywordStageLocked() {},hydrateBrandSelections() {}, renderBrandChoices() {},
     getPlatformButtons() {}, getSelectedPlatforms() {}, setPlatformPreview() {}, applyTimeline() {},
-    connectStoryboardAssetsToEditor() {}, fillScript() {}, applyScript() {},keywordHydrator:{applyContent(){},restoreState(){}}
+    connectStoryboardAssetsToEditor() {}, fillScript() {}, applyScript() {},keywordHydrator:{applyContent(){},restoreState(){}},mediaHydrator:{contentProfile(){},stateProfile(){},applyCropPositions(){},applyMedia(){},applyVoiceProfile(){}}
   };
   for (const name of Object.keys(required)) {
     const deps = {...required}; delete deps[name];
