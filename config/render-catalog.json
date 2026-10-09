@@ -55,7 +55,7 @@
     "caption_size": 0,
     "video_pan_x": 0.5,
     "still_image_pan_enabled": true,
-    "still_image_pan_travel_ratio": 0.35,
+    "still_image_pan_travel_ratio": 0.175,
     "preview_platform": "youtube",
     "platforms": ["youtube", "instagram", "naver"],
     "scene_dissolve_seconds": 0.5

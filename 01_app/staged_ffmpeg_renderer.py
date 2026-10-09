@@ -218,7 +218,7 @@ def _render_scene(
     is_still_image = not video_artifact and image_path is not None
     pan_enabled = bool(dependencies.render_defaults.get("still_image_pan_enabled", True))
     if is_still_image and format_label != "16x9" and pan_enabled:
-        travel = float(dependencies.render_defaults.get("still_image_pan_travel_ratio", 0.35))
+        travel = float(dependencies.render_defaults.get("still_image_pan_travel_ratio", 0.175))
         pan_start, pan_end = _still_image_pan_bounds(scene_id, format_label, pan_x, travel)
         crop_x = (
             f"(iw-ow)*({pan_start:.6f}+({pan_end - pan_start:.6f})"

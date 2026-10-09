@@ -70,7 +70,7 @@ class StagedFfmpegRendererTests(unittest.TestCase):
             },
             music={"none": None, "satie": self.music},
             narration_tracks=[],
-            render_defaults={"scene_dissolve_seconds": 0.3, "music_start_offset_seconds": 3.0, "music_fade_in_seconds": 2.0, "music_fade_out_seconds": 2.0, "still_image_pan_enabled": True, "still_image_pan_travel_ratio": 0.35},
+            render_defaults={"scene_dissolve_seconds": 0.3, "music_start_offset_seconds": 3.0, "music_fade_in_seconds": 2.0, "music_fade_out_seconds": 2.0, "still_image_pan_enabled": True, "still_image_pan_travel_ratio": 0.175},
             timeline_from_data=self.timeline,
             timed_script_scenes=self.title_scenes,
             storyboard_image_path=lambda uri: self.image if uri else None,
