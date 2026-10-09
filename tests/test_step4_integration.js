@@ -40,6 +40,7 @@ const promptLabControllerPath = '01_app/assets/core/prompt-lab-controller.js';
 const providerSettingsControllerPath = '01_app/assets/core/provider-settings-controller.js';
 const scriptEditorControllerPath = '01_app/assets/steps/step03/step03-script-editor-controller.js';
 const trendKeywordControllerPath = '01_app/assets/steps/step02/trend-keyword-controller.js';
+const scriptGenerationControllerPath = '01_app/assets/steps/step02/script-generation-controller.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
@@ -75,6 +76,7 @@ assert.ok(fs.existsSync(promptLabControllerPath), 'prompt-lab-controller.js must
 assert.ok(fs.existsSync(providerSettingsControllerPath), 'provider-settings-controller.js must exist');
 assert.ok(fs.existsSync(scriptEditorControllerPath), 'step03-script-editor-controller.js must exist');
 assert.ok(fs.existsSync(trendKeywordControllerPath), 'trend-keyword-controller.js must exist');
+assert.ok(fs.existsSync(scriptGenerationControllerPath), 'script-generation-controller.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
@@ -97,7 +99,9 @@ assert.match(html, /src="\/01_app\/assets\/core\/prompt-lab-controller\.js\?v=20
 assert.match(html, /src="\/01_app\/assets\/core\/provider-settings-controller\.js\?v=20261009_v39"/, 'HTML cache-busts provider settings controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/trend-keyword-controller\.js\?v=20261009_v40"/, 'HTML cache-busts trend keyword controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/step02-keyword\.js\?v=20261009_v41"/, 'HTML cache-busts Step 2 keyword controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step02\/script-generation-controller\.js\?v=20261009_v42"/, 'HTML cache-busts script generation controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('trend-keyword-controller.js'), 'base Step 2 module loads before trend keyword controller');
+assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('script-generation-controller.js') && html.indexOf('script-generation-controller.js') < html.indexOf('trend-keyword-controller.js'), 'script generation loads between Step 2 keyword controllers');
 assert.ok(html.indexOf('content-route.js') < html.indexOf('shell-navigation-controller.js'), 'content route helper loads before shell navigation');
 assert.ok(html.indexOf('shell-navigation-controller.js') < html.indexOf('session-bootstrap-controller.js'), 'shell navigation loads before session bootstrap');
 assert.ok(html.indexOf('session-bootstrap-controller.js') < html.indexOf('auth-ui-controller.js'), 'session bootstrap loads before auth UI controller');
@@ -145,6 +149,14 @@ assert.match(html, /keywordController\.mount\(document\)/, 'P1 mounts Step 2 key
 assert.match(html, /function renderKeywords\(\)\{\s*return keywordController\.render\(\);\s*\}/, 'P1 keeps a thin keyword render wrapper');
 assert.match(html, /function refreshKeywordBatch\(\)\{\s*return keywordController\.refresh\(\);\s*\}/, 'P1 keeps a thin keyword refresh wrapper');
 assert.doesNotMatch(html, /keywordTilts|document\.querySelector\('#keywordGrid'\)\.addEventListener|document\.querySelector\('#keywordRefresh'\)\.addEventListener|document\.querySelector\('#keywordNext'\)\.addEventListener/, 'P1 removes duplicate Step 2 state and listeners');
+assert.match(html, /const scriptGenerationController=Step02ScriptGenerationController\.create\(/, 'P1 wires the script generation controller');
+assert.match(html, /scriptGenerationController\.mount\(document\)/, 'P1 mounts script generation workflow');
+assert.match(html, /async function runAiWorkflow\(\)\{\s*return scriptGenerationController\.run\(\);\s*\}/, 'P1 keeps a thin script generation wrapper');
+assert.doesNotMatch(html, /activePhase=|waitingTimer=|configureWorkflowModal\('storyboard'\)/, 'P1 removes the storyboard workflow implementation');
+assert.match(html, /production:\{[\s\S]*kicker:'AI IMAGE PRODUCTION TEAM'/, 'production workflow config remains in P1');
+assert.match(html, /export:\{[\s\S]*kicker:'AI VIDEO & FINAL EXPORT TEAM'/, 'export workflow config remains in P1');
+assert.match(html, /configureWorkflowModal\('production'\)/, 'production workflow keeps its modal configuration call');
+assert.match(fs.readFileSync(renderControllerPath,'utf8'), /configureWorkflowModal\('export'\)/, 'export controller keeps its modal configuration call');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v31"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
@@ -388,6 +400,7 @@ function createPrePartialContext() {
     ThinkCastProviderSettingsController: require('../01_app/assets/core/provider-settings-controller.js'),
     Step03ScriptEditorController: require('../01_app/assets/steps/step03/step03-script-editor-controller.js'),
     Step02Keyword: require('../01_app/assets/steps/step02/step02-keyword.js'),
+    Step02ScriptGenerationController: require('../01_app/assets/steps/step02/script-generation-controller.js'),
     Step02TrendKeywordController: require('../01_app/assets/steps/step02/trend-keyword-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),

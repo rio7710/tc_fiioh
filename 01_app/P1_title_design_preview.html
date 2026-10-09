@@ -22,6 +22,7 @@
 <script src="/01_app/assets/steps/step01/step01-project-index-controller.js?v=20261009_v31"></script>
 <script src="/01_app/assets/steps/step01/step01-content-index-controller.js?v=20261009_v30"></script>
 <script src="/01_app/assets/steps/step02/step02-keyword.js?v=20261009_v41"></script>
+<script src="/01_app/assets/steps/step02/script-generation-controller.js?v=20261009_v42"></script>
 <script src="/01_app/assets/steps/step02/trend-keyword-controller.js?v=20261009_v40"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
@@ -2153,19 +2154,6 @@ function selectedKeywordLabels(){
   return (demoData?.keywords||[]).filter(item=>selectedKeywords.has(item.id)).map(item=>item.label);
 }
 const workflowConfigs={
-  storyboard:{
-    kicker:'STORYBOARD GENERATION',
-    title:'최종대본 생성 중',
-    summary:'선택한 키워드와 그룹 레퍼런스로 실제 최종대본을 생성합니다.',
-    engines:[
-      {mark:'GPT',kind:'gpt',name:'OpenAI API',status:'실제 요청'}
-    ],
-    roles:[
-      {name:'대본 작성',description:'인물·장소 분산, 서사와 나레이션 확정',engine:'OpenAI API'},
-      {name:'콘티 작성',description:'장소 이동·연속성·씬 프롬프트 설계',engine:'OpenAI API'},
-      {name:'최종 검증',description:'스키마 검증 · 프로젝트 저장',engine:'Schema Validator'}
-    ]
-  },
   production:{
     kicker:'AI IMAGE PRODUCTION TEAM',
     title:'장면 이미지 제작 중',
@@ -2203,8 +2191,8 @@ const workflowConfigs={
     ]
   }
 };
-function configureWorkflowModal(type){
-  const config=workflowConfigs[type];
+function configureWorkflowModal(type,configOverride=null){
+  const config=configOverride||workflowConfigs[type];
   const modal=document.querySelector('#aiWorkflowModal');
   modal.dataset.workflow=type;
   document.querySelector('#aiWorkflowKicker').innerHTML=`<span class="ai-live-dot"></span>${config.kicker}`;
@@ -2269,90 +2257,7 @@ function applySequentialSceneProgress(role,completed){
   });
 }
 async function runAiWorkflow(){
-  const modal=configureWorkflowModal('storyboard');
-  const roles=[...modal.querySelectorAll('.ai-role')];
-  const progress=document.querySelector('#aiProgressBar');
-  const foot=document.querySelector('#aiFootStatus');
-  const summary=document.querySelector('#aiWorkflowSummary');
-  const now=document.querySelector('#aiNow');
-  const labels=selectedKeywordLabels();
-  const requestStartedAt=Date.now();
-  const formatElapsed=()=>{
-    const totalSeconds=Math.max(0,Math.floor((Date.now()-requestStartedAt)/1000));
-    const minutes=String(Math.floor(totalSeconds/60)).padStart(2,'0');
-    const seconds=String(totalSeconds%60).padStart(2,'0');
-    return `${minutes}:${seconds}`;
-  };
-  let activePhase=0;
-  const updateWaitingState=()=>{
-    const elapsed=formatElapsed();
-    now.textContent=`${activePhase===0?'대본':'콘티'} 작성 중 · ${elapsed}`;
-    foot.textContent=`${activePhase+1}차 요청 처리 중 · GPT 응답 대기 ${elapsed} · 창을 유지해 주세요.`;
-    roles.forEach((role,index)=>{if(index===activePhase)role.querySelector('.ai-role-state').textContent=`응답 대기 ${elapsed}`});
-  };
-  modal.hidden=false;
-  modal.classList.remove('complete');
-  document.body.classList.add('modal-open');
-  progress.classList.add('indeterminate');
-  progress.style.transform='none';
-  progress.style.width='';
-  summary.textContent=`${labels.join(', ')} 키워드로 실제 최종대본을 생성하고 있습니다.`;
-  now.classList.add('processing');
-  now.textContent='GPT에 최종대본 생성 요청을 전송하고 있습니다';
-  foot.textContent='요청 1건 전송 중 · 중복 요청은 차단됩니다.';
-  roles.forEach((role,index)=>{role.className=`ai-role ${index===0?'active':''}`;role.querySelector('.ai-role-state').textContent=index===0?'요청 전송':'대기';role.querySelector('.ai-role-result').textContent=''});
-  updateWaitingState();
-  const waitingTimer=setInterval(updateWaitingState,1000);
-  try{
-    await api('/api/script/plan',{method:'POST',body:JSON.stringify({project_id:activeProjectId})});
-    roles[0].classList.remove('active');roles[0].classList.add('done');roles[0].querySelector('.ai-role-state').textContent='저장 완료';
-    activePhase=1;roles[1].classList.add('active');roles[1].querySelector('.ai-role-state').textContent='요청 전송';
-    progress.classList.remove('indeterminate');progress.style.width='33%';
-    summary.textContent='1차 대본이 저장됐습니다. 장소 이동과 씬 연속성을 설계합니다.';
-    const generated=await api('/api/script/generate',{method:'POST',body:JSON.stringify({project_id:activeProjectId})});
-    clearInterval(waitingTimer);
-    roles[1].classList.remove('active');roles[1].classList.add('done');roles[1].querySelector('.ai-role-state').textContent='완료';
-    activePhase=2;roles[2].classList.add('active');progress.style.width='66%';
-    now.textContent='GPT 응답 수신 완료 · 검증된 결과를 화면에 반영하고 있습니다';
-    foot.textContent=`응답 수신 ${formatElapsed()} · 프로젝트 저장 완료 · 화면 구성 중`;
-    roles[2].querySelector('.ai-role-state').textContent='응답 수신';
-    demoData.state=generated.state;
-    demoData.timeline=generated.timeline;
-    activeStoryboardDocument=generated.document||null;
-    setKeywordStageLocked(true);
-    setVoiceProfile('warm_female');
-    applyTimeline(generated.timeline);
-    progress.classList.remove('indeterminate');
-    progress.style.transform='none';
-    progress.style.width='100%';
-    roles.forEach(role=>{role.classList.add('done');role.querySelector('.ai-role-state').textContent='완료'});
-    modal.classList.add('complete');
-    now.classList.remove('processing');
-    now.textContent='대본이 완료되었습니다.';
-    summary.textContent='스키마 검증과 프로젝트 저장이 완료되어 대본과 콘티 초안이 준비됐습니다.';
-    foot.textContent='1초 후 대본 화면으로 이동합니다.';
-    await sleep(1000);
-    modal.hidden=true;
-    document.body.classList.remove('modal-open');
-    localStorage.removeItem(SCRIPT_STORAGE_KEY);
-    fillScript(generated.state.script);
-    applyScript(generated.state.script);
-    await refreshProjectIndex();
-    showStep(3);
-  }catch(error){
-    clearInterval(waitingTimer);
-    progress.classList.remove('indeterminate');
-    progress.style.transform='none';
-    progress.style.width='0%';
-    now.classList.remove('processing');
-    now.textContent='처리를 완료하지 못했습니다.';
-    summary.textContent='스토리보드 생성 중 문제가 발생했습니다.';
-    foot.textContent=error.message;
-    await sleep(1500);
-    modal.hidden=true;
-    document.body.classList.remove('modal-open');
-    throw error;
-  }
+  return scriptGenerationController.run();
 }
 async function runProductionWorkflow(){
   await generateMissingSceneVideos();
@@ -2518,6 +2423,8 @@ shellNavigationController.mount(document);
 const sessionBootstrapController=ThinkCastSessionBootstrapController.create({request:(...args)=>api(...args),navigation:shellNavigationController,setLoginAccess,refreshProjectIndex,hydrateCalendarEntries,getActiveProjectId:()=>activeProjectId,openIndexProject,loadProjectState,loadProjectContent,setContentIndexError});
 const contentIndexController=Step01ContentIndexController.create({request:(...args)=>api(...args),getProjects:()=>indexProjects,getActiveProjectId:()=>activeProjectId,beginNav,setActiveProjectId,showStep,showBrandLibrary,navigateProjectStep,resetProjectScopedState,setKeywordStageLocked,setVoiceProfile,getKeywords:()=>demoData.keywords,setVisibleKeywordIds:ids=>{visibleKeywordIds=ids},renderKeywords,refreshProjectIndex,confirm:message=>confirm(message),alert:message=>alert(message),escapeHtml,projectCreatedDate});
 contentIndexController.mount(document);
+const scriptGenerationController=Step02ScriptGenerationController.create({getRoot:()=>document,configureWorkflowModal,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getSelectedKeywordLabels:selectedKeywordLabels,now:()=>Date.now(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),sleep,setGeneratedState:state=>{demoData.state=state},setGeneratedTimeline:timeline=>{demoData.timeline=timeline},setGeneratedDocument:value=>{activeStoryboardDocument=value},setKeywordLocked:setKeywordStageLocked,setVoiceProfile,applyTimeline,removeStoredScript:()=>localStorage.removeItem(SCRIPT_STORAGE_KEY),fillScript,applyScript,refreshProjectIndex,showStep});
+scriptGenerationController.mount(document);
 const keywordController=Step02Keyword.create({getRoot:()=>document,getKeywords:()=>demoData.keywords,getVisibleKeywordIds:()=>visibleKeywordIds,setVisibleKeywordIds:value=>{visibleKeywordIds=value},getSelectedKeywords:()=>selectedKeywords,getActiveProjectId:()=>activeProjectId,beginNav,isStaleNav,loadProjectContent,showStep,ensureStepApiReady,request:(...args)=>api(...args),setDemoState:state=>{demoData.state=state},runAiWorkflow,random:()=>Math.random()});
 keywordController.mount(document);
 const trendKeywordController=Step02TrendKeywordController.create({getRoot:()=>document,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,isKeywordLocked:()=>keywordStageLocked,getSelectedKeywords:()=>selectedKeywords,getSeasonalKeywordIds:()=>seasonalKeywordIds,setSeasonalKeywordIds:value=>{seasonalKeywordIds=value},getVisibleKeywordIds:()=>visibleKeywordIds,setVisibleKeywordIds:value=>{visibleKeywordIds=value},getKeywords:()=>demoData.keywords,setKeywords:value=>{demoData.keywords=value},renderKeywords,showTokenUsage,escapeHtml});
