@@ -9,6 +9,7 @@ console.log('--- Step 4 Partial Lifecycle & Strict Browser Runtime Safety Tests 
 const partialPath = '01_app/pages/steps/step04-video.html';
 const cssPath = '01_app/assets/steps/step04/step04-video.css';
 const jsPath = '01_app/assets/steps/step04/step04-video.js';
+const contentIndexControllerPath = '01_app/assets/steps/step01/step01-content-index-controller.js';
 const brandStatePath = '01_app/assets/steps/step04/step04-brand-state.js';
 const brandSelectionControllerPath = '01_app/assets/steps/step04/step04-brand-selection-controller.js';
 const brandLibraryControllerPath = '01_app/assets/steps/step04/step04-brand-library-controller.js';
@@ -34,6 +35,7 @@ const videoEditorPath = '01_app/assets/video-editor/index.js';
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
 assert.ok(fs.existsSync(jsPath), 'step04-video.js must exist');
+assert.ok(fs.existsSync(contentIndexControllerPath), 'step01-content-index-controller.js must exist');
 assert.ok(fs.existsSync(brandStatePath), 'step04-brand-state.js must exist');
 assert.ok(fs.existsSync(brandSelectionControllerPath), 'step04-brand-selection-controller.js must exist');
 assert.ok(fs.existsSync(brandLibraryControllerPath), 'step04-brand-library-controller.js must exist');
@@ -68,6 +70,10 @@ console.log('✓ File integrity checks passed');
 
 // 2. Headless VM Execution Test: Pre-Partial Script Evaluation MUST NOT Throw (No Null Query Errors)
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
+assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
+assert.match(html, /function openIndexProject\(projectId,historyMode='push'\)\{\s*return contentIndexController\.openProject\(projectId,historyMode\);\s*\}/, 'P1 keeps a thin project-open wrapper');
+assert.match(html, /contentIndexController\.mount\(document\)/, 'P1 mounts content index interactions after partial loading');
+assert.doesNotMatch(html, /document\.querySelector\('#projectDeleteButton'\)\.addEventListener|document\.querySelector\('#createProjectButton'\)\.addEventListener/, 'P1 does not retain create/delete event bodies');
 
 assert.match(html, /href="\/01_app\/assets\/video-editor\/video-editor\.css(?:\?v=[^"]+)?"/, 'HTML links video-editor.css');
 assert.match(html, /href="\/01_app\/assets\/steps\/step04\/step04-video\.css(?:\?v=[^"]+)?"/, 'HTML links step04-video.css');
@@ -289,6 +295,7 @@ function createPrePartialContext() {
   const context = vm.createContext({
     console,
     URL,
+    Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),
     Step04BrandSelectionController: require('../01_app/assets/steps/step04/step04-brand-selection-controller.js'),
     Step04BrandLibraryController: require('../01_app/assets/steps/step04/step04-brand-library-controller.js'),

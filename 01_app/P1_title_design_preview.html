@@ -13,6 +13,7 @@
 <script src="/01_app/assets/core/content-route.js?v=20261007_v2"></script>
 <script src="/01_app/assets/core/project-store.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step-partial-loader.js?v=20261007_v2"></script>
+<script src="/01_app/assets/steps/step01/step01-content-index-controller.js?v=20261009_v30"></script>
 <script src="/01_app/assets/steps/step02/step02-keyword.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
 <script src="/01_app/assets/video-editor/scene-navigation.js?v=20261007_v2"></script>
@@ -1706,20 +1707,7 @@ function renderProjectIndex(projects){
 async function refreshProjectIndex(){const [result]=await Promise.all([api('/api/projects'),refreshBrandLibrary()]);renderProjectIndex(result.projects||[])}
 let projectStatusPollBusy=false;setInterval(async()=>{const holder=document.querySelector('#contentIndex');if(!holder||holder.offsetParent===null||projectStatusPollBusy)return;projectStatusPollBusy=true;try{const result=await api('/api/projects');renderProjectIndex(result.projects||[])}catch(error){}finally{projectStatusPollBusy=false}},5000);
 function openIndexProject(projectId,historyMode='push'){
-  const project=indexProjects[projectId];if(!project)return;
-  beginNav();
-  setActiveProjectId(projectId);document.querySelector('#projectDetailKicker').textContent=`PROJECT · ${projectId}`;
-  document.querySelector('#projectDetailTitle').textContent=project.title;
-  document.querySelector('#projectDetailSummary').textContent=project.summary;
-  const currentKey=project.currentStep||'2';
-  const currentIndex=Math.max(0,project.steps.findIndex(item=>item.key===currentKey));
-  const completedCount=currentIndex;
-  document.querySelector('#projectDetailStatus').textContent=`${completedCount} / ${project.steps.length} 제작 항목 완료 · STEP ${currentKey.padStart(2,'0')} 진행 중`;
-  document.querySelector('#projectDetailNote').textContent=project.note;
-  document.querySelector('#projectDetailSteps').innerHTML=project.steps.map((item,index)=>{const state=index<currentIndex?'completed':index===currentIndex?'current':'locked';const stateLabel=state==='completed'?'✓ 완료':state==='current'?'진행 중':'미완료';const detailText=item.key==='1'?projectCreatedDate(project.created_at):item.key==='2'?(project.selected_keywords||[]).join(', '):'';const detail=detailText?` <span class="project-step-keywords">· ${escapeHtml(detailText)}</span>`:'';return `<li class="${state}"><b>${item.key.padStart(2,'0')}</b><span class="project-step-label" title="${escapeHtml(detailText)}">${escapeHtml(item.label)}${detail}</span><span class="project-step-state">${stateLabel}</span></li>`}).join('');
-  document.querySelectorAll('.project-detail-actions [data-go]').forEach(button=>{const targetIndex=project.steps.findIndex(item=>item.key===button.dataset.go);const completedKeyword=button.dataset.go==='2'&&currentIndex>=2;const locked=targetIndex>currentIndex||completedKeyword;button.disabled=locked;button.setAttribute('aria-disabled',String(locked));button.title=completedKeyword?'대본이 생성되어 키워드가 확정되었습니다.':locked?'이전 단계를 먼저 완료해 주세요.':''});
-  document.querySelector('#projectDetailContinue').dataset.targetStep=currentKey;
-  showStep('project',historyMode);
+  return contentIndexController.openProject(projectId,historyMode);
 }
 async function loadProjectContent(projectId,token){
   const result=await api(`/api/project-content?project_id=${encodeURIComponent(projectId)}`);
@@ -2938,23 +2926,8 @@ function refreshBrandLibrary(){return brandLibraryController.refresh()}
 function showBrandLibrary(show){return brandLibraryController.show(show)}
 brandLibraryController.mount(document);
 const brandOverlayMount=brandOverlayController.mount(document);if(!brandOverlayMount.watermark.ok)console.error('[BrandOverlay:watermark]',brandOverlayMount.watermark.error);if(!brandOverlayMount.outro.ok)console.error('[BrandOverlay:outro]',brandOverlayMount.outro.error);
-document.querySelector('#contentIndex').addEventListener('click',event=>{const row=event.target.closest('[data-project-id]');if(row)openIndexProject(row.dataset.projectId)});
-document.querySelectorAll('[data-index-filter]').forEach(button=>button.addEventListener('click',()=>{showBrandLibrary(false);const filter=button.dataset.indexFilter;document.querySelectorAll('[data-index-filter]').forEach(item=>item.classList.toggle('active',item===button));document.querySelectorAll('.content-index-row[data-project-id]').forEach(row=>{row.hidden=filter!=='all'&&row.dataset.state!==filter})}));
-document.querySelector('#projectDetailContinue').addEventListener('click',async event=>{try{await navigateProjectStep(event.currentTarget.dataset.targetStep||'2')}catch(error){document.querySelector('#projectDetailNote').textContent=error.message}});
-document.querySelector('#projectDeleteButton').addEventListener('click',async event=>{
-  if(!activeProjectId)return;
-  const project=indexProjects[activeProjectId];
-  if(!confirm(`“${project?.title||'이 콘텐츠'}”를 삭제할까요?\n저장된 제작 데이터도 함께 삭제됩니다.`))return;
-  const button=event.currentTarget;button.disabled=true;
-  try{
-    await api('/api/project/delete',{method:'POST',body:JSON.stringify({project_id:activeProjectId})});
-    resetProjectScopedState();
-    setActiveProjectId(null);setKeywordStageLocked(false);
-    await refreshProjectIndex();showStep('index');
-  }catch(error){document.querySelector('#projectDetailNote').textContent=error.message}
-  finally{button.disabled=false}
-});
-document.querySelector('#createProjectButton').addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{const result=await api('/api/projects',{method:'POST',body:JSON.stringify({name:'새 콘텐츠'})});resetProjectScopedState();setActiveProjectId(result.project.project_id);setKeywordStageLocked(false);setVoiceProfile('warm_female');visibleKeywordIds=demoData.keywords.filter(item=>!item.seasonal).slice(0,8).map(item=>item.id);renderKeywords();await refreshProjectIndex();showStep(2)}catch(error){alert(error.message)}finally{button.disabled=false}});
+const contentIndexController=Step01ContentIndexController.create({request:(...args)=>api(...args),getProjects:()=>indexProjects,getActiveProjectId:()=>activeProjectId,beginNav,setActiveProjectId,showStep,showBrandLibrary,navigateProjectStep,resetProjectScopedState,setKeywordStageLocked,setVoiceProfile,getKeywords:()=>demoData.keywords,setVisibleKeywordIds:ids=>{visibleKeywordIds=ids},renderKeywords,refreshProjectIndex,confirm:message=>confirm(message),alert:message=>alert(message),escapeHtml,projectCreatedDate});
+contentIndexController.mount(document);
 let trendRequestVersion=0;
 function setTrendKeywordLoading(loading){
   document.querySelector('#trendKeywordLoading').hidden=!loading;

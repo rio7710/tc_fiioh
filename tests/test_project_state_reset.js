@@ -1,6 +1,9 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const ContentIndexController = require('../01_app/assets/steps/step01/step01-content-index-controller.js');
+
+(async () => {
 
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 assert.match(html, /let demoData=\{state:\{\},timeline:\{scenes:\[\]\},keywords:\[\]\};/, 'project restore starts from a safe non-null demo state');
@@ -41,22 +44,30 @@ assert.equal(vm.runInContext('activeProjectId',context),'old-project','helper mu
 assert.equal(Object.keys(context.editorCropPositions).length,0,'Step 4 crop state must be cleared');
 assert.equal(context.timelineBridgeResetCount,1,'Step 4 timeline bridge state must be reset exactly once');
 
-const deleteStart = html.indexOf("document.querySelector('#projectDeleteButton')");
-const deleteEnd = html.indexOf("document.querySelector('#createProjectButton')",deleteStart);
-const deleteHandler = html.slice(deleteStart,deleteEnd);
-const deleteApi = deleteHandler.indexOf("await api('/api/project/delete'");
-const deleteReset = deleteHandler.indexOf('resetProjectScopedState()');
-assert.ok(deleteApi >= 0 && deleteReset > deleteApi,'delete must reset only after the API succeeds');
-assert.equal((deleteHandler.match(/resetProjectScopedState\(\)/g)||[]).length,1,'delete reset must have one success-path call');
-
-const createStart = deleteEnd;
-const createEnd = html.indexOf('\nlet trendRequestVersion=',createStart);
-const createHandler = html.slice(createStart,createEnd);
-const createApi = createHandler.indexOf("await api('/api/projects'");
-const createReset = createHandler.indexOf('resetProjectScopedState()');
-const assignNewProject = createHandler.search(/(?:activeProjectId=|setActiveProjectId\()result\.project\.project_id/);
-assert.ok(createApi >= 0 && createReset > createApi,'create must preserve state when the API fails');
-assert.ok(assignNewProject > createReset,'create must reset old state before adopting the new project');
-assert.equal((createHandler.match(/resetProjectScopedState\(\)/g)||[]).length,1,'create reset must have one success-path call');
+const calls=[];
+let active='old-project';
+let request=async path=>path==='/api/projects'?{project:{project_id:'new-project'}}:{};
+const controller=ContentIndexController.create({
+  request:(...args)=>{calls.push(['api',args[0]]);return request(...args)},getProjects:()=>({'old-project':{title:'Old'}}),getActiveProjectId:()=>active,
+  beginNav(){},setActiveProjectId(id){active=id;calls.push(['active',id])},showStep(step){calls.push(['show',step])},showBrandLibrary(){},navigateProjectStep:async()=>{},
+  resetProjectScopedState(){calls.push(['reset'])},setKeywordStageLocked(){calls.push(['unlock'])},setVoiceProfile(){calls.push(['voice'])},getKeywords:()=>[],
+  setVisibleKeywordIds(){calls.push(['keywords'])},renderKeywords(){calls.push(['render'])},refreshProjectIndex:async()=>calls.push(['refresh']),confirm:()=>true,alert(){calls.push(['alert'])},
+  escapeHtml:String,projectCreatedDate:String
+});
+const eventNode={dataset:{},textContent:'',addEventListener(){},removeEventListener(){}};
+controller.mount({querySelector:selector=>selector==='#projectDetailNote'?{textContent:''}:eventNode,querySelectorAll:()=>[]});
+await controller.deleteProject({disabled:false});
+assert.deepEqual(calls.map(item=>item[0]),['api','reset','active','unlock','refresh','show'],'delete resets once and only after API success');
+calls.length=0;active='old-project';request=async()=>{throw new Error('failed')};
+await controller.deleteProject({disabled:false});
+assert.equal(calls.some(item=>item[0]==='reset'),false,'failed delete preserves project state');
+calls.length=0;request=async()=>({project:{project_id:'new-project'}});
+await controller.createProject({disabled:false});
+assert.deepEqual(calls.slice(0,3),[['api','/api/projects'],['reset'],['active','new-project']],'create resets old state before adopting new project');
+assert.equal(calls.filter(item=>item[0]==='reset').length,1,'create resets exactly once');
+calls.length=0;request=async()=>{throw new Error('failed')};
+await controller.createProject({disabled:false});
+assert.equal(calls.some(item=>item[0]==='reset'),false,'failed create preserves project state');
 
 console.log('PASS: project-scoped state reset and success-only delete/create wiring');
+})().catch(error=>{console.error(error);process.exitCode=1});
