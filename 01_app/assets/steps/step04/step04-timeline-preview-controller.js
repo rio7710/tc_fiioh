@@ -38,7 +38,6 @@
         video.pause?.();
         return;
       }
-      video.dataset = video.dataset || {};
       if (changed || video.dataset.previewSrc !== videoUri) {
         video.dataset.previewSrc = videoUri;
         video.src = videoUri;

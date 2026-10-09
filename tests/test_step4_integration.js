@@ -391,7 +391,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-navigation-cont
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-bindings\.js\?v=20261007_v7"/, 'HTML cache-busts UI bindings');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-bridge\.js\?v=20261010_v9"/, 'HTML cache-busts timeline bridge');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-narration-controller\.js\?v=20261010_v18"/, 'HTML cache-busts narration controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-preview-controller\.js\?v=20261010_v11"/, 'HTML cache-busts timeline preview controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-preview-controller\.js\?v=20261010_v12"/, 'HTML cache-busts timeline preview controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ratio-crop-controller\.js\?v=20261008_v11"/, 'HTML cache-busts ratio crop controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-playback-controller\.js\?v=20261010_v13"/, 'HTML cache-busts playback controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-settings-controller\.js\?v=20261008_v23"/, 'HTML cache-busts settings controller');

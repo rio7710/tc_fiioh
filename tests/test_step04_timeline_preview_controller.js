@@ -70,10 +70,13 @@ for (const count of [1, 3, 7]) {
 }
 
 {
+  const sceneVideoDataset = {};
+  const sceneVideo = {...element(), paused: true, duration: 5, currentTime: 0, pauseCount: 0, playCount: 0, loadCount: 0, pause(){this.paused=true;this.pauseCount+=1}, play(){this.paused=false;this.playCount+=1;return Promise.resolve()}, load(){this.loadCount+=1}};
+  Object.defineProperty(sceneVideo, 'dataset', {get: () => sceneVideoDataset});
   const nodes = {
     '#stage': element(), '#sceneImage': element(), '#sceneResourceBadge': element(), '#brandOutroPreview': element(), '#titleText': element(),
     '#progressFill': element(), '#clock': element(), '#sceneTimelineSummary': element(), '#video': {paused: false},
-    '#sceneVideo': {...element(), dataset: {}, paused: true, duration: 5, currentTime: 0, pauseCount: 0, playCount: 0, loadCount: 0, pause(){this.paused=true;this.pauseCount+=1}, play(){this.paused=false;this.playCount+=1;return Promise.resolve()}, load(){this.loadCount+=1}}
+    '#sceneVideo': sceneVideo
   };
   const scenes = [{id:'clip',name:'Clip',image:'/fallback.jpg',generatedVideo:{uri:'/clip.mp4'},start:0,end:4,text:'음성 자막'}];
   let currentScene=-1;
@@ -84,6 +87,7 @@ for (const count of [1, 3, 7]) {
   assert.equal(nodes['#sceneVideo'].currentTime,1.5,'clip follows the narration timeline offset');
   assert.equal(nodes['#sceneVideo'].paused,false,'clip plays while the narration clock is playing');
   assert.equal(nodes['#sceneResourceBadge'].textContent,'영상');
+  assert.equal(sceneVideoDataset.previewSrc,'/clip.mp4','native getter-only dataset receives a property without reassignment');
 }
 
 const emptyViews = [];
