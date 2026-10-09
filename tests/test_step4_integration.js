@@ -11,6 +11,7 @@ const cssPath = '01_app/assets/steps/step04/step04-video.css';
 const jsPath = '01_app/assets/steps/step04/step04-video.js';
 const brandStatePath = '01_app/assets/steps/step04/step04-brand-state.js';
 const brandSelectionControllerPath = '01_app/assets/steps/step04/step04-brand-selection-controller.js';
+const brandLibraryControllerPath = '01_app/assets/steps/step04/step04-brand-library-controller.js';
 const outroRatioAssetsPath = '01_app/assets/steps/step04/step04-outro-ratio-assets.js';
 const brandStagePreviewPath = '01_app/assets/steps/step04/step04-brand-stage-preview.js';
 const brandOverlayPath = '01_app/assets/steps/step04/step04-brand-overlay.js';
@@ -35,6 +36,7 @@ assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
 assert.ok(fs.existsSync(jsPath), 'step04-video.js must exist');
 assert.ok(fs.existsSync(brandStatePath), 'step04-brand-state.js must exist');
 assert.ok(fs.existsSync(brandSelectionControllerPath), 'step04-brand-selection-controller.js must exist');
+assert.ok(fs.existsSync(brandLibraryControllerPath), 'step04-brand-library-controller.js must exist');
 assert.ok(fs.existsSync(outroRatioAssetsPath), 'step04-outro-ratio-assets.js must exist');
 assert.ok(fs.existsSync(brandStagePreviewPath), 'step04-brand-stage-preview.js must exist');
 assert.ok(fs.existsSync(brandOverlayPath), 'step04-brand-overlay.js must exist');
@@ -56,6 +58,7 @@ assert.ok(fs.existsSync(videoEditorPath), 'video-editor/index.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
+const brandLibrarySource = fs.readFileSync(brandLibraryControllerPath, 'utf8');
 assert.match(partialHtml, /id="step4"/, 'Partial HTML contains #step4');
 assert.match(partialHtml, /id="imageRegenerationModal"/, 'Partial HTML contains #imageRegenerationModal');
 assert.doesNotMatch(step04Source, /document\.addEventListener\('click',[\s\S]*\.ratio-btn/, 'ratio controls must not have a duplicate global click listener');
@@ -76,6 +79,7 @@ const mobileSyncScript = html.indexOf('/01_app/assets/video-editor/mobile-sync.j
 const videoEditorIndexScript = html.indexOf('/01_app/assets/video-editor/index.js');
 const step04BrandStateScript = html.indexOf('/01_app/assets/steps/step04/step04-brand-state.js');
 const step04BrandSelectionControllerScript = html.indexOf('/01_app/assets/steps/step04/step04-brand-selection-controller.js');
+const step04BrandLibraryControllerScript = html.indexOf('/01_app/assets/steps/step04/step04-brand-library-controller.js');
 const step04OutroRatioAssetsScript = html.indexOf('/01_app/assets/steps/step04/step04-outro-ratio-assets.js');
 const step04BrandStagePreviewScript = html.indexOf('/01_app/assets/steps/step04/step04-brand-stage-preview.js');
 const step04BrandOverlayScript = html.indexOf('/01_app/assets/steps/step04/step04-brand-overlay.js');
@@ -100,7 +104,7 @@ assert.ok(mobileSyncScript >= 0, 'HTML loads browser mobile sync dependency');
 assert.ok(Math.max(sceneNavigationScript, ratioProfilesScript, brandSelectionScript, mobileSyncScript) < videoEditorIndexScript, 'browser dependencies load before video-editor index.js');
 assert.ok(videoEditorIndexScript < step04BindingsScript, 'Step 4 UI bindings load after video editor dependencies');
 assert.ok(videoEditorIndexScript < step04BrandStateScript, 'Step 4 brand state loads after video editor dependencies');
-assert.ok(step04BrandStateScript < step04BrandSelectionControllerScript && step04BrandSelectionControllerScript < step04OutroRatioAssetsScript && step04OutroRatioAssetsScript < step04BrandStagePreviewScript && step04BrandStagePreviewScript < step04BrandOverlayScript, 'Step 4 brand dependencies load before overlay controller');
+assert.ok(step04BrandStateScript < step04BrandSelectionControllerScript && step04BrandSelectionControllerScript < step04BrandLibraryControllerScript && step04BrandLibraryControllerScript < step04OutroRatioAssetsScript && step04OutroRatioAssetsScript < step04BrandStagePreviewScript && step04BrandStagePreviewScript < step04BrandOverlayScript, 'Step 4 brand dependencies load before overlay controller');
 assert.ok(step04BrandOverlayScript < step04StoreScript, 'Step 4 overlay controller loads before related Step 4 scripts');
 assert.ok(step04StoreScript < step04NavigationScript, 'Step 4 navigation controller loads after state dependencies');
 assert.ok(step04StoreScript < step04TimelineBridgeScript && step04TimelineBridgeScript < step04NavigationScript, 'timeline bridge loads between Step 4 state and controllers');
@@ -122,6 +126,7 @@ assert.match(html, /src="\/01_app\/assets\/video-editor\/index\.js(?:\?v=[^"]+)?
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js(?:\?v=[^"]+)?"/, 'HTML loads step04-video.js');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-brand-state\.js\?v=20261007_v5"/, 'HTML cache-busts step04-brand-state.js');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-brand-selection-controller\.js\?v=20261009_v28"/, 'HTML cache-busts brand selection controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-brand-library-controller\.js\?v=20261009_v29"/, 'HTML cache-busts brand library controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-outro-ratio-assets\.js\?v=20261009_v26"/, 'HTML cache-busts outro ratio policy');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-brand-stage-preview\.js\?v=20261009_v27"/, 'HTML cache-busts brand stage preview');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-brand-overlay\.js\?v=20261008_v25"/, 'HTML cache-busts step04-brand-overlay.js');
@@ -154,8 +159,13 @@ assert.doesNotMatch(html, /let brandAssets=\[\]|let brandSelections=\[\]/, 'P1 d
 assert.match(html, /function renderBrandChoices\(\)\{return brandSelectionController\.renderChoices\(\)\}/, 'P1 keeps a thin brand choices wrapper');
 assert.match(html, /function currentBrandSelections\(\)\{return brandSelectionController\.serializeSelections\(\)\}/, 'P1 keeps a thin brand serialization wrapper');
 assert.match(html, /function saveBrandSelections\(\)\{return brandSelectionController\.saveSelections\(\)\}/, 'P1 keeps a thin brand save wrapper');
+assert.match(html, /function refreshBrandLibrary\(\)\{return brandLibraryController\.refresh\(\)\}/, 'P1 keeps a thin brand library refresh wrapper');
+assert.match(html, /function showBrandLibrary\(show\)\{return brandLibraryController\.show\(show\)\}/, 'P1 keeps a thin brand library visibility wrapper');
+assert.match(html, /brandLibraryController\.mount\(document\)/, 'P1 mounts the brand library controller after partials load');
+assert.doesNotMatch(html, /document\.querySelector\('#brandUploadButton'\)\.addEventListener/, 'P1 does not retain the brand upload implementation');
 assert.doesNotMatch(html, /if\(path==='\/api\/brand-assets'&&Array\.isArray\(result\.selections\)\)/, 'generic API has no hidden brand selection mutation');
-assert.ok((html.match(/brandSelectionController\.hydrate\(\{assets:/g) || []).length >= 2, 'project content and library refresh hydrate brand data explicitly');
+assert.match(html, /brandSelectionController\.hydrate\(\{assets:result\.brand_assets\|\|\[\],selections:result\.brand_selections\|\|\[\]\}\)/, 'project content load hydrates brand data explicitly');
+assert.match(brandLibrarySource, /selectionController\.hydrate\(\{assets: result\.assets \|\| \[\], selections: result\.selections \|\| \[\]\}\)/, 'brand library refresh hydrates brand data explicitly');
 const brandStateDeclaration = "const brandOverlayState=Step04BrandState.create();";
 assert.ok(html.indexOf(brandStateDeclaration) > 0 && html.indexOf(brandStateDeclaration) < html.indexOf('function activeWatermarkProfile'), 'brand state is initialized before Step 4 settings restore');
 assert.doesNotMatch(html, /let (?:watermarkPosition|watermarkWidthRatio|watermarkProfiles|outroPosition|outroWidthRatio|outroBackground|outroBackgroundOpacity|outroProfiles)=/, 'brand overlay state must not be duplicated in P1 globals');
@@ -281,6 +291,7 @@ function createPrePartialContext() {
     URL,
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),
     Step04BrandSelectionController: require('../01_app/assets/steps/step04/step04-brand-selection-controller.js'),
+    Step04BrandLibraryController: require('../01_app/assets/steps/step04/step04-brand-library-controller.js'),
     Step04OutroRatioAssets: require('../01_app/assets/steps/step04/step04-outro-ratio-assets.js'),
     Step04BrandStagePreview: require('../01_app/assets/steps/step04/step04-brand-stage-preview.js'),
     BrandOverlayController: require('../01_app/assets/steps/step04/step04-brand-overlay.js'),
