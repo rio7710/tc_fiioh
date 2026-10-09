@@ -306,7 +306,7 @@ assert.doesNotMatch(html,/storedStoryboardImageCandidates=new Map\(\);\s*\(items
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-view\.js\?v=20261009_v56"/, 'HTML cache-busts content index view');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v56"/, 'HTML cache-busts content index controller');
 assert.ok(html.indexOf('step01-content-index-view.js') < html.indexOf('step01-content-index-controller.js'), 'content index view loads before controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-view\.js\?v=20261009_v55"/, 'HTML cache-busts project index view');
+assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-view\.js\?v=20261010_v56"/, 'HTML cache-busts project index view');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v55"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-view.js') < html.indexOf('step01-project-index-controller.js'), 'project index view loads before controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');

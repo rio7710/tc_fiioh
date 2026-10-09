@@ -1173,7 +1173,10 @@ def unified_document_view(document):
     used_cues = set()
     for index, scene in enumerate(production.get("timeline", {}).get("scenes", [])):
         cue_ids = scene.get("narration_cue_ids", [])
-        cue_id = cue_ids[0] if cue_ids else None
+        # A generated bridge scene can carry the previous cue plus the cue
+        # that starts on this scene.  The last id is the newly-starting cue;
+        # selecting the first one silently drops the final narration line.
+        cue_id = cue_ids[-1] if cue_ids else None
         cue = cues[cue_indexes[cue_id]] if cue_id in cue_indexes else {}
         line_index = None
         if cue_id and cue_id not in used_cues:

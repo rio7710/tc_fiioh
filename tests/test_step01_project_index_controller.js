@@ -57,7 +57,7 @@ const View = require('../01_app/assets/steps/step01/step01-project-index-view.js
   assert.throws(() => Controller.create({...deps, projectsIndex: null}), /requires projectsIndex/);
 
   const raw = [
-    {project_id: 'A<&', name: 'Alpha<&', current_stage: 3, updated_at: '2026', selected_keywords: [], automation_status: 'failed', automation_stage: 'image_generate', automation_error_message: 'bad<&', is_automated: true, automation_endpoint: '4', automation_voice_total: 2, automation_voice_done: 9, automation_images_total: 3, automation_images_done: 1},
+    {project_id: 'A<&', name: 'Alpha<&', current_stage: 3, updated_at: '2026', selected_keywords: [], automation_status: 'failed', automation_stage: 'video_complete_scene-02', automation_error_message: 'bad<&', is_automated: true, automation_endpoint: '4', automation_voice_total: 2, automation_voice_done: 9, automation_images_total: 3, automation_images_done: 1, automation_videos_total: 4, automation_videos_done: 2},
     {project_id: 'B', name: 'Beta', current_stage: 0, automation_status: 'running', automation_stage: 'image_generate', is_automated: true, automation_endpoint: '5', automation_voice_total: 1, automation_voice_done: 1, automation_images_total: 2, automation_images_done: 9},
     {project_id: 'C', name: 'Legacy', automation_status: 'cancelled', automation_stage: 'video_complete'},
     {project_id: 'D', name: 'Versioned', automation_status: 'succeeded'}
@@ -83,12 +83,13 @@ const View = require('../01_app/assets/steps/step01/step01-project-index-view.js
   assert.match(rows[0].html, /Alpha&lt;&amp;/);
   assert.match(rows[0].html, /automation-failed/);
   assert.match(rows[0].html, /title="bad&lt;&amp;"/);
-  assert.match(rows[0].html, /오류 정지 위치 · STAGE:image_generate/);
+  assert.match(rows[0].html, /오류 정지 위치 · STAGE:video_complete_scene-02/);
   assert.match(rows[1].html, /automation-running/);
   assert.match(rows[2].html, /자동 중지/);
   assert.match(rows[3].html, /자동 완료/);
   assert.match(rows[0].meta.html, /음성 2\/2/);
   assert.match(rows[0].meta.html, /장면 이미지 1\/3/);
+  assert.match(rows[0].meta.html, /Kling 영상 2\/4/);
   assert.match(rows[1].meta.html, /장면 이미지 2\/2/);
   assert.deepEqual(calls.at(-1), ['active', 'B']);
 

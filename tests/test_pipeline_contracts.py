@@ -68,6 +68,29 @@ class PipelineContractTests(unittest.TestCase):
         self.assertEqual(len(self.server.NARRATION_TRACKS), len(timed_scenes))
         self.assertEqual(list(range(len(timed_scenes))), [scene["script_line_index"] for scene in timed_scenes])
 
+    def test_multi_cue_bridge_starts_the_last_cue_without_dropping_a_line(self):
+        cues = [
+            {"id": f"cue-{index}", "narration": {"text": f"line {index}"}}
+            for index in range(1, 5)
+        ]
+        document = {
+            "project": {"title": "fixture"},
+            "production": {
+                "narration_cues": cues,
+                "timeline": {"scenes": [
+                    {"id": "s1", "start": 0, "end": 1, "narration_cue_ids": ["cue-1"]},
+                    {"id": "s2", "start": 1, "end": 2, "narration_cue_ids": ["cue-2"]},
+                    {"id": "s3", "start": 2, "end": 3, "narration_cue_ids": ["cue-3"]},
+                    {"id": "s4", "start": 3, "end": 4, "narration_cue_ids": ["cue-3", "cue-4"]},
+                ]},
+            },
+        }
+        script, timeline = self.server.unified_document_view(document)
+        timed = self.server.timed_script_scenes({"state": {"script": script}, "timeline": timeline})
+        self.assertEqual(4, len(script["lines"]))
+        self.assertEqual([0, 1, 2, 3], [scene["script_line_index"] for scene in timed])
+        self.assertEqual("cue-4", timeline["scenes"][-1]["narration_cue_id"])
+
     def test_render_assets_exist(self):
         self.assertTrue((ROOT / "02_media" / "video" / "P1_merged.mp4").is_file())
         scene_dir = ROOT / "02_media" / "images" / "scenes"

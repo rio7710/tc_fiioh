@@ -1620,6 +1620,7 @@ class AuthStore:
                           ap.status AS automation_status, ap.stage AS automation_stage,
                           ap.error_message AS automation_error_message,
                           ap.endpoint AS automation_endpoint,
+                          ap.run_id AS automation_run_id,
                           (ap.project_id IS NOT NULL) AS is_automated,
                           COALESCE((SELECT json_array_length(json_extract(sr.data_json, '$.document.production.timeline.scenes'))
                               FROM project_stage_revisions sr WHERE sr.project_id=p.project_id AND sr.stage=3
@@ -1661,9 +1662,32 @@ class AuthStore:
                    ORDER BY p.updated_at DESC""",
                 (user_id, user_id),
             ).fetchall()
+            video_counts = {}
+            if connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='automation_steps'"
+            ).fetchone():
+                video_counts = {
+                    row["run_id"]: (int(row["total"] or 0), int(row["done"] or 0))
+                    for row in connection.execute(
+                        """SELECT runs.run_id,
+                                  COALESCE((SELECT json_array_length(json_extract(selection.result_json, '$.value.selected'))
+                                      FROM automation_steps selection
+                                      WHERE selection.run_id=runs.run_id AND selection.step_key='video_scene_selection'
+                                      LIMIT 1),0) AS total,
+                                  (SELECT COUNT(*) FROM automation_steps completed
+                                      WHERE completed.run_id=runs.run_id
+                                        AND completed.step_key LIKE 'video_complete_%'
+                                        AND completed.status='succeeded') AS done
+                             FROM automated_projects runs"""
+                    )
+                }
         projects = []
         for row in rows:
             project = dict(row)
+            run_id = project.pop("automation_run_id", None)
+            video_total, video_done = video_counts.get(run_id, (0, 0))
+            project["automation_videos_total"] = video_total
+            project["automation_videos_done"] = min(video_done, video_total)
             last_confirmed = int(project.pop("last_confirmed_stage"))
             keyword_data = json.loads(project.pop("keyword_data_json") or "{}")
             project["selected_keywords"] = keyword_data.get("selected_keywords", [])

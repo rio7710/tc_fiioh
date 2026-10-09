@@ -143,11 +143,15 @@ class AutomationTests(unittest.TestCase):
         self.assertEqual(automatic['automation_images_done'],0)
         self.assertEqual(automatic['automation_voice_total'],0)
         self.assertEqual(automatic['automation_voice_done'],0)
+        self.assertEqual(automatic['automation_videos_total'],0)
+        self.assertEqual(automatic['automation_videos_done'],0)
         AutomationRunner(self.store,FakeAPI,BASE).execute(run)
         finished=next(item for item in self.auth.list_projects(self.user) if item['project_id']==run['project_id'])
         self.assertEqual(finished['automation_status'],'succeeded')
         self.assertEqual(finished['automation_images_total'],2)
         self.assertEqual(finished['automation_voice_total'],2)
+        self.assertEqual(finished['automation_videos_total'],0)
+        self.assertEqual(finished['automation_videos_done'],0)
     def test_keyword_counts_one_to_five(self):
         for count in range(1,6):
             c=config();c['keywords']['count']=count
@@ -247,6 +251,9 @@ class AutomationTests(unittest.TestCase):
         self.assertEqual(self.store.snapshot(self.user)['runs'][0]['status'],'succeeded')
         generated=[p['scene_id'] for route,p in FakeAPI.calls if route=='/api/storyboard/video-generate']
         self.assertEqual(generated,['fixture_scene_b'])
+        project=next(item for item in self.auth.list_projects(self.user) if item['project_id']==run['project_id'])
+        self.assertEqual(project['automation_videos_total'],1)
+        self.assertEqual(project['automation_videos_done'],1)
         exported=next(p for route,p in FakeAPI.calls if route=='/render')
         self.assertEqual(exported['scene_crop_positions']['fixture_scene_a']['9x16'],75)
 
