@@ -42,12 +42,22 @@
           'FFmpeg Worker가 비율별 영상·자막·음성·BGM을 H.264/AAC로 최종 합성 중입니다',
           'MP4 파일을 등록하고 콘텐츠 캘린더에 기록 중입니다'
         ];
+        const renderJobId = `render-${d.now()}-${d.random().toString(36).slice(2, 8)}`;
+        const payload = d.getPayload(renderJobId);
         modal.hidden = false; modal.classList.remove('complete'); root().body?.classList.add('modal-open');
         progress.style.width = '0%'; now.classList.add('processing'); now.textContent = '영상 생성·최종 출력 워커를 호출하고 있습니다';
         roles.forEach(role => { role.className = 'ai-role'; role.querySelector('.ai-role-state').textContent = '대기'; });
-        d.setupCaptionProgressBadges(roles[1]);
-        d.setupCompositeFormatBadges(roles[2]);
-        d.setupSceneProgressBadges(roles[2], '장면별 최종 영상 합성 상태');
+        // Start the durable job before optional progress decoration. A broken
+        // badge renderer must never prevent the actual export from reaching
+        // the queue.
+        const renderRequest = d.fetch('/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        try {
+          d.setupCaptionProgressBadges(roles[1]);
+          d.setupCompositeFormatBadges(roles[2]);
+          d.setupSceneProgressBadges(roles[2], '장면별 최종 영상 합성 상태');
+        } catch (decorationError) {
+          d.onError?.(decorationError);
+        }
         const captionBadgeTotal = roles[1].querySelectorAll('.scene-conversion-badge').length;
         try {
           const activate = index => {
@@ -73,7 +83,6 @@
           activate(1); d.applySequentialCaptionProgress(roles[1], 0);
           d.applyCompositeFormatProgress(roles[2], 0);
           d.applySequentialSceneProgress(roles[2], 0);
-          const renderJobId = `render-${d.now()}-${d.random().toString(36).slice(2, 8)}`;
           let renderPollBusy = false;
           const pollRenderProgress = async () => {
             if (renderPollBusy) return;
@@ -105,8 +114,7 @@
           renderPoll = d.setInterval(pollRenderProgress, 500);
           let response;
           try {
-            const payload = d.getPayload(renderJobId);
-            response = await d.fetch('/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            response = await renderRequest;
           } catch (requestError) {
             let recoveredResult = null;
             for (let attempt = 0; attempt < 1200; attempt++) {

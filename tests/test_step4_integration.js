@@ -400,7 +400,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-orches
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-lifecycle-controller\.js\?v=20261008_v18"/, 'HTML cache-busts lifecycle controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-image-regeneration-controller\.js\?v=20261009_v50"/, 'HTML cache-busts image regeneration controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-actions-controller\.js\?v=20261008_v25"/, 'HTML cache-busts UI actions controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-render-controller\.js\?v=20261008_v13"/, 'HTML cache-busts render controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-render-controller\.js\?v=20261010_v14"/, 'HTML cache-busts render controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261010_v4"/, 'HTML cache-busts Step 4 controller');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /#prevBtn|#nextBtn|#mobileSceneSelect|#sceneList/, 'UI bindings do not duplicate navigation listeners');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /feature\('playback'|#playBtn|addEventListener\('play'|addEventListener\('pause'/, 'UI bindings do not duplicate playback listeners');
