@@ -26,6 +26,7 @@
 <script src="/01_app/assets/steps/step02/trend-keyword-controller.js?v=20261009_v40"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
+<script src="/01_app/assets/steps/step03/candidate-selection-controller.js?v=20261009_v46"></script>
 <script src="/01_app/assets/steps/step03/scene-image-controller.js?v=20261009_v45"></script>
 <script src="/01_app/assets/steps/step03/scene-video-controller.js?v=20261009_v44"></script>
 <script src="/01_app/assets/steps/step03/production-workflow-controller.js?v=20261009_v43"></script>
@@ -1547,33 +1548,10 @@ function renderStoryboardGrid(){
   resumePendingSceneVideos();
 }
 async function cycleStoryboardCandidate(button){
-  const card=button.closest('.storyboard-card');const sceneId=card.dataset.scene;
-  const candidates=storedStoryboardImageCandidates.get(sceneId)||[];
-  if(candidates.length<2)return;
-  const current=storedStoryboardImages.get(sceneId);
-  const currentIndex=Math.max(0,candidates.findIndex(item=>item.artifact_id===current?.artifact_id||item.uri===current?.uri));
-  const target=candidates[(currentIndex+Number(button.dataset.direction)+candidates.length)%candidates.length];
-  card.querySelectorAll('.storyboard-candidate-nav').forEach(item=>item.disabled=true);
-  await api('/api/storyboard/image-select',{method:'POST',body:JSON.stringify({project_id:activeProjectId,scene_id:sceneId,artifact_id:target.artifact_id})});
-  candidates.forEach(item=>item.selected=item.artifact_id===target.artifact_id);
-  storedStoryboardImages.set(sceneId,{...target});storedStoryboardVideos.delete(sceneId);
-  renderStoryboardGrid();
-  document.querySelector(`.storyboard-card[data-scene="${CSS.escape(sceneId)}"]`)?.scrollIntoView({block:'nearest'});
+  return candidateSelectionController.selectImage(button);
 }
 async function cycleStoryboardVideoCandidate(button){
-  const card=button.closest('.storyboard-card');const sceneId=card.dataset.scene;
-  const candidates=storedStoryboardVideoCandidates.get(sceneId)||[];
-  if(candidates.length<2)return;
-  const current=storedStoryboardVideos.get(sceneId);
-  const currentIndex=Math.max(0,candidates.findIndex(item=>item.artifact_id===current?.artifact_id||item.uri===current?.uri));
-  const target=candidates[(currentIndex+Number(button.dataset.direction)+candidates.length)%candidates.length];
-  card.querySelectorAll('.storyboard-video-candidate-nav').forEach(item=>item.disabled=true);
-  await api('/api/storyboard/video-select',{method:'POST',body:JSON.stringify({project_id:activeProjectId,scene_id:sceneId,artifact_id:target.artifact_id})});
-  candidates.forEach(item=>item.selected=item.artifact_id===target.artifact_id);
-  storedStoryboardVideos.set(sceneId,{...target});
-  renderStoryboardGrid();
-  document.querySelector(`.storyboard-card[data-scene="${CSS.escape(sceneId)}"]`)?.scrollIntoView({block:'nearest'});
-  document.querySelector('#storyboardMessage').textContent='선택한 영상 버전이 콘텐츠에 저장되었습니다.';
+  return candidateSelectionController.selectVideo(button);
 }
 async function generateStoryboardImage(button,force=true){
   return sceneImageController.generate(button,force);
@@ -2227,6 +2205,8 @@ const contentIndexController=Step01ContentIndexController.create({request:(...ar
 contentIndexController.mount(document);
 const scriptGenerationController=Step02ScriptGenerationController.create({getRoot:()=>document,configureWorkflowModal,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getSelectedKeywordLabels:selectedKeywordLabels,now:()=>Date.now(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),sleep,setGeneratedState:state=>{demoData.state=state},setGeneratedTimeline:timeline=>{demoData.timeline=timeline},setGeneratedDocument:value=>{activeStoryboardDocument=value},setKeywordLocked:setKeywordStageLocked,setVoiceProfile,applyTimeline,removeStoredScript:()=>localStorage.removeItem(SCRIPT_STORAGE_KEY),fillScript,applyScript,refreshProjectIndex,showStep});
 scriptGenerationController.mount(document);
+const candidateSelectionController=Step03CandidateSelectionController.create({getRoot:()=>document,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getImages:()=>storedStoryboardImages,getImageCandidates:()=>storedStoryboardImageCandidates,getVideos:()=>storedStoryboardVideos,getVideoCandidates:()=>storedStoryboardVideoCandidates,renderStoryboardGrid,escapeSelector:value=>CSS.escape(value),onError:(feature,error)=>console.error(`[CandidateSelection:${feature}]`,error)});
+candidateSelectionController.mount(document);
 const sceneImageController=Step03SceneImageController.create({getRoot:()=>document,request:(...args)=>api(...args),sleep,getActiveProjectId:()=>activeProjectId,getImages:()=>storedStoryboardImages,getImageCandidates:()=>storedStoryboardImageCandidates,getVideos:()=>storedStoryboardVideos,escapeHtml,onError:(feature,error)=>console.error(`[SceneImage:${feature}]`,error)});
 sceneImageController.mount(document);
 const sceneVideoController=Step03SceneVideoController.create({getRoot:()=>document,request:(...args)=>api(...args),sleep,getActiveProjectId:()=>activeProjectId,getImages:()=>storedStoryboardImages,getVideos:()=>storedStoryboardVideos,getVideoCandidates:()=>storedStoryboardVideoCandidates,renderStoryboardGrid,escapeSelector:value=>CSS.escape(value),onError:(feature,error)=>console.error(`[SceneVideo:${feature}]`,error)});
@@ -2255,16 +2235,6 @@ document.querySelector('#storyboardNext').addEventListener('click',async()=>{
     connectStoryboardAssetsToEditor();
     showStep(4);
   }catch(error){message.textContent=error.message}
-});
-document.querySelector('#storyboardGrid').addEventListener('click',async event=>{
-  const candidateButton=event.target.closest('.storyboard-candidate-nav');if(!candidateButton)return;
-  event.preventDefault();event.stopPropagation();
-  try{await cycleStoryboardCandidate(candidateButton)}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
-});
-document.querySelector('#storyboardGrid').addEventListener('click',async event=>{
-  const candidateButton=event.target.closest('.storyboard-video-candidate-nav');if(!candidateButton)return;
-  event.preventDefault();event.stopPropagation();
-  try{await cycleStoryboardVideoCandidate(candidateButton)}catch(error){document.querySelector('#storyboardMessage').textContent=error.message}
 });
 document.querySelector('#storyboardGrid').addEventListener('click',async event=>{
   const button=event.target.closest('.storyboard-speaker');if(!button)return;
