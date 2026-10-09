@@ -46,6 +46,7 @@ const sceneVideoControllerPath = '01_app/assets/steps/step03/scene-video-control
 const sceneImageControllerPath = '01_app/assets/steps/step03/scene-image-controller.js';
 const candidateSelectionControllerPath = '01_app/assets/steps/step03/candidate-selection-controller.js';
 const sceneVoiceControllerPath = '01_app/assets/steps/step03/scene-voice-controller.js';
+const voiceProfileControllerPath = '01_app/assets/steps/step03/voice-profile-controller.js';
 
 assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist');
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
@@ -87,6 +88,7 @@ assert.ok(fs.existsSync(sceneVideoControllerPath), 'scene-video-controller.js mu
 assert.ok(fs.existsSync(sceneImageControllerPath), 'scene-image-controller.js must exist');
 assert.ok(fs.existsSync(candidateSelectionControllerPath), 'candidate-selection-controller.js must exist');
 assert.ok(fs.existsSync(sceneVoiceControllerPath), 'scene-voice-controller.js must exist');
+assert.ok(fs.existsSync(voiceProfileControllerPath), 'voice-profile-controller.js must exist');
 
 const partialHtml = fs.readFileSync(partialPath, 'utf8');
 const step04Source = fs.readFileSync(jsPath, 'utf8');
@@ -115,6 +117,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-video-controller
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-image-controller\.js\?v=20261009_v45"/, 'HTML cache-busts scene image controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/candidate-selection-controller\.js\?v=20261009_v46"/, 'HTML cache-busts candidate selection controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-voice-controller\.js\?v=20261009_v47"/, 'HTML cache-busts scene voice controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step03\/voice-profile-controller\.js\?v=20261009_v48"/, 'HTML cache-busts voice profile controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('trend-keyword-controller.js'), 'base Step 2 module loads before trend keyword controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('script-generation-controller.js') && html.indexOf('script-generation-controller.js') < html.indexOf('trend-keyword-controller.js'), 'script generation loads between Step 2 keyword controllers');
 assert.ok(html.indexOf('step03-script-editor-controller.js') < html.indexOf('production-workflow-controller.js'), 'production workflow loads after Step 3 script editor');
@@ -122,6 +125,7 @@ assert.ok(html.indexOf('scene-video-controller.js') < html.indexOf('production-w
 assert.ok(html.indexOf('scene-image-controller.js') < html.indexOf('scene-video-controller.js'), 'scene image controller loads before scene video controller');
 assert.ok(html.indexOf('candidate-selection-controller.js') < html.indexOf('scene-image-controller.js'), 'candidate selection controller loads before scene image controller');
 assert.ok(html.indexOf('scene-voice-controller.js') < html.indexOf('candidate-selection-controller.js'), 'scene voice controller loads before candidate selection controller');
+assert.ok(html.indexOf('voice-profile-controller.js') < html.indexOf('scene-voice-controller.js'), 'voice profile controller loads before scene voice controller');
 assert.ok(html.indexOf('content-route.js') < html.indexOf('shell-navigation-controller.js'), 'content route helper loads before shell navigation');
 assert.ok(html.indexOf('shell-navigation-controller.js') < html.indexOf('session-bootstrap-controller.js'), 'shell navigation loads before session bootstrap');
 assert.ok(html.indexOf('session-bootstrap-controller.js') < html.indexOf('auth-ui-controller.js'), 'session bootstrap loads before auth UI controller');
@@ -203,6 +207,13 @@ assert.match(html,/function updateStoryboardVoiceControls\(\)\{\s*return sceneVo
 assert.match(html,/async function generateOrPlaySceneVoice\(button,autoplay=true\)\{\s*return sceneVoiceController\.generateOrPlay\(button,autoplay\);\s*\}/,'P1 keeps thin scene voice wrapper');
 assert.match(html,/async function generateMissingSceneVoices\(\)\{\s*return sceneVoiceController\.generateMissing\(\);\s*\}/,'P1 keeps thin bulk voice wrapper');
 assert.doesNotMatch(html,/\/api\/voice\/generate-scene|document\.querySelector\('#storyboardVoiceBulkGenerate'\)\.addEventListener/,'P1 removes scene voice API body and listeners');
+assert.match(html,/const voiceProfileController=Step03VoiceProfileController\.create\(/,'P1 wires voice profile controller');
+assert.match(html,/voiceProfileController\.mount\(document\)/,'P1 mounts voice profile interactions');
+assert.match(html,/function setVoiceProfile\(profileId\)\{\s*return voiceProfileController\.setProfile\(profileId\);\s*\}/,'P1 keeps thin voice profile setter');
+assert.match(html,/async function previewVoiceProfile\(button\)\{\s*return voiceProfileController\.preview\(button\);\s*\}/,'P1 keeps thin voice preview wrapper');
+assert.doesNotMatch(html,/async function previewVoiceProfile\(button\)\{\s*const profileId=|document\.querySelector\('\.voice-picker'\)\.addEventListener/,'P1 removes main voice profile body and listener');
+assert.match(fs.readFileSync(voiceProfileControllerPath,'utf8'),/\/api\/voice\/select[\s\S]*\/api\/voice\/sample\?profile=/,'voice profile controller owns select and sample requests');
+assert.match(html,/document\.querySelector\('#userVoicePreview'\)\.addEventListener/,'user settings voice preview remains in P1');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v31"/, 'HTML cache-busts project index controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
@@ -452,6 +463,7 @@ function createPrePartialContext() {
     Step03SceneImageController: require('../01_app/assets/steps/step03/scene-image-controller.js'),
     Step03CandidateSelectionController: require('../01_app/assets/steps/step03/candidate-selection-controller.js'),
     Step03SceneVoiceController: require('../01_app/assets/steps/step03/scene-voice-controller.js'),
+    Step03VoiceProfileController: require('../01_app/assets/steps/step03/voice-profile-controller.js'),
     Step02TrendKeywordController: require('../01_app/assets/steps/step02/trend-keyword-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),

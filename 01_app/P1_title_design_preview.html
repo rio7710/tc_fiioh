@@ -26,6 +26,7 @@
 <script src="/01_app/assets/steps/step02/trend-keyword-controller.js?v=20261009_v40"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-script-editor-controller.js?v=20261009_v38"></script>
+<script src="/01_app/assets/steps/step03/voice-profile-controller.js?v=20261009_v48"></script>
 <script src="/01_app/assets/steps/step03/scene-voice-controller.js?v=20261009_v47"></script>
 <script src="/01_app/assets/steps/step03/candidate-selection-controller.js?v=20261009_v46"></script>
 <script src="/01_app/assets/steps/step03/scene-image-controller.js?v=20261009_v45"></script>
@@ -1495,8 +1496,7 @@ async function loadProjectState(projectId,token){
   return projectHydrationController.loadState(projectId,token);
 }
 function setVoiceProfile(profileId){
-  selectedVoiceProfile=['warm_female','bright_female','steady_male','qwen_narrator','qwen_etp'].includes(profileId)?profileId:'warm_female';
-  document.querySelectorAll('[data-voice-profile]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.voiceProfile===selectedVoiceProfile)));
+  return voiceProfileController.setProfile(profileId);
 }
 function sceneVoiceContext(sceneId){
   return sceneVoiceController.context(sceneId);
@@ -1564,20 +1564,7 @@ async function generateMissingSceneVideos(){
   return sceneVideoController.generateMissing();
 }
 async function previewVoiceProfile(button){
-  const profileId=button.dataset.voiceProfile;
-  const message=document.querySelector('#scriptMessage');
-  const audio=document.querySelector('#voiceSampleAudio');
-  button.classList.add('loading');message.textContent='샘플 음성을 준비하고 있습니다.';
-  try{
-    const selected=await api('/api/voice/select',{method:'POST',body:JSON.stringify({project_id:activeProjectId,profile_id:profileId})});
-    setVoiceProfile(selected.voice_profile);
-    const response=await fetch(`/api/voice/sample?profile=${encodeURIComponent(profileId)}&v=greeting-20260928`,{credentials:'same-origin',cache:'no-store'});
-    if(!response.ok){const detail=await response.json().catch(()=>({}));throw new Error(detail.error||'샘플 음성을 불러오지 못했습니다.')}
-    const sampleUrl=URL.createObjectURL(await response.blob());
-    audio.pause();audio.src=sampleUrl;audio.onended=()=>URL.revokeObjectURL(sampleUrl);
-    await audio.play();
-    message.textContent='선택한 샘플을 재생합니다. 다음 단계에서 이 목소리로 실제 대본 음성을 생성합니다.';
-  }finally{button.classList.remove('loading')}
+  return voiceProfileController.preview(button);
 }
 function renderKeywords(){
   return keywordController.render();
@@ -2160,6 +2147,8 @@ const contentIndexController=Step01ContentIndexController.create({request:(...ar
 contentIndexController.mount(document);
 const scriptGenerationController=Step02ScriptGenerationController.create({getRoot:()=>document,configureWorkflowModal,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getSelectedKeywordLabels:selectedKeywordLabels,now:()=>Date.now(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),sleep,setGeneratedState:state=>{demoData.state=state},setGeneratedTimeline:timeline=>{demoData.timeline=timeline},setGeneratedDocument:value=>{activeStoryboardDocument=value},setKeywordLocked:setKeywordStageLocked,setVoiceProfile,applyTimeline,removeStoredScript:()=>localStorage.removeItem(SCRIPT_STORAGE_KEY),fillScript,applyScript,refreshProjectIndex,showStep});
 scriptGenerationController.mount(document);
+const voiceProfileController=Step03VoiceProfileController.create({getRoot:()=>document,request:(...args)=>api(...args),fetch:(...args)=>fetch(...args),createObjectURL:blob=>URL.createObjectURL(blob),revokeObjectURL:url=>URL.revokeObjectURL(url),getActiveProjectId:()=>activeProjectId,getSelectedProfile:()=>selectedVoiceProfile,setSelectedProfile:value=>{selectedVoiceProfile=value},onError:(feature,error)=>console.error(`[VoiceProfile:${feature}]`,error)});
+voiceProfileController.mount(document);
 const sceneVoiceController=Step03SceneVoiceController.create({getRoot:()=>document,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getStoryboardDocument:()=>activeStoryboardDocument,getVoiceClips:()=>storedStoryboardVoiceClips,getSelectedVoiceProfile:()=>selectedVoiceProfile,setDemoTimeline:timeline=>{demoData.timeline=timeline},applyTimeline,onError:(feature,error)=>console.error(`[SceneVoice:${feature}]`,error)});
 sceneVoiceController.mount(document);
 const candidateSelectionController=Step03CandidateSelectionController.create({getRoot:()=>document,request:(...args)=>api(...args),getActiveProjectId:()=>activeProjectId,getImages:()=>storedStoryboardImages,getImageCandidates:()=>storedStoryboardImageCandidates,getVideos:()=>storedStoryboardVideos,getVideoCandidates:()=>storedStoryboardVideoCandidates,renderStoryboardGrid,escapeSelector:value=>CSS.escape(value),onError:(feature,error)=>console.error(`[CandidateSelection:${feature}]`,error)});
@@ -2196,7 +2185,6 @@ document.querySelector('#storyboardNext').addEventListener('click',async()=>{
 document.querySelector('#storyboardLookToolbar').addEventListener('click',event=>{
   const button=event.target.closest('[data-look]');if(button)applyStoryboardLook(button.dataset.look);
 });
-document.querySelector('.voice-picker').addEventListener('click',async event=>{const button=event.target.closest('[data-voice-profile]');if(!button)return;try{await previewVoiceProfile(button)}catch(error){document.querySelector('#scriptMessage').textContent=error.message}});
 
 
 // Thin Adapter Bridge for Step 04 Video Editor
