@@ -568,6 +568,7 @@ function createPrePartialContext() {
     Step05CalendarStore: require('../01_app/assets/steps/step05/step05-calendar-store.js'),
     Step05CalendarViewController: require('../01_app/assets/steps/step05/step05-calendar-view-controller.js'),
     Step05CalendarRenderer: require('../01_app/assets/steps/step05/step05-calendar-renderer.js'),
+    Step05CalendarDragController: require('../01_app/assets/steps/step05/step05-calendar-drag-controller.js'),
     Step02TrendKeywordController: require('../01_app/assets/steps/step02/trend-keyword-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ContentIndexView: require('../01_app/assets/steps/step01/step01-content-index-view.js'),

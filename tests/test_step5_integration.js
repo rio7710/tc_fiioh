@@ -7,7 +7,8 @@ const jsPath = '01_app/assets/steps/step05/step05-calendar.js';
 const storePath = '01_app/assets/steps/step05/step05-calendar-store.js';
 const viewControllerPath = '01_app/assets/steps/step05/step05-calendar-view-controller.js';
 const rendererPath = '01_app/assets/steps/step05/step05-calendar-renderer.js';
-[partialPath, cssPath, jsPath, storePath, viewControllerPath, rendererPath].forEach(file => assert.ok(fs.existsSync(file), `${file} must exist`));
+const dragControllerPath = '01_app/assets/steps/step05/step05-calendar-drag-controller.js';
+[partialPath, cssPath, jsPath, storePath, viewControllerPath, rendererPath, dragControllerPath].forEach(file => assert.ok(fs.existsSync(file), `${file} must exist`));
 
 const html = fs.readFileSync(partialPath, 'utf8');
 const shell = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
@@ -31,9 +32,11 @@ assert.match(shell, /step05-calendar\.js\?v=20261009_v63/, 'shell cache-busts St
 assert.match(shell, /step05-calendar-store\.js\?v=20261009_v64/, 'shell cache-busts Step 5 calendar store');
 assert.match(shell, /step05-calendar-view-controller\.js\?v=20261009_v65/, 'shell cache-busts calendar view controller');
 assert.match(shell, /step05-calendar-renderer\.js\?v=20261009_v66/, 'shell cache-busts calendar renderer');
+assert.match(shell, /step05-calendar-drag-controller\.js\?v=20261009_v67/, 'shell cache-busts calendar drag controller');
 assert.ok(shell.indexOf('step05-calendar.js') < shell.indexOf('step05-calendar-store.js'), 'calendar domain helpers load before store');
 assert.ok(shell.indexOf('step05-calendar-store.js') < shell.indexOf('step05-calendar-view-controller.js'), 'calendar view controller loads after calendar store');
 assert.ok(shell.indexOf('step05-calendar-view-controller.js') < shell.indexOf('step05-calendar-renderer.js'), 'calendar renderer loads after view controller');
+assert.ok(shell.indexOf('step05-calendar-renderer.js') < shell.indexOf('step05-calendar-drag-controller.js'), 'calendar drag controller loads after renderer');
 assert.match(shell,/const calendarStore=Step05CalendarStore\.create\(\{storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:\(\.\.\.args\)=>api\(\.\.\.args\),collapseDuplicates:Step05Calendar\.collapseDuplicates,uniquenessKey:Step05Calendar\.uniquenessKey\}\)/,'shell wires calendar store to canonical uniqueness helpers');
 assert.match(shell,/function loadCalendarEntries\(\)\{\s*calendarEntries=calendarStore\.load\(\)\.entries;\s*\}/,'local calendar load is a thin state delegate');
 assert.match(shell,/async function hydrateCalendarEntries\(\)\{\s*calendarEntries=\(await calendarStore\.hydrate\(calendarEntries\)\)\.entries;\s*renderCalendar\(\{preserveScroll:true\}\);\s*\}/,'server calendar hydration is a thin state/render delegate');
@@ -45,6 +48,9 @@ assert.match(shell,/function moveCalendarPeriod\(direction\)\{\s*calendarViewCon
 assert.doesNotMatch(shell,/let calendarCursor=|let calendarView=|function loadCalendarUi\(\)\{\s*try|calendarCursor=new Date\(`\$\{day\.dataset\.date\}/,'shell has no duplicate calendar view state');
 assert.match(shell,/const model=calendarRenderer\.render\(\{view:calendarView,cursor:calendarCursor,entries:calendarEntries,now:new Date\(\)\}\)/,'shell delegates calendar markup to pure renderer');
 assert.doesNotMatch(shell,/function renderCalendarStickers|function calendarDayMarkup|function renderCalendarTimeGrid|const weekdays=\['SUN'/,'shell has no duplicate calendar markup implementation');
+assert.match(shell,/const calendarDragController=Step05CalendarDragController\.create\(\{grid:calendarGrid,[\s\S]*?contentIdentity:Step05Calendar\.contentIdentity,[\s\S]*?collapseDuplicates:Step05Calendar\.collapseDuplicates,[\s\S]*?shiftTimestampDate:Step05Calendar\.shiftTimestampDate,dateKey:Step05Calendar\.dateKey/,'shell injects canonical calendar helpers into drag controller');
+assert.match(shell,/if\(calendarDragController\.consumeDidDrag\(\)\)return;/,'shell click path consumes drag suppression explicitly');
+assert.doesNotMatch(shell,/function shiftCalendarTimestampDate|function moveCalendarGroupToDate|function calendarDropMinute|function clearCalendarDropTargets|calendarGrid\.addEventListener\('dragstart'/,'shell has no duplicate drag implementation');
 assert.equal((shell.match(/id="step5"/g) || []).length, 0, 'Step 5 markup is not duplicated inline');
 assert.equal((shell.match(/id="calendarSettingsModal"/g) || []).length, 0, 'Step 5 modals are not duplicated inline');
 assert.match(shell, /ThinkCastApiClient\.createApiClient\(\)/, 'shell delegates JSON requests to the shared API client');

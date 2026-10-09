@@ -76,6 +76,7 @@
 <script src="/01_app/assets/steps/step05/step05-calendar-store.js?v=20261009_v64"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-view-controller.js?v=20261009_v65"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-renderer.js?v=20261009_v66"></script>
+<script src="/01_app/assets/steps/step05/step05-calendar-drag-controller.js?v=20261009_v67"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css?v=20261007_v2">
@@ -1237,8 +1238,6 @@ let calendarSettingsGroup=[];
 let calendarLongPressTimer=null;
 let calendarLongPressPoint=null;
 let calendarLongPressOpened=false;
-let calendarDraggingGroupId=null;
-let calendarDidDrag=false;
 let currentPreviewPlatform='youtube';
 let captionSizeLevel=0;
 let videoPanX=50;
@@ -1593,47 +1592,6 @@ function renderCalendar({preserveScroll=false}={}){
   }else if(calendarView!=='month'&&scroller.scrollTop===0)scroller.scrollTop=8*52;
   saveCalendarUi();
 }
-function shiftCalendarTimestampDate(value,nextDate){
-  if(!value)return value;
-  const parsed=new Date(value);if(Number.isNaN(parsed.getTime()))return value;
-  const parts=new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'Asia/Seoul'}).formatToParts(parsed);
-  const part=type=>parts.find(item=>item.type===type)?.value||'00';
-  const hour=part('hour')==='24'?'00':part('hour');
-  return `${nextDate}T${hour}:${part('minute')}:${part('second')}+09:00`;
-}
-function moveCalendarGroupToDate(groupId,nextDate,nextMinute=null){
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(nextDate||''))return;
-  const anchor=calendarEntries.find(item=>item.id===groupId);if(!anchor||(anchor.start===nextDate&&!Number.isFinite(nextMinute)))return;
-  const previousDate=anchor.start;
-  const group=calendarEntries.filter(item=>item.start===previousDate&&item.title===anchor.title);
-  group.forEach(item=>{
-    item.extendedProps=item.extendedProps||{};
-    item.start=nextDate;item.end=nextDateKey(nextDate);
-    ['createdAt','scheduledAt','distributedAt','deletedAt'].forEach(key=>{
-      if(item.extendedProps?.[key])item.extendedProps[key]=shiftCalendarTimestampDate(item.extendedProps[key],nextDate);
-    });
-    if(Number.isFinite(nextMinute)){
-      const status=item.extendedProps.status||'draft';
-      const timeKey=status==='published'?'distributedAt':status==='scheduled'?'scheduledAt':status==='deleted'?'deletedAt':'createdAt';
-      const hour=String(Math.floor(nextMinute/60)).padStart(2,'0');
-      const minute=String(nextMinute%60).padStart(2,'0');
-      item.extendedProps[timeKey]=`${nextDate}T${hour}:${minute}:00+09:00`;
-    }
-  });
-  saveCalendarEntries();renderCalendar({preserveScroll:true});
-  const movedTime=Number.isFinite(nextMinute)?` ${String(Math.floor(nextMinute/60)).padStart(2,'0')}:${String(nextMinute%60).padStart(2,'0')}`:'';
-  calendarHelp.textContent=`${anchor.title} 스티커를 ${nextDate}${movedTime}로 이동했습니다.`;
-}
-function calendarDropMinute(event,column){
-  const rect=column.getBoundingClientRect();
-  const raw=(event.clientY-rect.top)*60/52;
-  return Math.max(0,Math.min(1410,Math.round(raw/30)*30));
-}
-function clearCalendarDropTargets(){
-  calendarGrid.querySelectorAll('.drop-target').forEach(item=>{
-    item.classList.remove('drop-target');item.style.removeProperty('--drop-top');delete item.dataset.dropTime;
-  });
-}
 function recordCurrentProduction(result){
   const start=dateKey(new Date());
   const title=document.querySelector('#projectTitle').textContent.trim()||'그린힐 콘텐츠';
@@ -1987,44 +1945,12 @@ document.querySelectorAll('.calendar-view-btn').forEach(button=>button.addEventL
 }));
 document.querySelector('#calendarExport').addEventListener('click',exportCalendarIcs);
 calendarGrid.addEventListener('click',event=>{
-  if(calendarDidDrag){calendarDidDrag=false;return}
+  if(calendarDragController.consumeDidDrag())return;
   if(calendarLongPressOpened){calendarLongPressOpened=false;return}
   const sticker=event.target.closest('.calendar-sticker');
   if(sticker){openCalendarPreview(sticker.dataset.groupId);return}
   const day=event.target.closest('.calendar-day,.calendar-time-column');if(!day||calendarViewController.snapshot().view==='day')return;
   calendarViewController.selectDate(day.dataset.date);renderCalendar();
-});
-calendarGrid.addEventListener('dragstart',event=>{
-  const sticker=event.target.closest('.calendar-sticker');if(!sticker)return;
-  calendarDraggingGroupId=sticker.dataset.groupId;calendarDidDrag=true;
-  sticker.classList.add('dragging');
-  event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',calendarDraggingGroupId);
-});
-calendarGrid.addEventListener('dragover',event=>{
-  const target=event.target.closest('.calendar-day,.calendar-time-column');if(!target||!calendarDraggingGroupId)return;
-  event.preventDefault();event.dataTransfer.dropEffect='move';
-  calendarGrid.querySelectorAll('.drop-target').forEach(item=>item.classList.toggle('drop-target',item===target));
-  if(target.classList.contains('calendar-time-column')){
-    const minute=calendarDropMinute(event,target);
-    target.style.setProperty('--drop-top',`${(minute*52/60).toFixed(1)}px`);
-    target.dataset.dropTime=`${String(Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`;
-  }
-});
-calendarGrid.addEventListener('dragleave',event=>{
-  const target=event.target.closest('.calendar-day,.calendar-time-column');
-  if(target&&!target.contains(event.relatedTarget)){target.classList.remove('drop-target');target.style.removeProperty('--drop-top');delete target.dataset.dropTime}
-});
-calendarGrid.addEventListener('drop',event=>{
-  const target=event.target.closest('.calendar-day,.calendar-time-column');if(!target)return;
-  event.preventDefault();
-  const groupId=calendarDraggingGroupId||event.dataTransfer.getData('text/plain');
-  const minute=target.classList.contains('calendar-time-column')?calendarDropMinute(event,target):null;
-  moveCalendarGroupToDate(groupId,target.dataset.date,minute);
-});
-calendarGrid.addEventListener('dragend',event=>{
-  event.target.closest('.calendar-sticker')?.classList.remove('dragging');
-  clearCalendarDropTargets();
-  calendarDraggingGroupId=null;setTimeout(()=>{calendarDidDrag=false},100);
 });
 calendarGrid.addEventListener('contextmenu',event=>{
   const sticker=event.target.closest('.calendar-sticker');if(!sticker)return;
@@ -2081,6 +2007,8 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!platformGu
 const calendarStore=Step05CalendarStore.create({storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:(...args)=>api(...args),collapseDuplicates:Step05Calendar.collapseDuplicates,uniquenessKey:Step05Calendar.uniquenessKey});
 const calendarViewController=Step05CalendarViewController.create({storage:localStorage,storageKey:CALENDAR_UI_STORAGE_KEY,now:()=>new Date(),isDateKey:value=>/^\d{4}-\d{2}-\d{2}$/.test(value||''),dateKey:Step05Calendar.dateKey});
 const calendarRenderer=Step05CalendarRenderer.create({dateKey:Step05Calendar.dateKey,groupEntries:Step05Calendar.groupCalendarEntries,statusTimestamp:Step05Calendar.calendarStatusTimestamp,formatTime:Step05Calendar.formatCalendarTime,minuteOfDay:Step05Calendar.calendarMinuteOfDay,escapeHtml,statusLabels:calendarStatusLabels,platformLabels:calendarPlatformLabels,timeLabels:calendarTimeLabels});
+const calendarDragController=Step05CalendarDragController.create({grid:calendarGrid,getEntries:()=>calendarEntries,setEntries:entries=>{calendarEntries=entries},save:saveCalendarEntries,render:renderCalendar,setHelp:text=>{calendarHelp.textContent=text},contentIdentity:Step05Calendar.contentIdentity,collapseDuplicates:Step05Calendar.collapseDuplicates,nextDateKey:Step05Calendar.nextDateKey,shiftTimestampDate:Step05Calendar.shiftTimestampDate,dateKey:Step05Calendar.dateKey,setTimer:(callback,delay)=>setTimeout(callback,delay),clearTimer:timer=>clearTimeout(timer)});
+calendarDragController.mount();
 loadCalendarUi();
 loadCalendarEntries();
 loadLatestExport();
