@@ -461,7 +461,7 @@ function createPrePartialContext() {
       setAttribute() {},
       getAttribute() { return null; },
       removeAttribute() {},
-      style: { setProperty() {}, getPropertyValue() { return ''; } },
+      style: { setProperty() {}, removeProperty() {}, getPropertyValue() { return ''; } },
       addEventListener(type, fn) {
         const list = listeners.get(type) || [];
         list.push(fn);
@@ -573,6 +573,7 @@ function createPrePartialContext() {
     Step05CalendarPreviewController: require('../01_app/assets/steps/step05/step05-calendar-preview-controller.js'),
     Step05CalendarExportController: require('../01_app/assets/steps/step05/step05-calendar-export-controller.js'),
     Step05ProductionCalendarController: require('../01_app/assets/steps/step05/step05-production-calendar-controller.js'),
+    Step05CalendarPresentationController: require('../01_app/assets/steps/step05/step05-calendar-presentation-controller.js'),
     Step02TrendKeywordController: require('../01_app/assets/steps/step02/trend-keyword-controller.js'),
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
     Step01ContentIndexView: require('../01_app/assets/steps/step01/step01-content-index-view.js'),

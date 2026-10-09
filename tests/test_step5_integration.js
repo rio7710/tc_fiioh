@@ -12,11 +12,13 @@ const settingsControllerPath = '01_app/assets/steps/step05/step05-calendar-setti
 const previewControllerPath = '01_app/assets/steps/step05/step05-calendar-preview-controller.js';
 const exportControllerPath = '01_app/assets/steps/step05/step05-calendar-export-controller.js';
 const productionCalendarControllerPath = '01_app/assets/steps/step05/step05-production-calendar-controller.js';
-[partialPath, cssPath, jsPath, storePath, viewControllerPath, rendererPath, dragControllerPath, settingsControllerPath, previewControllerPath, exportControllerPath, productionCalendarControllerPath].forEach(file => assert.ok(fs.existsSync(file), `${file} must exist`));
+const presentationControllerPath = '01_app/assets/steps/step05/step05-calendar-presentation-controller.js';
+[partialPath, cssPath, jsPath, storePath, viewControllerPath, rendererPath, dragControllerPath, settingsControllerPath, previewControllerPath, exportControllerPath, productionCalendarControllerPath, presentationControllerPath].forEach(file => assert.ok(fs.existsSync(file), `${file} must exist`));
 
 const html = fs.readFileSync(partialPath, 'utf8');
 const shell = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 const projectHydration = fs.readFileSync('01_app/assets/core/project-brand-platform-hydrator.js', 'utf8');
+const presentationController = fs.readFileSync(presentationControllerPath, 'utf8');
 [
   'step5', 'latestExport', 'latestExportList', 'calendarPrev', 'calendarMonthTitle',
   'calendarNext', 'calendarExport', 'calendarGrid', 'calendarHelp', 'calendarSettingsModal',
@@ -41,6 +43,7 @@ assert.match(shell, /step05-calendar-settings-controller\.js\?v=20261009_v68/, '
 assert.match(shell, /step05-calendar-preview-controller\.js\?v=20261009_v69/, 'shell cache-busts calendar preview controller');
 assert.match(shell, /step05-calendar-export-controller\.js\?v=20261009_v70/, 'shell cache-busts calendar export controller');
 assert.match(shell, /step05-production-calendar-controller\.js\?v=20261009_v71/, 'shell cache-busts production calendar controller');
+assert.match(shell, /step05-calendar-presentation-controller\.js\?v=20261009_v72/, 'shell cache-busts calendar presentation controller');
 assert.ok(shell.indexOf('step05-calendar.js') < shell.indexOf('step05-calendar-store.js'), 'calendar domain helpers load before store');
 assert.ok(shell.indexOf('step05-calendar-store.js') < shell.indexOf('step05-calendar-view-controller.js'), 'calendar view controller loads after calendar store');
 assert.ok(shell.indexOf('step05-calendar-view-controller.js') < shell.indexOf('step05-calendar-renderer.js'), 'calendar renderer loads after view controller');
@@ -49,16 +52,15 @@ assert.ok(shell.indexOf('step05-calendar-drag-controller.js') < shell.indexOf('s
 assert.ok(shell.indexOf('step05-calendar-settings-controller.js') < shell.indexOf('step05-calendar-preview-controller.js'), 'calendar preview controller loads after settings controller');
 assert.ok(shell.indexOf('step05-calendar-preview-controller.js') < shell.indexOf('step05-calendar-export-controller.js'), 'calendar export controller loads after preview controller');
 assert.ok(shell.indexOf('step05-calendar-export-controller.js') < shell.indexOf('step05-production-calendar-controller.js'), 'production calendar controller loads after export controller');
+assert.ok(shell.indexOf('step05-production-calendar-controller.js') < shell.indexOf('step05-calendar-presentation-controller.js'), 'calendar presentation controller loads after production controller');
 assert.match(shell,/const calendarStore=Step05CalendarStore\.create\(\{storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:\(\.\.\.args\)=>api\(\.\.\.args\),collapseDuplicates:Step05Calendar\.collapseDuplicates,uniquenessKey:Step05Calendar\.uniquenessKey\}\)/,'shell wires calendar store to canonical uniqueness helpers');
 assert.match(shell,/function loadCalendarEntries\(\)\{\s*calendarEntries=calendarStore\.load\(\)\.entries;\s*\}/,'local calendar load is a thin state delegate');
 assert.match(shell,/async function hydrateCalendarEntries\(\)\{\s*calendarEntries=\(await calendarStore\.hydrate\(calendarEntries\)\)\.entries;\s*renderCalendar\(\{preserveScroll:true\}\);\s*\}/,'server calendar hydration is a thin state/render delegate');
 assert.match(shell,/function saveCalendarEntries\(\)\{\s*return calendarStore\.save\(calendarEntries\);\s*\}/,'calendar save is a thin delegate');
 assert.doesNotMatch(shell,/function loadCalendarEntries\(\)\{[^}]*JSON\.parse|function hydrateCalendarEntries\(\)\{[^}]*serverLegacyKeys/,'shell has no calendar persistence implementation');
-assert.match(shell,/function loadCalendarUi\(\)\{\s*return calendarViewController\.load\(\);\s*\}/,'calendar UI load is a thin delegate');
-assert.match(shell,/function saveCalendarUi\(\)\{\s*return calendarViewController\.save\(\);\s*\}/,'calendar UI save is a thin delegate');
-assert.match(shell,/function moveCalendarPeriod\(direction\)\{\s*calendarViewController\.move\(direction\);\s*renderCalendar\(\);\s*\}/,'calendar period move is a thin controller/render delegate');
-assert.doesNotMatch(shell,/let calendarCursor=|let calendarView=|function loadCalendarUi\(\)\{\s*try|calendarCursor=new Date\(`\$\{day\.dataset\.date\}/,'shell has no duplicate calendar view state');
-assert.match(shell,/const model=calendarRenderer\.render\(\{view:calendarView,cursor:calendarCursor,entries:calendarEntries,now:new Date\(\)\}\)/,'shell delegates calendar markup to pure renderer');
+assert.doesNotMatch(shell,/function loadCalendarUi|function saveCalendarUi|function moveCalendarPeriod|let calendarCursor=|let calendarView=/,'shell has no duplicate calendar view lifecycle');
+assert.match(presentationController,/deps\.viewController\.load\(\)/,'presentation controller owns calendar UI loading');
+assert.match(presentationController,/deps\.renderer\.render\(\{/,'presentation controller delegates markup to pure renderer');
 assert.doesNotMatch(shell,/function renderCalendarStickers|function calendarDayMarkup|function renderCalendarTimeGrid|const weekdays=\['SUN'/,'shell has no duplicate calendar markup implementation');
 assert.match(shell,/const calendarDragController=Step05CalendarDragController\.create\(\{grid:calendarGrid,[\s\S]*?contentIdentity:Step05Calendar\.contentIdentity,[\s\S]*?collapseDuplicates:Step05Calendar\.collapseDuplicates,[\s\S]*?shiftTimestampDate:Step05Calendar\.shiftTimestampDate,dateKey:Step05Calendar\.dateKey/,'shell injects canonical calendar helpers into drag controller');
 assert.match(shell,/if\(calendarDragController\.consumeDidDrag\(\)\)return;/,'shell click path consumes drag suppression explicitly');
@@ -79,6 +81,10 @@ assert.doesNotMatch(shell,/function exportCalendarIcs|calendarExport'\)\.addEven
 assert.match(shell,/function recordCurrentProduction\(result\)\{\s*return productionCalendarController\.record\(result\);\s*\}/,'production callback remains a thin compatibility wrapper');
 assert.match(shell,/const productionCalendarController=Step05ProductionCalendarController\.create\(\{getEntries:\(\)=>calendarEntries,[\s\S]*?collapseDuplicates:Step05Calendar\.collapseDuplicates/,'shell injects production calendar state and canonical uniqueness');
 assert.doesNotMatch(shell,/function recordCurrentProduction\(result\)\{[\s\S]*?targets\.forEach/,'shell has no production calendar implementation body');
+assert.match(shell,/function renderCalendar\(options\)\{\s*return calendarPresentationController\.render\(options\);\s*\}/,'calendar render remains a thin compatibility wrapper');
+assert.match(shell,/const calendarPresentationController=Step05CalendarPresentationController\.create\(\{grid:calendarGrid,[\s\S]*?viewController:calendarViewController,renderer:calendarRenderer/,'shell explicitly composes calendar presentation');
+assert.match(shell,/calendarPresentationController\.selectDate\(day\.dataset\.date\)/,'day routing delegates through calendar presentation');
+assert.doesNotMatch(shell,/function loadCalendarUi|function saveCalendarUi|function moveCalendarPeriod|calendarPrev'\)\.addEventListener|calendarNext'\)\.addEventListener|document\.querySelectorAll\('\.calendar-view-btn'\)\.forEach\(button=>button\.addEventListener/,'shell has no duplicate calendar presentation lifecycle');
 assert.equal((shell.match(/id="step5"/g) || []).length, 0, 'Step 5 markup is not duplicated inline');
 assert.equal((shell.match(/id="calendarSettingsModal"/g) || []).length, 0, 'Step 5 modals are not duplicated inline');
 assert.match(shell, /ThinkCastApiClient\.createApiClient\(\)/, 'shell delegates JSON requests to the shared API client');

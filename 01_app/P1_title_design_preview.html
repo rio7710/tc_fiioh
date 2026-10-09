@@ -81,6 +81,7 @@
 <script src="/01_app/assets/steps/step05/step05-calendar-preview-controller.js?v=20261009_v69"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-export-controller.js?v=20261009_v70"></script>
 <script src="/01_app/assets/steps/step05/step05-production-calendar-controller.js?v=20261009_v71"></script>
+<script src="/01_app/assets/steps/step05/step05-calendar-presentation-controller.js?v=20261009_v72"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css?v=20261007_v2">
@@ -1527,12 +1528,6 @@ function calendarContentVersions(entry){
 function saveCalendarEntries(){
   return calendarStore.save(calendarEntries);
 }
-function loadCalendarUi(){
-  return calendarViewController.load();
-}
-function saveCalendarUi(){
-  return calendarViewController.save();
-}
 function exportPreviewClass(item){
   const width=Number(item?.width);const height=Number(item?.height);
   if(width>0&&height>0){const ratio=width/height;if(Math.abs(ratio-16/9)<.03)return 'preview-landscape';if(Math.abs(ratio-9/16)<.03)return 'preview-portrait';if(Math.abs(ratio-4/5)<.03)return 'preview-feed';if(Math.abs(ratio-1/1)<.03)return 'preview-square'}
@@ -1573,31 +1568,13 @@ function calendarTimeInputValue(item){return Step05Calendar.calendarTimeInputVal
 function calendarMinuteOfDay(item){
   return Step05Calendar.calendarMinuteOfDay(item);
 }
-function renderCalendar({preserveScroll=false}={}){
-  const {view:calendarView,cursor:calendarCursor}=calendarViewController.snapshot();
-  const scroller=calendarGrid.parentElement;
-  const previousScroll={top:scroller.scrollTop,left:scroller.scrollLeft,pageX:window.scrollX,pageY:window.scrollY};
-  const model=calendarRenderer.render({view:calendarView,cursor:calendarCursor,entries:calendarEntries,now:new Date()});
-  document.querySelectorAll('.calendar-view-btn').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.calendarView===calendarView)));
-  scroller.classList.toggle('time-scroll',model.timeScroll);
-  calendarGrid.className=model.className;
-  calendarMonthTitle.textContent=model.title;
-  if(model.calendarDays)calendarGrid.style.setProperty('--calendar-days',model.calendarDays);
-  calendarGrid.innerHTML=model.html;
-  if(preserveScroll){
-    scroller.scrollTop=previousScroll.top;scroller.scrollLeft=previousScroll.left;
-    requestAnimationFrame(()=>{scroller.scrollTop=previousScroll.top;scroller.scrollLeft=previousScroll.left;window.scrollTo(previousScroll.pageX,previousScroll.pageY)});
-  }else if(calendarView!=='month'&&scroller.scrollTop===0)scroller.scrollTop=8*52;
-  saveCalendarUi();
+function renderCalendar(options){
+  return calendarPresentationController.render(options);
 }
 function recordCurrentProduction(result){
   return productionCalendarController.record(result);
 }
 function icsEscape(value){return Step05Calendar.icsEscape(value)}
-function moveCalendarPeriod(direction){
-  calendarViewController.move(direction);
-  renderCalendar();
-}
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function selectedKeywordLabels(){
   return (demoData?.keywords||[]).filter(item=>selectedKeywords.has(item.id)).map(item=>item.label);
@@ -1838,19 +1815,13 @@ Object.assign(window,{
 });
 Object.defineProperty(window,'brandAssets',{configurable:true,get:()=>brandSelectionController.getAssets()});
 
-document.querySelector('#calendarPrev').addEventListener('click',()=>moveCalendarPeriod(-1));
-document.querySelector('#calendarNext').addEventListener('click',()=>moveCalendarPeriod(1));
-document.querySelectorAll('.calendar-view-btn').forEach(button=>button.addEventListener('click',()=>{
-  calendarViewController.selectView(button.dataset.calendarView);
-  renderCalendar();
-}));
 calendarGrid.addEventListener('click',event=>{
   if(calendarDragController.consumeDidDrag())return;
   if(calendarSettingsController.consumeLongPressOpened())return;
   const sticker=event.target.closest('.calendar-sticker');
   if(sticker){calendarPreviewController.open(sticker.dataset.groupId);return}
   const day=event.target.closest('.calendar-day,.calendar-time-column');if(!day||calendarViewController.snapshot().view==='day')return;
-  calendarViewController.selectDate(day.dataset.date);renderCalendar();
+  calendarPresentationController.selectDate(day.dataset.date);
 });
 calendarContentView.addEventListener('click',()=>{
   const item=calendarSettingsController.getActiveEntries().find(entry=>calendarContentVersions(entry).length);
@@ -1864,6 +1835,8 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!platformGu
 const calendarStore=Step05CalendarStore.create({storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:(...args)=>api(...args),collapseDuplicates:Step05Calendar.collapseDuplicates,uniquenessKey:Step05Calendar.uniquenessKey});
 const calendarViewController=Step05CalendarViewController.create({storage:localStorage,storageKey:CALENDAR_UI_STORAGE_KEY,now:()=>new Date(),isDateKey:value=>/^\d{4}-\d{2}-\d{2}$/.test(value||''),dateKey:Step05Calendar.dateKey});
 const calendarRenderer=Step05CalendarRenderer.create({dateKey:Step05Calendar.dateKey,groupEntries:Step05Calendar.groupCalendarEntries,statusTimestamp:Step05Calendar.calendarStatusTimestamp,formatTime:Step05Calendar.formatCalendarTime,minuteOfDay:Step05Calendar.calendarMinuteOfDay,escapeHtml,statusLabels:calendarStatusLabels,platformLabels:calendarPlatformLabels,timeLabels:calendarTimeLabels});
+const calendarPresentationController=Step05CalendarPresentationController.create({grid:calendarGrid,scroller:calendarGrid.parentElement,title:calendarMonthTitle,viewButtons:[...document.querySelectorAll('.calendar-view-btn')],prevButton:document.querySelector('#calendarPrev'),nextButton:document.querySelector('#calendarNext'),viewController:calendarViewController,renderer:calendarRenderer,getEntries:()=>calendarEntries,now:()=>new Date(),requestFrame:callback=>requestAnimationFrame(callback),cancelFrame:frame=>cancelAnimationFrame(frame),getPageScroll:()=>({x:window.scrollX,y:window.scrollY}),scrollWindow:(x,y)=>window.scrollTo(x,y)});
+calendarPresentationController.mount();
 const calendarDragController=Step05CalendarDragController.create({grid:calendarGrid,getEntries:()=>calendarEntries,setEntries:entries=>{calendarEntries=entries},save:saveCalendarEntries,render:renderCalendar,setHelp:text=>{calendarHelp.textContent=text},contentIdentity:Step05Calendar.contentIdentity,collapseDuplicates:Step05Calendar.collapseDuplicates,nextDateKey:Step05Calendar.nextDateKey,shiftTimestampDate:Step05Calendar.shiftTimestampDate,dateKey:Step05Calendar.dateKey,setTimer:(callback,delay)=>setTimeout(callback,delay),clearTimer:timer=>clearTimeout(timer)});
 calendarDragController.mount();
 const calendarSettingsController=Step05CalendarSettingsController.create({grid:calendarGrid,modal:calendarSettingsModal,title:calendarSettingsTitle,dateInput:calendarSettingsDate,platforms:calendarSettingsPlatforms,cancelButton:document.querySelector('#calendarSettingsCancel'),saveButton:document.querySelector('#calendarSettingsSave'),body:document.body,keyTarget:document,getEntries:()=>calendarEntries,setEntries:entries=>{calendarEntries=entries},contentIdentity:Step05Calendar.contentIdentity,nextDateKey:Step05Calendar.nextDateKey,timeInputValue:Step05Calendar.calendarTimeInputValue,escapeHtml,statusLabels:calendarStatusLabels,platformLabels:calendarPlatformLabels,setCursor:value=>calendarViewController.setCursor(value),saveEntries:saveCalendarEntries,render:renderCalendar,setHelp:text=>{calendarHelp.textContent=text},setTimer:(callback,delay)=>setTimeout(callback,delay),clearTimer:timer=>clearTimeout(timer)});
@@ -1873,7 +1846,7 @@ calendarPreviewController.mount();
 const calendarExportController=Step05CalendarExportController.create({button:document.querySelector('#calendarExport'),getEntries:()=>calendarEntries,contentIdentity:Step05Calendar.contentIdentity,collapseDuplicates:Step05Calendar.collapseDuplicates,nextDateKey:Step05Calendar.nextDateKey,dateKey:Step05Calendar.dateKey,icsEscape:Step05Calendar.icsEscape,statusLabels:calendarStatusLabels,now:()=>new Date(),createBlob:(parts,options)=>new Blob(parts,options),createObjectURL:blob=>URL.createObjectURL(blob),revokeObjectURL:url=>URL.revokeObjectURL(url),createLink:()=>document.createElement('a'),setTimer:(callback,delay)=>setTimeout(callback,delay),setHelp:text=>{calendarHelp.textContent=text}});
 calendarExportController.mount();
 const productionCalendarController=Step05ProductionCalendarController.create({getEntries:()=>calendarEntries,setEntries:entries=>{calendarEntries=entries},getActiveProjectId:()=>activeProjectId,getTitle:()=>document.querySelector('#projectTitle').textContent,getSelectedPlatforms:()=>selectedPlatforms,getPreviewPlatform:()=>currentPreviewPlatform,calendarContentVersions:Step05Calendar.calendarContentVersions,collapseDuplicates:Step05Calendar.collapseDuplicates,nextDateKey:Step05Calendar.nextDateKey,dateKey:Step05Calendar.dateKey,createId:calendarId,now:()=>new Date(),save:saveCalendarEntries,render:renderCalendar,refresh:refreshProjectIndex,onError:(feature,error)=>console.error(`[ProductionCalendar:${feature}]`,error)});
-loadCalendarUi();
+calendarPresentationController.load();
 loadCalendarEntries();
 loadLatestExport();
 renderCalendar();
