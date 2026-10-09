@@ -78,6 +78,7 @@
 <script src="/01_app/assets/steps/step05/step05-calendar-renderer.js?v=20261009_v66"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-drag-controller.js?v=20261009_v67"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-settings-controller.js?v=20261009_v68"></script>
+<script src="/01_app/assets/steps/step05/step05-calendar-preview-controller.js?v=20261009_v69"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css?v=20261007_v2">
@@ -1232,8 +1233,6 @@ const calendarPreviewDownload=document.querySelector('#calendarPreviewDownload')
 const calendarPreviewVersionPrev=document.querySelector('#calendarPreviewVersionPrev');
 const calendarPreviewVersionNext=document.querySelector('#calendarPreviewVersionNext');
 const calendarPreviewVersionCount=document.querySelector('#calendarPreviewVersionCount');
-let calendarPreviewVersions=[];
-let calendarPreviewVersionIndex=0;
 let calendarEntries=[];
 let currentPreviewPlatform='youtube';
 let captionSizeLevel=0;
@@ -1636,45 +1635,6 @@ function exportCalendarIcs(){
   setTimeout(()=>URL.revokeObjectURL(link.href),1000);
   calendarHelp.textContent='Google·Apple·Outlook 캘린더에서 가져올 수 있는 .ics 파일을 저장했습니다.';
 }
-function closeCalendarPreview(){
-  calendarPreviewVideo.pause();calendarPreviewVideo.removeAttribute('src');calendarPreviewVideo.load();
-  calendarPreviewVersions=[];calendarPreviewVersionIndex=0;
-  calendarPreviewModal.hidden=true;document.body.classList.remove('modal-open');
-}
-function openCalendarPreview(groupId){
-  const anchor=calendarEntries.find(entry=>entry.id===groupId);
-  if(!anchor)return;
-  const group=calendarEntries.filter(item=>item.start===anchor.start&&item.title===anchor.title);
-  const playable=group.filter(entry=>entry.extendedProps?.contentUrl);
-  const item=playable[0];
-  if(!item){contentUnavailableModal.hidden=false;document.body.classList.add('modal-open');return}
-  calendarPreviewTitle.textContent=anchor.title;
-  calendarPreviewMeta.innerHTML=playable.map((entry,index)=>{const platform=entry.extendedProps?.platform||'youtube';return `<button class="calendar-preview-tab" type="button" data-entry-id="${escapeHtml(entry.id)}" data-platform="${escapeHtml(platform)}" aria-pressed="${index===0}"><span class="calendar-platform" data-platform="${escapeHtml(platform)}"></span><span>${escapeHtml(calendarPlatformLabels[platform]||platform)} · 미배포</span></button>`}).join('');
-  selectCalendarPreviewTab(calendarPreviewMeta.querySelector('.calendar-preview-tab'));
-  calendarPreviewModal.hidden=false;document.body.classList.add('modal-open');
-  calendarPreviewVideo.play().catch(()=>{});
-}
-function selectCalendarPreviewTab(button){
-  if(!button)return;
-  calendarPreviewMeta.querySelectorAll('.calendar-preview-tab').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
-  const dialog=calendarPreviewModal.querySelector('.calendar-preview-dialog');
-  const previewClass=platformPreviewFormats[button.dataset.platform]?.className||'preview-landscape';
-  dialog.classList.remove('preview-landscape','preview-portrait','preview-feed');dialog.classList.add(previewClass);
-  const entry=calendarEntries.find(item=>item.id===button.dataset.entryId);
-  calendarPreviewVersions=calendarContentVersions(entry);calendarPreviewVersionIndex=Math.max(0,calendarPreviewVersions.length-1);
-  selectCalendarPreviewVersion(calendarPreviewVersionIndex);
-}
-function selectCalendarPreviewVersion(index){
-  if(!calendarPreviewVersions.length)return;
-  calendarPreviewVersionIndex=(index+calendarPreviewVersions.length)%calendarPreviewVersions.length;
-  const version=calendarPreviewVersions[calendarPreviewVersionIndex];
-  calendarPreviewVideo.src=version.url;calendarPreviewVideo.load();
-  calendarPreviewDownload.href=version.url;calendarPreviewDownload.download=version.filename||'thinkcast-final.mp4';
-  const multiple=calendarPreviewVersions.length>1;
-  calendarPreviewVersionPrev.disabled=!multiple;calendarPreviewVersionNext.disabled=!multiple;
-  calendarPreviewVersionCount.hidden=!multiple;calendarPreviewVersionCount.textContent=`${calendarPreviewVersionIndex+1} / ${calendarPreviewVersions.length}`;
-  if(!calendarPreviewModal.hidden)calendarPreviewVideo.play().catch(()=>{});
-}
 function moveCalendarPeriod(direction){
   calendarViewController.move(direction);
   renderCalendar();
@@ -1930,27 +1890,18 @@ calendarGrid.addEventListener('click',event=>{
   if(calendarDragController.consumeDidDrag())return;
   if(calendarSettingsController.consumeLongPressOpened())return;
   const sticker=event.target.closest('.calendar-sticker');
-  if(sticker){openCalendarPreview(sticker.dataset.groupId);return}
+  if(sticker){calendarPreviewController.open(sticker.dataset.groupId);return}
   const day=event.target.closest('.calendar-day,.calendar-time-column');if(!day||calendarViewController.snapshot().view==='day')return;
   calendarViewController.selectDate(day.dataset.date);renderCalendar();
 });
 calendarContentView.addEventListener('click',()=>{
-  const item=calendarSettingsController.getActiveEntries().find(entry=>entry.extendedProps?.contentUrl);
-  if(!item){calendarSettingsController.close();contentUnavailableModal.hidden=false;document.body.classList.add('modal-open');return}
-  showLatestExport({url:item.extendedProps.contentUrl,filename:item.extendedProps.filename||`${item.title}.mp4`});
+  const item=calendarSettingsController.getActiveEntries().find(entry=>calendarContentVersions(entry).length);
+  if(!item){calendarSettingsController.close();calendarPreviewController.openUnavailable();return}
+  const version=calendarContentVersions(item).at(-1);
+  showLatestExport({url:version.url,filename:version.filename||`${item.title}.mp4`});
   calendarSettingsController.close();showStep(5);
   requestAnimationFrame(()=>{latestExport.scrollIntoView({behavior:'smooth',block:'start'});latestExportList.querySelector('video')?.play().catch(()=>{})});
 });
-function closeContentUnavailable(){contentUnavailableModal.hidden=true;document.body.classList.remove('modal-open')}
-document.querySelector('#contentUnavailableClose').addEventListener('click',closeContentUnavailable);
-contentUnavailableModal.addEventListener('pointerdown',event=>{if(event.target===contentUnavailableModal)closeContentUnavailable()});
-document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!contentUnavailableModal.hidden)closeContentUnavailable()});
-document.querySelector('#calendarPreviewClose').addEventListener('click',closeCalendarPreview);
-calendarPreviewMeta.addEventListener('click',event=>{const button=event.target.closest('.calendar-preview-tab');if(button)selectCalendarPreviewTab(button)});
-calendarPreviewVersionPrev.addEventListener('click',()=>selectCalendarPreviewVersion(calendarPreviewVersionIndex-1));
-calendarPreviewVersionNext.addEventListener('click',()=>selectCalendarPreviewVersion(calendarPreviewVersionIndex+1));
-calendarPreviewModal.addEventListener('pointerdown',event=>{if(event.target===calendarPreviewModal)closeCalendarPreview()});
-document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!calendarPreviewModal.hidden)closeCalendarPreview()});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!platformGuideModal.hidden)closePlatformGuide()});
 const calendarStore=Step05CalendarStore.create({storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:(...args)=>api(...args),collapseDuplicates:Step05Calendar.collapseDuplicates,uniquenessKey:Step05Calendar.uniquenessKey});
 const calendarViewController=Step05CalendarViewController.create({storage:localStorage,storageKey:CALENDAR_UI_STORAGE_KEY,now:()=>new Date(),isDateKey:value=>/^\d{4}-\d{2}-\d{2}$/.test(value||''),dateKey:Step05Calendar.dateKey});
@@ -1959,6 +1910,8 @@ const calendarDragController=Step05CalendarDragController.create({grid:calendarG
 calendarDragController.mount();
 const calendarSettingsController=Step05CalendarSettingsController.create({grid:calendarGrid,modal:calendarSettingsModal,title:calendarSettingsTitle,dateInput:calendarSettingsDate,platforms:calendarSettingsPlatforms,cancelButton:document.querySelector('#calendarSettingsCancel'),saveButton:document.querySelector('#calendarSettingsSave'),body:document.body,keyTarget:document,getEntries:()=>calendarEntries,setEntries:entries=>{calendarEntries=entries},contentIdentity:Step05Calendar.contentIdentity,nextDateKey:Step05Calendar.nextDateKey,timeInputValue:Step05Calendar.calendarTimeInputValue,escapeHtml,statusLabels:calendarStatusLabels,platformLabels:calendarPlatformLabels,setCursor:value=>calendarViewController.setCursor(value),saveEntries:saveCalendarEntries,render:renderCalendar,setHelp:text=>{calendarHelp.textContent=text},setTimer:(callback,delay)=>setTimeout(callback,delay),clearTimer:timer=>clearTimeout(timer)});
 calendarSettingsController.mount();
+const calendarPreviewController=Step05CalendarPreviewController.create({previewModal:calendarPreviewModal,previewMeta:calendarPreviewMeta,video:calendarPreviewVideo,title:calendarPreviewTitle,download:calendarPreviewDownload,count:calendarPreviewVersionCount,previousButton:calendarPreviewVersionPrev,nextButton:calendarPreviewVersionNext,previewCloseButton:document.querySelector('#calendarPreviewClose'),unavailableModal:contentUnavailableModal,unavailableCloseButton:document.querySelector('#contentUnavailableClose'),body:document.body,keyTarget:document,getEntries:()=>calendarEntries,contentIdentity:Step05Calendar.contentIdentity,contentVersions:Step05Calendar.calendarContentVersions,escapeHtml,platformFormats:window.VideoEditorRatioProfiles?.PLATFORM_PREVIEW_FORMATS||{},platformLabels:calendarPlatformLabels,onError:(feature,error)=>console.warn(`[CalendarPreview:${feature}]`,error)});
+calendarPreviewController.mount();
 loadCalendarUi();
 loadCalendarEntries();
 loadLatestExport();

@@ -9,7 +9,8 @@ const viewControllerPath = '01_app/assets/steps/step05/step05-calendar-view-cont
 const rendererPath = '01_app/assets/steps/step05/step05-calendar-renderer.js';
 const dragControllerPath = '01_app/assets/steps/step05/step05-calendar-drag-controller.js';
 const settingsControllerPath = '01_app/assets/steps/step05/step05-calendar-settings-controller.js';
-[partialPath, cssPath, jsPath, storePath, viewControllerPath, rendererPath, dragControllerPath, settingsControllerPath].forEach(file => assert.ok(fs.existsSync(file), `${file} must exist`));
+const previewControllerPath = '01_app/assets/steps/step05/step05-calendar-preview-controller.js';
+[partialPath, cssPath, jsPath, storePath, viewControllerPath, rendererPath, dragControllerPath, settingsControllerPath, previewControllerPath].forEach(file => assert.ok(fs.existsSync(file), `${file} must exist`));
 
 const html = fs.readFileSync(partialPath, 'utf8');
 const shell = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
@@ -35,11 +36,13 @@ assert.match(shell, /step05-calendar-view-controller\.js\?v=20261009_v65/, 'shel
 assert.match(shell, /step05-calendar-renderer\.js\?v=20261009_v66/, 'shell cache-busts calendar renderer');
 assert.match(shell, /step05-calendar-drag-controller\.js\?v=20261009_v67/, 'shell cache-busts calendar drag controller');
 assert.match(shell, /step05-calendar-settings-controller\.js\?v=20261009_v68/, 'shell cache-busts calendar settings controller');
+assert.match(shell, /step05-calendar-preview-controller\.js\?v=20261009_v69/, 'shell cache-busts calendar preview controller');
 assert.ok(shell.indexOf('step05-calendar.js') < shell.indexOf('step05-calendar-store.js'), 'calendar domain helpers load before store');
 assert.ok(shell.indexOf('step05-calendar-store.js') < shell.indexOf('step05-calendar-view-controller.js'), 'calendar view controller loads after calendar store');
 assert.ok(shell.indexOf('step05-calendar-view-controller.js') < shell.indexOf('step05-calendar-renderer.js'), 'calendar renderer loads after view controller');
 assert.ok(shell.indexOf('step05-calendar-renderer.js') < shell.indexOf('step05-calendar-drag-controller.js'), 'calendar drag controller loads after renderer');
 assert.ok(shell.indexOf('step05-calendar-drag-controller.js') < shell.indexOf('step05-calendar-settings-controller.js'), 'calendar settings controller loads after drag controller');
+assert.ok(shell.indexOf('step05-calendar-settings-controller.js') < shell.indexOf('step05-calendar-preview-controller.js'), 'calendar preview controller loads after settings controller');
 assert.match(shell,/const calendarStore=Step05CalendarStore\.create\(\{storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:\(\.\.\.args\)=>api\(\.\.\.args\),collapseDuplicates:Step05Calendar\.collapseDuplicates,uniquenessKey:Step05Calendar\.uniquenessKey\}\)/,'shell wires calendar store to canonical uniqueness helpers');
 assert.match(shell,/function loadCalendarEntries\(\)\{\s*calendarEntries=calendarStore\.load\(\)\.entries;\s*\}/,'local calendar load is a thin state delegate');
 assert.match(shell,/async function hydrateCalendarEntries\(\)\{\s*calendarEntries=\(await calendarStore\.hydrate\(calendarEntries\)\)\.entries;\s*renderCalendar\(\{preserveScroll:true\}\);\s*\}/,'server calendar hydration is a thin state/render delegate');
@@ -58,6 +61,12 @@ assert.match(shell,/const calendarSettingsController=Step05CalendarSettingsContr
 assert.match(shell,/calendarSettingsController\.getActiveEntries\(\)\.find/,'content preview reads the active settings group through the controller');
 assert.match(shell,/if\(calendarSettingsController\.consumeLongPressOpened\(\)\)return;/,'grid click consumes long-press suppression explicitly');
 assert.doesNotMatch(shell,/function openCalendarSettings|function closeCalendarSettings|calendarGrid\.addEventListener\('contextmenu'|calendarLongPressTimer|calendarSettingsGroup/,'shell has no duplicate settings interaction implementation');
+assert.match(shell,/const calendarPreviewController=Step05CalendarPreviewController\.create\(\{previewModal:calendarPreviewModal,[\s\S]*?contentIdentity:Step05Calendar\.contentIdentity,[\s\S]*?contentVersions:Step05Calendar\.calendarContentVersions/,'shell injects canonical preview helpers');
+assert.match(shell,/onError:\(feature,error\)=>console\.warn\(`\[CalendarPreview:\$\{feature\}\]`,error\)/,'preview autoplay policy failures are warning-level diagnostics');
+assert.doesNotMatch(shell,/onError:\(feature,error\)=>console\.error\(`\[CalendarPreview:/,'preview autoplay policy failures are not public console errors');
+assert.match(shell,/calendarPreviewController\.open\(sticker\.dataset\.groupId\)/,'sticker click delegates preview opening');
+assert.match(shell,/calendarPreviewController\.openUnavailable\(\)/,'settings content view delegates unavailable modal');
+assert.doesNotMatch(shell,/function openCalendarPreview|function closeCalendarPreview|function selectCalendarPreviewTab|function selectCalendarPreviewVersion|calendarPreviewVersions|calendarPreviewVersionIndex|calendarPreviewMeta\.addEventListener\('click'/,'shell has no duplicate preview lifecycle');
 assert.equal((shell.match(/id="step5"/g) || []).length, 0, 'Step 5 markup is not duplicated inline');
 assert.equal((shell.match(/id="calendarSettingsModal"/g) || []).length, 0, 'Step 5 modals are not duplicated inline');
 assert.match(shell, /ThinkCastApiClient\.createApiClient\(\)/, 'shell delegates JSON requests to the shared API client');
