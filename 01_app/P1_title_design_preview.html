@@ -77,6 +77,7 @@
 <script src="/01_app/assets/steps/step05/step05-calendar-view-controller.js?v=20261009_v65"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-renderer.js?v=20261009_v66"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-drag-controller.js?v=20261009_v67"></script>
+<script src="/01_app/assets/steps/step05/step05-calendar-settings-controller.js?v=20261009_v68"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css?v=20261007_v2">
@@ -1234,10 +1235,6 @@ const calendarPreviewVersionCount=document.querySelector('#calendarPreviewVersio
 let calendarPreviewVersions=[];
 let calendarPreviewVersionIndex=0;
 let calendarEntries=[];
-let calendarSettingsGroup=[];
-let calendarLongPressTimer=null;
-let calendarLongPressPoint=null;
-let calendarLongPressOpened=false;
 let currentPreviewPlatform='youtube';
 let captionSizeLevel=0;
 let videoPanX=50;
@@ -1639,7 +1636,6 @@ function exportCalendarIcs(){
   setTimeout(()=>URL.revokeObjectURL(link.href),1000);
   calendarHelp.textContent='Google·Apple·Outlook 캘린더에서 가져올 수 있는 .ics 파일을 저장했습니다.';
 }
-function closeCalendarSettings(){calendarSettingsModal.hidden=true;calendarSettingsGroup=[];document.body.classList.remove('modal-open')}
 function closeCalendarPreview(){
   calendarPreviewVideo.pause();calendarPreviewVideo.removeAttribute('src');calendarPreviewVideo.load();
   calendarPreviewVersions=[];calendarPreviewVersionIndex=0;
@@ -1678,20 +1674,6 @@ function selectCalendarPreviewVersion(index){
   calendarPreviewVersionPrev.disabled=!multiple;calendarPreviewVersionNext.disabled=!multiple;
   calendarPreviewVersionCount.hidden=!multiple;calendarPreviewVersionCount.textContent=`${calendarPreviewVersionIndex+1} / ${calendarPreviewVersions.length}`;
   if(!calendarPreviewModal.hidden)calendarPreviewVideo.play().catch(()=>{});
-}
-function openCalendarSettings(groupId){
-  const anchor=calendarEntries.find(entry=>entry.id===groupId);if(!anchor)return;
-  calendarSettingsGroup=calendarEntries.filter(item=>item.start===anchor.start&&item.title===anchor.title);
-  calendarSettingsTitle.textContent=anchor.title;
-  calendarSettingsDate.value=anchor.start;
-  calendarSettingsPlatforms.innerHTML=calendarSettingsGroup.map(item=>{
-    const platform=item.extendedProps?.platform||'youtube';
-    const status=item.extendedProps?.status||'draft';
-    const options=Object.entries(calendarStatusLabels).map(([value,label])=>`<option value="${value}" ${value===status?'selected':''}>${label}</option>`).join('');
-    return `<div class="calendar-setting-row" data-event-id="${escapeHtml(item.id)}"><span class="calendar-platform" data-platform="${platform}"></span><strong>${calendarPlatformLabels[platform]||platform}</strong><select aria-label="${calendarPlatformLabels[platform]||platform} 상태">${options}</select><input type="time" value="${calendarTimeInputValue(item)}" aria-label="${calendarPlatformLabels[platform]||platform} 상태 시간"></div>`;
-  }).join('');
-  calendarSettingsModal.hidden=false;document.body.classList.add('modal-open');
-  calendarSettingsDate.focus();
 }
 function moveCalendarPeriod(direction){
   calendarViewController.move(direction);
@@ -1946,32 +1928,17 @@ document.querySelectorAll('.calendar-view-btn').forEach(button=>button.addEventL
 document.querySelector('#calendarExport').addEventListener('click',exportCalendarIcs);
 calendarGrid.addEventListener('click',event=>{
   if(calendarDragController.consumeDidDrag())return;
-  if(calendarLongPressOpened){calendarLongPressOpened=false;return}
+  if(calendarSettingsController.consumeLongPressOpened())return;
   const sticker=event.target.closest('.calendar-sticker');
   if(sticker){openCalendarPreview(sticker.dataset.groupId);return}
   const day=event.target.closest('.calendar-day,.calendar-time-column');if(!day||calendarViewController.snapshot().view==='day')return;
   calendarViewController.selectDate(day.dataset.date);renderCalendar();
 });
-calendarGrid.addEventListener('contextmenu',event=>{
-  const sticker=event.target.closest('.calendar-sticker');if(!sticker)return;
-  event.preventDefault();event.stopPropagation();openCalendarSettings(sticker.dataset.groupId);
-});
-calendarGrid.addEventListener('pointerdown',event=>{
-  const sticker=event.target.closest('.calendar-sticker');if(!sticker||event.pointerType==='mouse')return;
-  calendarLongPressPoint={x:event.clientX,y:event.clientY};
-  calendarLongPressTimer=setTimeout(()=>{calendarLongPressOpened=true;openCalendarSettings(sticker.dataset.groupId);calendarLongPressTimer=null},600);
-});
-calendarGrid.addEventListener('pointermove',event=>{
-  if(!calendarLongPressTimer||!calendarLongPressPoint)return;
-  if(Math.hypot(event.clientX-calendarLongPressPoint.x,event.clientY-calendarLongPressPoint.y)>8){clearTimeout(calendarLongPressTimer);calendarLongPressTimer=null}
-});
-['pointerup','pointercancel'].forEach(type=>calendarGrid.addEventListener(type,()=>{if(calendarLongPressTimer)clearTimeout(calendarLongPressTimer);calendarLongPressTimer=null}));
-document.querySelector('#calendarSettingsCancel').addEventListener('click',closeCalendarSettings);
 calendarContentView.addEventListener('click',()=>{
-  const item=calendarSettingsGroup.find(entry=>entry.extendedProps?.contentUrl);
-  if(!item){closeCalendarSettings();contentUnavailableModal.hidden=false;document.body.classList.add('modal-open');return}
+  const item=calendarSettingsController.getActiveEntries().find(entry=>entry.extendedProps?.contentUrl);
+  if(!item){calendarSettingsController.close();contentUnavailableModal.hidden=false;document.body.classList.add('modal-open');return}
   showLatestExport({url:item.extendedProps.contentUrl,filename:item.extendedProps.filename||`${item.title}.mp4`});
-  closeCalendarSettings();showStep(5);
+  calendarSettingsController.close();showStep(5);
   requestAnimationFrame(()=>{latestExport.scrollIntoView({behavior:'smooth',block:'start'});latestExportList.querySelector('video')?.play().catch(()=>{})});
 });
 function closeContentUnavailable(){contentUnavailableModal.hidden=true;document.body.classList.remove('modal-open')}
@@ -1984,31 +1951,14 @@ calendarPreviewVersionPrev.addEventListener('click',()=>selectCalendarPreviewVer
 calendarPreviewVersionNext.addEventListener('click',()=>selectCalendarPreviewVersion(calendarPreviewVersionIndex+1));
 calendarPreviewModal.addEventListener('pointerdown',event=>{if(event.target===calendarPreviewModal)closeCalendarPreview()});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!calendarPreviewModal.hidden)closeCalendarPreview()});
-document.querySelector('#calendarSettingsSave').addEventListener('click',()=>{
-  const nextDate=calendarSettingsDate.value;if(!nextDate)return;
-  calendarSettingsPlatforms.querySelectorAll('.calendar-setting-row').forEach(row=>{
-    const item=calendarEntries.find(entry=>entry.id===row.dataset.eventId);if(!item)return;
-    const status=row.querySelector('select').value;
-    const time=row.querySelector('input[type="time"]').value||'09:00';
-    const timestamp=`${nextDate}T${time}:00+09:00`;
-    item.start=nextDate;item.end=nextDateKey(nextDate);item.extendedProps.status=status;
-    if(status==='draft')item.extendedProps.createdAt=timestamp;
-    if(status==='scheduled')item.extendedProps.scheduledAt=timestamp;
-    if(status==='published')item.extendedProps.distributedAt=timestamp;
-    if(status==='deleted')item.extendedProps.deletedAt=timestamp;
-  });
-  calendarViewController.setCursor(nextDate);
-  saveCalendarEntries();closeCalendarSettings();renderCalendar();
-  calendarHelp.textContent='스티커의 날짜와 플랫폼별 파이프라인 시간을 저장했습니다.';
-});
-calendarSettingsModal.addEventListener('pointerdown',event=>{if(event.target===calendarSettingsModal)closeCalendarSettings()});
-document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!calendarSettingsModal.hidden)closeCalendarSettings()});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!platformGuideModal.hidden)closePlatformGuide()});
 const calendarStore=Step05CalendarStore.create({storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:(...args)=>api(...args),collapseDuplicates:Step05Calendar.collapseDuplicates,uniquenessKey:Step05Calendar.uniquenessKey});
 const calendarViewController=Step05CalendarViewController.create({storage:localStorage,storageKey:CALENDAR_UI_STORAGE_KEY,now:()=>new Date(),isDateKey:value=>/^\d{4}-\d{2}-\d{2}$/.test(value||''),dateKey:Step05Calendar.dateKey});
 const calendarRenderer=Step05CalendarRenderer.create({dateKey:Step05Calendar.dateKey,groupEntries:Step05Calendar.groupCalendarEntries,statusTimestamp:Step05Calendar.calendarStatusTimestamp,formatTime:Step05Calendar.formatCalendarTime,minuteOfDay:Step05Calendar.calendarMinuteOfDay,escapeHtml,statusLabels:calendarStatusLabels,platformLabels:calendarPlatformLabels,timeLabels:calendarTimeLabels});
 const calendarDragController=Step05CalendarDragController.create({grid:calendarGrid,getEntries:()=>calendarEntries,setEntries:entries=>{calendarEntries=entries},save:saveCalendarEntries,render:renderCalendar,setHelp:text=>{calendarHelp.textContent=text},contentIdentity:Step05Calendar.contentIdentity,collapseDuplicates:Step05Calendar.collapseDuplicates,nextDateKey:Step05Calendar.nextDateKey,shiftTimestampDate:Step05Calendar.shiftTimestampDate,dateKey:Step05Calendar.dateKey,setTimer:(callback,delay)=>setTimeout(callback,delay),clearTimer:timer=>clearTimeout(timer)});
 calendarDragController.mount();
+const calendarSettingsController=Step05CalendarSettingsController.create({grid:calendarGrid,modal:calendarSettingsModal,title:calendarSettingsTitle,dateInput:calendarSettingsDate,platforms:calendarSettingsPlatforms,cancelButton:document.querySelector('#calendarSettingsCancel'),saveButton:document.querySelector('#calendarSettingsSave'),body:document.body,keyTarget:document,getEntries:()=>calendarEntries,setEntries:entries=>{calendarEntries=entries},contentIdentity:Step05Calendar.contentIdentity,nextDateKey:Step05Calendar.nextDateKey,timeInputValue:Step05Calendar.calendarTimeInputValue,escapeHtml,statusLabels:calendarStatusLabels,platformLabels:calendarPlatformLabels,setCursor:value=>calendarViewController.setCursor(value),saveEntries:saveCalendarEntries,render:renderCalendar,setHelp:text=>{calendarHelp.textContent=text},setTimer:(callback,delay)=>setTimeout(callback,delay),clearTimer:timer=>clearTimeout(timer)});
+calendarSettingsController.mount();
 loadCalendarUi();
 loadCalendarEntries();
 loadLatestExport();
