@@ -13,6 +13,7 @@
 <script src="/01_app/assets/core/content-route.js?v=20261007_v2"></script>
 <script src="/01_app/assets/core/project-store.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step-partial-loader.js?v=20261007_v2"></script>
+<script src="/01_app/assets/steps/step01/step01-project-index-controller.js?v=20261009_v31"></script>
 <script src="/01_app/assets/steps/step01/step01-content-index-controller.js?v=20261009_v30"></script>
 <script src="/01_app/assets/steps/step02/step02-keyword.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step03/step03-flow.js?v=20261007_v2"></script>
@@ -1669,43 +1670,9 @@ function projectDate(value){return value?new Intl.DateTimeFormat('ko-KR',{year:'
 function automationStageLabel(stage){if(!stage||stage==='create_project')return '콘텐츠 생성';if(stage.startsWith('keywords_'))return '키워드 선정';if(stage.startsWith('script_'))return '대본·타임라인';if(stage.startsWith('voice_'))return '음성 준비';if(stage==='video_scene_selection')return '영상 장면 선택';if(stage.startsWith('image_'))return '장면 이미지 생성';if(stage.startsWith('video_submit_')||stage.startsWith('video_complete_'))return '장면 영상 변환';if(stage.startsWith('crop_'))return '사람 위치 조정';if(stage==='video_design')return '영상 디자인';if(stage==='final_export_calendar')return '영상 제작·캘린더';return stage}
 function projectCreatedDate(value){if(!value)return '날짜 미정';const parts=Object.fromEntries(new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'}).formatToParts(new Date(value)).map(part=>[part.type,part.value]));return `${parts.year}년 ${parts.month}월 ${parts.day}일 ${parts.weekday}`}
 function renderProjectIndex(projects){
-  Object.keys(indexProjects).forEach(key=>delete indexProjects[key]);
-  projects.forEach(project=>{indexProjects[project.project_id]={...project,title:project.name,summary:`콘텐츠 ID · ${project.project_id}`,currentStep:String(project.current_stage||2),note:'이 프로젝트에 저장된 단계부터 계속 제작할 수 있습니다.',steps:[{key:'1',label:'프로젝트 생성'},{key:'2',label:'키워드·AI 논의'},{key:'3',label:'대본·타임라인'},{key:'3-1',label:'콘티'},{key:'4',label:'영상 디자인'},{key:'5',label:'배포 캘린더'}]}});
-  const hasFinalVideo=project=>calendarEntries.some(entry=>{
-    const props=entry.extendedProps||{};
-    return Boolean(props.contentUrl||calendarContentVersions(entry).length)&&
-      (props.projectId===project.project_id||(!props.projectId&&entry.title===project.name));
-  });
-  const completed=projects.filter(hasFinalVideo);
-  const scheduledProjects=new Set(calendarEntries.filter(entry=>entry.extendedProps?.status==='scheduled')
-    .map(entry=>entry.extendedProps?.projectId||entry.title));
-  const counts={all:projects.length,progress:projects.length-completed.length,
-    completed:completed.length,scheduled:projects.filter(project=>scheduledProjects.has(project.project_id)||scheduledProjects.has(project.name)).length};
-  Object.entries(counts).forEach(([key,value])=>{const target=document.querySelector(`[data-index-count="${key}"]`);if(target)target.textContent=String(value).padStart(2,'0')});
-  const holder=document.querySelector('#contentIndex');holder.querySelectorAll('[data-project-id],.content-index-empty').forEach(item=>item.remove());
-  if(!projects.length){holder.insertAdjacentHTML('beforeend','<p class="content-index-empty">아직 제작한 콘텐츠가 없습니다. 아래 버튼으로 첫 콘텐츠를 만들어 보세요.</p>');return}
-  projects.forEach((project,index)=>{const automationStatus=project.automation_status||'';const automationActive=['queued','running'].includes(automationStatus);const automationFailed=automationStatus==='failed';const automationStopped=automationStatus==='cancelled';const statusClass={queued:'automation-queued',running:'automation-running',failed:'automation-failed',cancelled:'automation-cancelled',succeeded:'automation-succeeded'}[automationStatus]||'';const statusText={queued:'자동 대기',running:'자동 진행 중',failed:'자동 오류',cancelled:'자동 중지',succeeded:'자동 완료'}[automationStatus]||`STEP ${String(project.current_stage||2).padStart(2,'0')}`;const detail=(automationActive||automationFailed||automationStopped)?`<span class="content-index-automation-detail ${automationFailed?'failed':automationActive?'running':''}"${automationFailed&&project.automation_error_message?` title="${escapeHtml(project.automation_error_message)}"`:''}>${automationFailed?'오류 정지 위치':automationStopped?'중지 위치':automationActive?'진행 단계':''} · ${escapeHtml(automationStageLabel(project.automation_stage))}</span>`:'';holder.insertAdjacentHTML('beforeend',`<article class="content-index-row" data-project-id="${escapeHtml(project.project_id)}" data-state="${hasFinalVideo(project)?'completed':'progress'}"><span class="content-index-no">${String(index+1).padStart(3,'0')}</span><div class="content-index-title"><strong>${escapeHtml(project.name)}${project.is_automated?'<span class="content-index-auto-badge" aria-label="자동 생성 콘텐츠">자동</span>':''}</strong><small>${escapeHtml(project.project_id)}</small></div><span class="content-index-status ${hasFinalVideo(project)?'done':''} ${statusClass}">${escapeHtml(statusText)}</span><span class="content-index-meta"><span>${projectDate(project.updated_at)}</span>${detail}</span><button class="content-index-open" type="button">상세 보기</button></article>`)});
-  projects.forEach(project=>{
-    const stage=project.automation_stage||'';
-    if(!project.is_automated||!['3-1','4','5'].includes(project.automation_endpoint)||!(stage==='voice_prepare'||stage.startsWith('image_')||stage.startsWith('video_')||stage.startsWith('crop_')||stage==='final_export_calendar'))return;
-    const row=[...holder.querySelectorAll('.content-index-row[data-project-id]')].find(item=>item.dataset.projectId===project.project_id);
-    const meta=row?.querySelector('.content-index-meta');if(!meta)return;
-    const voiceTotal=Number(project.automation_voice_total)||0,voiceDone=Math.min(Number(project.automation_voice_done)||0,voiceTotal);
-    const imageTotal=Number(project.automation_images_total)||0,imageDone=Math.min(Number(project.automation_images_done)||0,imageTotal);
-    if(stage==='voice_prepare'&&voiceTotal)meta.insertAdjacentHTML('beforeend',`<span class="content-index-automation-progress">음성 ${voiceDone}/${voiceTotal}</span>`);
-    if(stage!=='voice_prepare'){
-      if(voiceTotal)meta.insertAdjacentHTML('beforeend',`<span class="content-index-automation-progress">음성 ${voiceDone}/${voiceTotal}</span>`);
-      if(imageTotal)meta.insertAdjacentHTML('beforeend',`<span class="content-index-automation-progress">장면 이미지 ${imageDone}/${imageTotal}</span>`);
-    }
-  });
-  const remembered=localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY);
-  if(remembered&&indexProjects[remembered])setActiveProjectId(remembered);
-  else if(!remembered&&projects.length===1){setActiveProjectId(projects[0].project_id)}
-  else if(remembered&&!indexProjects[remembered]){setActiveProjectId(null)}
-  else if(activeProjectId&&!indexProjects[activeProjectId]){setActiveProjectId(null)}
+  return projectIndexController.render(projects);
 }
-async function refreshProjectIndex(){const [result]=await Promise.all([api('/api/projects'),refreshBrandLibrary()]);renderProjectIndex(result.projects||[])}
-let projectStatusPollBusy=false;setInterval(async()=>{const holder=document.querySelector('#contentIndex');if(!holder||holder.offsetParent===null||projectStatusPollBusy)return;projectStatusPollBusy=true;try{const result=await api('/api/projects');renderProjectIndex(result.projects||[])}catch(error){}finally{projectStatusPollBusy=false}},5000);
+function refreshProjectIndex(){return projectIndexController.refresh()}
 function openIndexProject(projectId,historyMode='push'){
   return contentIndexController.openProject(projectId,historyMode);
 }
@@ -2926,6 +2893,8 @@ function refreshBrandLibrary(){return brandLibraryController.refresh()}
 function showBrandLibrary(show){return brandLibraryController.show(show)}
 brandLibraryController.mount(document);
 const brandOverlayMount=brandOverlayController.mount(document);if(!brandOverlayMount.watermark.ok)console.error('[BrandOverlay:watermark]',brandOverlayMount.watermark.error);if(!brandOverlayMount.outro.ok)console.error('[BrandOverlay:outro]',brandOverlayMount.outro.error);
+const projectIndexController=Step01ProjectIndexController.create({getRoot:()=>document,projectsIndex:indexProjects,getCalendarEntries:()=>calendarEntries,calendarContentVersions,getRememberedProjectId:()=>localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY),getActiveProjectId:()=>activeProjectId,setActiveProjectId,request:(...args)=>api(...args),refreshBrandLibrary,escapeHtml,projectDate,automationStageLabel,setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),onPollError:error=>console.error('[ProjectIndex:poll]',error)});
+projectIndexController.startPolling();
 const contentIndexController=Step01ContentIndexController.create({request:(...args)=>api(...args),getProjects:()=>indexProjects,getActiveProjectId:()=>activeProjectId,beginNav,setActiveProjectId,showStep,showBrandLibrary,navigateProjectStep,resetProjectScopedState,setKeywordStageLocked,setVoiceProfile,getKeywords:()=>demoData.keywords,setVisibleKeywordIds:ids=>{visibleKeywordIds=ids},renderKeywords,refreshProjectIndex,confirm:message=>confirm(message),alert:message=>alert(message),escapeHtml,projectCreatedDate});
 contentIndexController.mount(document);
 let trendRequestVersion=0;

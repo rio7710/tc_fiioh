@@ -10,6 +10,7 @@ const partialPath = '01_app/pages/steps/step04-video.html';
 const cssPath = '01_app/assets/steps/step04/step04-video.css';
 const jsPath = '01_app/assets/steps/step04/step04-video.js';
 const contentIndexControllerPath = '01_app/assets/steps/step01/step01-content-index-controller.js';
+const projectIndexControllerPath = '01_app/assets/steps/step01/step01-project-index-controller.js';
 const brandStatePath = '01_app/assets/steps/step04/step04-brand-state.js';
 const brandSelectionControllerPath = '01_app/assets/steps/step04/step04-brand-selection-controller.js';
 const brandLibraryControllerPath = '01_app/assets/steps/step04/step04-brand-library-controller.js';
@@ -36,6 +37,7 @@ assert.ok(fs.existsSync(partialPath), 'step04-video.html partial file must exist
 assert.ok(fs.existsSync(cssPath), 'step04-video.css must exist');
 assert.ok(fs.existsSync(jsPath), 'step04-video.js must exist');
 assert.ok(fs.existsSync(contentIndexControllerPath), 'step01-content-index-controller.js must exist');
+assert.ok(fs.existsSync(projectIndexControllerPath), 'step01-project-index-controller.js must exist');
 assert.ok(fs.existsSync(brandStatePath), 'step04-brand-state.js must exist');
 assert.ok(fs.existsSync(brandSelectionControllerPath), 'step04-brand-selection-controller.js must exist');
 assert.ok(fs.existsSync(brandLibraryControllerPath), 'step04-brand-library-controller.js must exist');
@@ -71,6 +73,12 @@ console.log('✓ File integrity checks passed');
 // 2. Headless VM Execution Test: Pre-Partial Script Evaluation MUST NOT Throw (No Null Query Errors)
 const html = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v30"/, 'HTML cache-busts content index controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-controller\.js\?v=20261009_v31"/, 'HTML cache-busts project index controller');
+assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
+assert.match(html, /function renderProjectIndex\(projects\)\{\s*return projectIndexController\.render\(projects\);\s*\}/, 'P1 keeps a thin project index render wrapper');
+assert.match(html, /function refreshProjectIndex\(\)\{return projectIndexController\.refresh\(\)\}/, 'P1 keeps a thin project index refresh wrapper');
+assert.match(html, /projectIndexController\.startPolling\(\)/, 'P1 starts project polling after controller creation');
+assert.doesNotMatch(html, /projectStatusPollBusy|setInterval\(async\(\)=>\{const holder=document\.querySelector\('#contentIndex'\)/, 'P1 does not retain raw project polling');
 assert.match(html, /function openIndexProject\(projectId,historyMode='push'\)\{\s*return contentIndexController\.openProject\(projectId,historyMode\);\s*\}/, 'P1 keeps a thin project-open wrapper');
 assert.match(html, /contentIndexController\.mount\(document\)/, 'P1 mounts content index interactions after partial loading');
 assert.doesNotMatch(html, /document\.querySelector\('#projectDeleteButton'\)\.addEventListener|document\.querySelector\('#createProjectButton'\)\.addEventListener/, 'P1 does not retain create/delete event bodies');
@@ -296,6 +304,7 @@ function createPrePartialContext() {
     console,
     URL,
     Step01ContentIndexController: require('../01_app/assets/steps/step01/step01-content-index-controller.js'),
+    Step01ProjectIndexController: require('../01_app/assets/steps/step01/step01-project-index-controller.js'),
     Step04BrandState: require('../01_app/assets/steps/step04/step04-brand-state.js'),
     Step04BrandSelectionController: require('../01_app/assets/steps/step04/step04-brand-selection-controller.js'),
     Step04BrandLibraryController: require('../01_app/assets/steps/step04/step04-brand-library-controller.js'),
