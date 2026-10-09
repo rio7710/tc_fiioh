@@ -299,6 +299,8 @@
     setSceneDissolveSeconds: setSceneDissolveSeconds,
     getSceneDissolveSeconds: () => editorState.get('sceneDissolveSeconds'),
     getEffectiveSettingsPayload: getEffectiveSettingsPayload,
+    getSelectedPlatforms: () => editorState.get('selectedPlatforms'),
+    setSelectedPlatforms: value => editorState.set('selectedPlatforms', value),
     getSceneCropPositions: getSceneCropPositions,
     setSceneCropPositions: setSceneCropPositions,
     initStep4UI: initStep4UI,

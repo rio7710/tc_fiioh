@@ -162,7 +162,7 @@ class PipelineContractTests(unittest.TestCase):
         self.assertNotIn("const sceneLabel", self.app_bootstrap)
 
     def test_composite_format_success_activates_only_selected_platform_icons(self):
-        self.assertIn("[...selectedPlatforms].forEach(platform=>", self.html)
+        self.assertIn("selectedPlatformValues().forEach(platform=>", self.html)
         self.assertIn("groups.find(item=>item.label===label)", self.html)
         self.assertIn("group.platforms.push(platform)", self.html)
         self.assertIn("group.platforms.map(platform=>`<span class=\"composite-platform-badge\"", self.html)

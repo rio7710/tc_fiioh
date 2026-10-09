@@ -9,9 +9,9 @@ assert.ok(shell.split(/\r?\n/).length <= 400, 'P1 remains a compact root shell o
 assert.equal((shell.match(/<style\b/gi) || []).length, 0, 'P1 has no inline style blocks');
 assert.equal((shell.match(/<script(?![^>]*\bsrc=)[^>]*>/g) || []).length, 0, 'P1 has no inline executable script');
 assert.equal((shell.match(/app-shell\.css\?v=20261009_v75/g) || []).length, 1, 'P1 loads app shell CSS once');
-assert.equal((shell.match(/app-bootstrap\.js\?v=20261009_v78/g) || []).length, 1, 'P1 loads one cache-busted bootstrap asset');
-assert.match(shell, /<script src="\/01_app\/assets\/core\/app-bootstrap\.js\?v=20261009_v78"><\/script>/);
-assert.match(shell, /<script src="\/01_app\/assets\/core\/app-bootstrap\.js\?v=20261009_v78"><\/script>\s*<\/body>/, 'bootstrap is the final shell executable entrypoint');
+assert.equal((shell.match(/app-bootstrap\.js\?v=20261010_v1/g) || []).length, 1, 'P1 loads one cache-busted bootstrap asset');
+assert.match(shell, /<script src="\/01_app\/assets\/core\/app-bootstrap\.js\?v=20261010_v1"><\/script>/);
+assert.match(shell, /<script src="\/01_app\/assets\/core\/app-bootstrap\.js\?v=20261010_v1"><\/script>\s*<\/body>/, 'bootstrap is the final shell executable entrypoint');
 
 const requiredMountPoints = [
   'step01LoginContainer',

@@ -143,7 +143,7 @@ assert.match(html, /src="\/01_app\/assets\/core\/session-bootstrap-controller\.j
 assert.match(html, /src="\/01_app\/assets\/core\/auth-ui-controller\.js\?v=20261009_v34"/, 'HTML cache-busts auth UI controller');
 assert.match(html, /src="\/01_app\/assets\/core\/project-keyword-hydrator\.js\?v=20261009_v58"/, 'HTML cache-busts project keyword hydrator');
 assert.match(html, /src="\/01_app\/assets\/core\/project-media-hydrator\.js\?v=20261009_v59"/, 'HTML cache-busts project media hydrator');
-assert.match(html, /src="\/01_app\/assets\/core\/project-brand-platform-hydrator\.js\?v=20261009_v60"/, 'HTML cache-busts project brand platform hydrator');
+assert.match(html, /src="\/01_app\/assets\/core\/project-brand-platform-hydrator\.js\?v=20261010_v1"/, 'HTML cache-busts project brand platform hydrator');
 assert.match(html, /src="\/01_app\/assets\/core\/project-editor-hydrator\.js\?v=20261009_v61"/, 'HTML cache-busts project editor hydrator');
 assert.match(html, /src="\/01_app\/assets\/core\/project-hydration-applier\.js\?v=20261009_v61"/, 'HTML cache-busts project hydration applier');
 assert.match(html, /src="\/01_app\/assets\/core\/project-hydration-composer\.js\?v=20261009_v62"/, 'HTML cache-busts project hydration composer');
@@ -211,6 +211,9 @@ assert.match(html, /applier:projectHydrationComposition\.applier/, 'P1 explicitl
 assert.match(html, /ThinkCastProjectHydrationComposer\.create\(\{factories:\{keyword:ThinkCastProjectKeywordHydrator,media:ThinkCastProjectMediaHydrator,brandPlatform:ThinkCastProjectBrandPlatformHydrator,editor:ThinkCastProjectEditorHydrator,applier:ThinkCastProjectHydrationApplier\}/, 'P1 delegates hydration construction to composer');
 assert.match(html, /applier:projectHydrationComposition\.applier/, 'P1 injects only composed applier into transport controller');
 assert.doesNotMatch(html, /ThinkCastProject(?:KeywordHydrator|MediaHydrator|BrandPlatformHydrator|EditorHydrator|HydrationApplier)\.create\(/, 'P1 has no individual hydration create calls');
+assert.match(appBootstrapSource, /getPlatformButtons:\(\)=>Array\.from\(document\.querySelectorAll\('\.distribution-btn'\)\)/, 'platform hydration resolves buttons from the mounted DOM');
+assert.match(appBootstrapSource, /setSelectedPlatforms:value=>window\.Step04VideoEditor\?\.setSelectedPlatforms\(value\)/, 'platform hydration updates the isolated Step 4 store through its public API');
+assert.doesNotMatch(appBootstrapSource, /=>platformButtons|=>selectedPlatforms|\.\.\.selectedPlatforms/, 'shell does not reference removed Step 4 globals');
 assert.doesNotMatch(projectHydrationSource,/setSceneCropPositions|setDemoTimeline|setSelectedKeywords/,'transport controller has no state setter dependencies');
 assert.doesNotMatch(projectHydrationApplierSource,/getDemoKeywords|setDemoKeywords|setSelectedKeywords|setSeasonalKeywordIds|setVisibleKeywordIds|renderKeywords/,'hydration applier has no keyword setter dependencies');
 assert.doesNotMatch(projectHydrationApplierSource,/setSceneCropPositions|setStoryboardImages|setStoryboardImageCandidates|setStoryboardVoiceClips|setStoryboardVideos|setStoryboardVideoCandidates|setVoiceProfile/,'hydration applier has no media setter dependencies');
@@ -398,7 +401,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-lifecycle-contr
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-image-regeneration-controller\.js\?v=20261009_v50"/, 'HTML cache-busts image regeneration controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-actions-controller\.js\?v=20261008_v25"/, 'HTML cache-busts UI actions controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-render-controller\.js\?v=20261008_v13"/, 'HTML cache-busts render controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261008_v22"/, 'HTML cache-busts Step 4 controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261010_v1"/, 'HTML cache-busts Step 4 controller');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /#prevBtn|#nextBtn|#mobileSceneSelect|#sceneList/, 'UI bindings do not duplicate navigation listeners');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /feature\('playback'|#playBtn|addEventListener\('play'|addEventListener\('pause'/, 'UI bindings do not duplicate playback listeners');
 assert.doesNotMatch(html, /const watermarkPreviewRatios=|let watermarkPreviewItem=|let outroPreviewItem=|function activateWatermarkRatio\(|function renderOutroPreviewSlide\(/, 'P1 does not retain overlay controller state or implementation');
