@@ -22,6 +22,7 @@
 <script src="/01_app/assets/video-editor/index.js?v=20261007_v2"></script>
 <script src="/01_app/assets/steps/step04/step04-brand-state.js?v=20261007_v5"></script>
 <script src="/01_app/assets/steps/step04/step04-outro-ratio-assets.js?v=20261009_v26"></script>
+<script src="/01_app/assets/steps/step04/step04-brand-stage-preview.js?v=20261009_v27"></script>
 <script src="/01_app/assets/steps/step04/step04-brand-overlay.js?v=20261008_v25"></script>
 <script src="/01_app/assets/steps/step04/step04-store.js?v=20261007_v4"></script>
 <script src="/01_app/assets/steps/step04/step04-timeline-bridge.js?v=20261007_v8"></script>
@@ -1749,10 +1750,11 @@ async function loadProjectContent(projectId,token){
   applyScript(result.script);
   return result;
 }
-function brandRoleControls(role){const title=role[0].toUpperCase()+role.slice(1);return {enabled:document.querySelector(`#brand${title}Enabled`),select:document.querySelector(`#brand${title}Version`)}}
 const outroRatioAssets=Step04OutroRatioAssets.create({state:brandOverlayState,getAssets:()=>brandAssets});
 function isOutroRatioCompanion(item){return outroRatioAssets.isCompanion(item)}
 function ensureOutroRatioAssets(item,options){return outroRatioAssets.ensure(item,options)}
+const brandStagePreview=Step04BrandStagePreview.create({getRoot:()=>document,state:brandOverlayState,getAssets:()=>brandAssets,ensureOutroRatioAssets,getCurrentRatio:()=>{if(window.Step04VideoEditor?.currentCropFormat)return window.Step04VideoEditor.currentCropFormat();const stageCard=document.querySelector('#stageCard')||document.querySelector('.stage-card');if(!stageCard)return '16x9';return window.RatioProfiles?window.RatioProfiles.calculateCropFormat(stageCard.className):'16x9'}});
+function brandRoleControls(role){return brandStagePreview.roleControls(role)}
 function renderBrandChoices(){
   ['intro','outro','watermark'].forEach(role=>{
     const controls=brandRoleControls(role);const items=brandAssets.filter(item=>item.role===role&&item.active&&!isOutroRatioCompanion(item));
@@ -1771,20 +1773,13 @@ function renderBrandChoices(){
   updateCommonOutroPreview();
   if(scenes.length)renderSceneList();
 }
-function applyWatermarkPosition(element,position){const [vertical,horizontal]=position.split('-');element.style.inset='auto';element.style.transform='';if(horizontal==='left')element.style.left='3.5%';else if(horizontal==='right')element.style.right='3.5%';else{element.style.left='50%';element.style.transform='translateX(-50%)'}if(vertical==='top')element.style.top='3.5%';else if(vertical==='bottom')element.style.bottom='3.5%';else{element.style.top='50%';element.style.transform+=(element.style.transform?' ':'')+'translateY(-50%)'}}
-function currentCropFormat(){
-  if(window.Step04VideoEditor?.currentCropFormat){
-    return window.Step04VideoEditor.currentCropFormat();
-  }
-  const stageCard=document.querySelector('#stageCard')||document.querySelector('.stage-card');
-  if(!stageCard)return '16x9';
-  return window.RatioProfiles?window.RatioProfiles.calculateCropFormat(stageCard.className):'16x9';
-}
-function activeWatermarkProfile(){return brandOverlayState.activeWatermarkProfile(currentCropFormat())}
-function updateWatermarkPreview(){const controls=brandRoleControls('watermark');const preview=document.querySelector('#brandWatermarkPreview');preview.hidden=!controls.enabled.checked||!controls.select.value;preview.src=preview.hidden?'':`/api/brand-asset?version_id=${encodeURIComponent(controls.select.value)}`;preview.style.opacity=document.querySelector('#brandWatermarkOpacity').value;const profile=activeWatermarkProfile();preview.style.width=`${Number(profile.width_ratio||.15)*100}%`;applyWatermarkPosition(preview,profile.position||'top-right')}
-function activeOutroProfile(){return brandOverlayState.activeOutroProfile(currentCropFormat())}
-function outroBackgroundColor(profile){const alpha=Math.max(0,Math.min(1,Number(profile.background_opacity??.8)));return profile.background==='white'?`rgba(255,255,255,${alpha})`:profile.background==='black'?`rgba(0,0,0,${alpha})`:'transparent'}
-function updateCommonOutroPreview(){const controls=brandRoleControls('outro');const selectedItem=brandAssets.find(asset=>asset.version_id===controls.select.value);if(selectedItem)ensureOutroRatioAssets(selectedItem);const profile=activeOutroProfile();const item=brandAssets.find(asset=>asset.version_id===profile.version_id)||selectedItem;const holder=document.querySelector('#brandOutroPreview');const image=document.querySelector('#brandOutroPreviewImage');const clip=document.querySelector('#brandOutroPreviewVideo');const enabled=Boolean(controls.enabled.checked&&item);holder.dataset.enabled=String(enabled);image.hidden=!enabled||item?.media_type==='video';clip.hidden=!enabled||item?.media_type!=='video';if(!enabled){holder.style.backgroundColor='transparent';image.removeAttribute('src');clip.removeAttribute('src');return}const source=`/api/brand-asset?version_id=${encodeURIComponent(item.version_id)}`;const media=item.media_type==='video'?clip:image;if(media.getAttribute('src')!==source)media.src=source;holder.style.backgroundColor=outroBackgroundColor(profile);media.style.width=`${Number(profile.width_ratio||1)*100}%`;media.style.inset='auto';applyWatermarkPosition(media,profile.position||'center-center')}
+function applyWatermarkPosition(element,position){return brandStagePreview.applyPosition(element,position)}
+function currentCropFormat(){return brandStagePreview.currentRatio()}
+function activeWatermarkProfile(){return brandStagePreview.activeWatermarkProfile()}
+function updateWatermarkPreview(){return brandStagePreview.updateWatermark()}
+function activeOutroProfile(){return brandStagePreview.activeOutroProfile()}
+function outroBackgroundColor(profile){return brandStagePreview.backgroundColor(profile)}
+function updateCommonOutroPreview(){return brandStagePreview.updateOutro()}
 function currentBrandSelections(){return ['intro','outro','watermark'].map(role=>{const controls=brandRoleControls(role);const settings=role==='watermark'?{opacity:Number(document.querySelector('#brandWatermarkOpacity').value),...brandOverlayState.serializeSettings('watermark')}:role==='outro'?brandOverlayState.serializeSettings('outro'):{};return {role,enabled:controls.enabled.checked,version_id:controls.select.value||null,settings}})}
 async function saveBrandSelections(){const result=await api('/api/content-brand-selection',{method:'POST',body:JSON.stringify({selections:currentBrandSelections()})});brandSelections=result.selections||[];if(scenes.length)renderSceneList()}
 async function loadProjectState(projectId,token){
