@@ -13,7 +13,8 @@ const previewControllerPath = '01_app/assets/steps/step05/step05-calendar-previe
 const exportControllerPath = '01_app/assets/steps/step05/step05-calendar-export-controller.js';
 const productionCalendarControllerPath = '01_app/assets/steps/step05/step05-production-calendar-controller.js';
 const presentationControllerPath = '01_app/assets/steps/step05/step05-calendar-presentation-controller.js';
-[partialPath, cssPath, jsPath, storePath, viewControllerPath, rendererPath, dragControllerPath, settingsControllerPath, previewControllerPath, exportControllerPath, productionCalendarControllerPath, presentationControllerPath].forEach(file => assert.ok(fs.existsSync(file), `${file} must exist`));
+const dataControllerPath = '01_app/assets/steps/step05/step05-calendar-data-controller.js';
+[partialPath, cssPath, jsPath, storePath, viewControllerPath, rendererPath, dragControllerPath, settingsControllerPath, previewControllerPath, exportControllerPath, productionCalendarControllerPath, presentationControllerPath, dataControllerPath].forEach(file => assert.ok(fs.existsSync(file), `${file} must exist`));
 
 const html = fs.readFileSync(partialPath, 'utf8');
 const shell = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
@@ -44,6 +45,7 @@ assert.match(shell, /step05-calendar-preview-controller\.js\?v=20261009_v69/, 's
 assert.match(shell, /step05-calendar-export-controller\.js\?v=20261009_v70/, 'shell cache-busts calendar export controller');
 assert.match(shell, /step05-production-calendar-controller\.js\?v=20261009_v71/, 'shell cache-busts production calendar controller');
 assert.match(shell, /step05-calendar-presentation-controller\.js\?v=20261009_v72/, 'shell cache-busts calendar presentation controller');
+assert.match(shell, /step05-calendar-data-controller\.js\?v=20261009_v73/, 'shell cache-busts calendar data controller');
 assert.ok(shell.indexOf('step05-calendar.js') < shell.indexOf('step05-calendar-store.js'), 'calendar domain helpers load before store');
 assert.ok(shell.indexOf('step05-calendar-store.js') < shell.indexOf('step05-calendar-view-controller.js'), 'calendar view controller loads after calendar store');
 assert.ok(shell.indexOf('step05-calendar-view-controller.js') < shell.indexOf('step05-calendar-renderer.js'), 'calendar renderer loads after view controller');
@@ -53,11 +55,14 @@ assert.ok(shell.indexOf('step05-calendar-settings-controller.js') < shell.indexO
 assert.ok(shell.indexOf('step05-calendar-preview-controller.js') < shell.indexOf('step05-calendar-export-controller.js'), 'calendar export controller loads after preview controller');
 assert.ok(shell.indexOf('step05-calendar-export-controller.js') < shell.indexOf('step05-production-calendar-controller.js'), 'production calendar controller loads after export controller');
 assert.ok(shell.indexOf('step05-production-calendar-controller.js') < shell.indexOf('step05-calendar-presentation-controller.js'), 'calendar presentation controller loads after production controller');
+assert.ok(shell.indexOf('step05-calendar-presentation-controller.js') < shell.indexOf('step05-calendar-data-controller.js'), 'calendar data controller loads after presentation controller');
 assert.match(shell,/const calendarStore=Step05CalendarStore\.create\(\{storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:\(\.\.\.args\)=>api\(\.\.\.args\),collapseDuplicates:Step05Calendar\.collapseDuplicates,uniquenessKey:Step05Calendar\.uniquenessKey\}\)/,'shell wires calendar store to canonical uniqueness helpers');
-assert.match(shell,/function loadCalendarEntries\(\)\{\s*calendarEntries=calendarStore\.load\(\)\.entries;\s*\}/,'local calendar load is a thin state delegate');
-assert.match(shell,/async function hydrateCalendarEntries\(\)\{\s*calendarEntries=\(await calendarStore\.hydrate\(calendarEntries\)\)\.entries;\s*renderCalendar\(\{preserveScroll:true\}\);\s*\}/,'server calendar hydration is a thin state/render delegate');
-assert.match(shell,/function saveCalendarEntries\(\)\{\s*return calendarStore\.save\(calendarEntries\);\s*\}/,'calendar save is a thin delegate');
+assert.match(shell,/function loadCalendarEntries\(\)\{\s*return calendarDataController\.load\(\);\s*\}/,'local calendar load is a thin data-controller delegate');
+assert.match(shell,/async function hydrateCalendarEntries\(\)\{\s*return calendarDataController\.hydrate\(\);\s*\}/,'server calendar hydration is a thin data-controller delegate');
+assert.match(shell,/function saveCalendarEntries\(\)\{\s*return calendarDataController\.save\(\);\s*\}/,'calendar save is a thin data-controller delegate');
 assert.doesNotMatch(shell,/function loadCalendarEntries\(\)\{[^}]*JSON\.parse|function hydrateCalendarEntries\(\)\{[^}]*serverLegacyKeys/,'shell has no calendar persistence implementation');
+assert.match(shell,/const calendarDataController=Step05CalendarDataController\.create\(\{store:calendarStore,getEntries:\(\)=>calendarEntries,setEntries:entries=>\{calendarEntries=entries\},render:renderCalendar\}\)/,'shell explicitly composes calendar data lifecycle');
+assert.doesNotMatch(shell,/calendarEntries=calendarStore\.load\(\)\.entries|calendarStore\.hydrate\(calendarEntries\)|calendarStore\.save\(calendarEntries\)/,'shell has no duplicate persistence lifecycle body');
 assert.doesNotMatch(shell,/function loadCalendarUi|function saveCalendarUi|function moveCalendarPeriod|let calendarCursor=|let calendarView=/,'shell has no duplicate calendar view lifecycle');
 assert.match(presentationController,/deps\.viewController\.load\(\)/,'presentation controller owns calendar UI loading');
 assert.match(presentationController,/deps\.renderer\.render\(\{/,'presentation controller delegates markup to pure renderer');

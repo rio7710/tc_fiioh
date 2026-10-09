@@ -82,6 +82,7 @@
 <script src="/01_app/assets/steps/step05/step05-calendar-export-controller.js?v=20261009_v70"></script>
 <script src="/01_app/assets/steps/step05/step05-production-calendar-controller.js?v=20261009_v71"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-presentation-controller.js?v=20261009_v72"></script>
+<script src="/01_app/assets/steps/step05/step05-calendar-data-controller.js?v=20261009_v73"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css?v=20261007_v2">
@@ -1516,17 +1517,16 @@ function seedCalendarEntries(){
   }));
 }
 function loadCalendarEntries(){
-  calendarEntries=calendarStore.load().entries;
+  return calendarDataController.load();
 }
 async function hydrateCalendarEntries(){
-  calendarEntries=(await calendarStore.hydrate(calendarEntries)).entries;
-  renderCalendar({preserveScroll:true});
+  return calendarDataController.hydrate();
 }
 function calendarContentVersions(entry){
   return Step05Calendar.calendarContentVersions(entry);
 }
 function saveCalendarEntries(){
-  return calendarStore.save(calendarEntries);
+  return calendarDataController.save();
 }
 function exportPreviewClass(item){
   const width=Number(item?.width);const height=Number(item?.height);
@@ -1833,6 +1833,7 @@ calendarContentView.addEventListener('click',()=>{
 });
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!platformGuideModal.hidden)closePlatformGuide()});
 const calendarStore=Step05CalendarStore.create({storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:(...args)=>api(...args),collapseDuplicates:Step05Calendar.collapseDuplicates,uniquenessKey:Step05Calendar.uniquenessKey});
+const calendarDataController=Step05CalendarDataController.create({store:calendarStore,getEntries:()=>calendarEntries,setEntries:entries=>{calendarEntries=entries},render:renderCalendar});
 const calendarViewController=Step05CalendarViewController.create({storage:localStorage,storageKey:CALENDAR_UI_STORAGE_KEY,now:()=>new Date(),isDateKey:value=>/^\d{4}-\d{2}-\d{2}$/.test(value||''),dateKey:Step05Calendar.dateKey});
 const calendarRenderer=Step05CalendarRenderer.create({dateKey:Step05Calendar.dateKey,groupEntries:Step05Calendar.groupCalendarEntries,statusTimestamp:Step05Calendar.calendarStatusTimestamp,formatTime:Step05Calendar.formatCalendarTime,minuteOfDay:Step05Calendar.calendarMinuteOfDay,escapeHtml,statusLabels:calendarStatusLabels,platformLabels:calendarPlatformLabels,timeLabels:calendarTimeLabels});
 const calendarPresentationController=Step05CalendarPresentationController.create({grid:calendarGrid,scroller:calendarGrid.parentElement,title:calendarMonthTitle,viewButtons:[...document.querySelectorAll('.calendar-view-btn')],prevButton:document.querySelector('#calendarPrev'),nextButton:document.querySelector('#calendarNext'),viewController:calendarViewController,renderer:calendarRenderer,getEntries:()=>calendarEntries,now:()=>new Date(),requestFrame:callback=>requestAnimationFrame(callback),cancelFrame:frame=>cancelAnimationFrame(frame),getPageScroll:()=>({x:window.scrollX,y:window.scrollY}),scrollWindow:(x,y)=>window.scrollTo(x,y)});
