@@ -537,7 +537,8 @@ def brand_asset_path(uri):
 def media_duration(path):
     ffprobe = shutil.which("ffprobe") or str(Path(find_ffmpeg()).with_name("ffprobe"))
     completed = subprocess.run(
-        [ffprobe, "-v", "error", "-show_entries", "format=duration",
+        [ffprobe, "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=duration",
          "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
         capture_output=True, text=True, timeout=RUNTIME_CONFIG["ffprobe_timeout"], check=True,
     )

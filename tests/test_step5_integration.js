@@ -92,7 +92,7 @@ assert.doesNotMatch(shell,/function openCalendarPreview|function closeCalendarPr
 assert.match(shell,/const calendarExportController=Step05CalendarExportController\.create\(\{button:document\.querySelector\('#calendarExport'\),[\s\S]*?contentIdentity:Step05Calendar\.contentIdentity,[\s\S]*?collapseDuplicates:Step05Calendar\.collapseDuplicates/,'shell injects canonical helpers into calendar export controller');
 assert.match(shell,/calendarExportController\.mount\(\)/,'shell mounts calendar export controller');
 assert.doesNotMatch(shell,/function exportCalendarIcs|calendarExport'\)\.addEventListener\('click'/,'shell has no duplicate ICS implementation or listener');
-assert.match(shell,/function recordCurrentProduction\(result\)\{\s*return productionCalendarController\.record\(result\);\s*\}/,'production callback remains a thin compatibility wrapper');
+assert.match(shell,/async function recordCurrentProduction\(result\)\{\s*const recorded=productionCalendarController\.record\(result\);\s*if\(recorded\)await hydrateCalendarEntries\(\);\s*return recorded;\s*\}/,'production callback records locally and immediately hydrates canonical server calendar data');
 assert.match(shell,/const productionCalendarController=Step05ProductionCalendarController\.create\(\{getEntries:\(\)=>calendarEntries,[\s\S]*?collapseDuplicates:Step05Calendar\.collapseDuplicates/,'shell injects production calendar state and canonical uniqueness');
 assert.doesNotMatch(shell,/function recordCurrentProduction\(result\)\{[\s\S]*?targets\.forEach/,'shell has no production calendar implementation body');
 assert.match(shell,/function renderCalendar\(options\)\{\s*return calendarPresentationController\.render\(options\);\s*\}/,'calendar render remains a thin compatibility wrapper');

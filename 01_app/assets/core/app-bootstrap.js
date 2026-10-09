@@ -390,8 +390,10 @@ function calendarMinuteOfDay(item){
 function renderCalendar(options){
   return calendarPresentationController.render(options);
 }
-function recordCurrentProduction(result){
-  return productionCalendarController.record(result);
+async function recordCurrentProduction(result){
+  const recorded=productionCalendarController.record(result);
+  if(recorded)await hydrateCalendarEntries();
+  return recorded;
 }
 function icsEscape(value){return Step05Calendar.icsEscape(value)}
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));

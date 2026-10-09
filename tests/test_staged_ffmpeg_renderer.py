@@ -133,6 +133,7 @@ class StagedFfmpegRendererTests(unittest.TestCase):
         self.assertIn("scene-transition", stages)
         self.assertIn("body-decoration-concat", stages)
         self.assertIn("brand-outro", stages)
+        self.assertIn("brand-outro-frame", stages)
         self.assertEqual("audio-mux", stages[-1])
         visual_calls = [(stage, args) for stage, args in self.runner.calls if stage != "audio-mux"]
         self.assertTrue(all(args.count("-i") <= 2 for _, args in visual_calls))
@@ -155,6 +156,9 @@ class StagedFfmpegRendererTests(unittest.TestCase):
         result = render_video_staged(self.config("instagram"), "vertical", dependencies=self.dependencies())
         self.assertEqual((1080, 1920), (result["width"], result["height"]))
         outro = next(args for stage, args in self.runner.calls if stage == "brand-outro")
+        outro_frame = next(args for stage, args in self.runner.calls if stage == "brand-outro-frame")
+        self.assertIn("-sseof", outro_frame)
+        self.assertIn("reverse", outro_frame)
         self.assertIn(str(self.outro_tall), outro)
         graph = outro[outro.index("-filter_complex") + 1]
         self.assertIn("scale=756:-1", graph)

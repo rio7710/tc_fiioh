@@ -397,7 +397,6 @@ def _render_outro(
     width: int,
     height: int,
     format_label: str,
-    body_duration: float,
     destination: Path,
 ) -> None:
     settings = outro.get("settings") or {}
@@ -419,15 +418,18 @@ def _render_outro(
         f"drawbox=color={background}@{opacity:.3f}:t=fill"
         if background != "none" and opacity > 0 else "null"
     )
-    args = _ffmpeg_prefix(dependencies) + [
-        "-ss", f"{max(0.0, body_duration - 1 / 30):.6f}", "-i", str(body),
+    frozen = destination.with_name(destination.stem + "-body.png")
+    freeze_args = _ffmpeg_prefix(dependencies) + [
+        "-sseof", "-1", "-i", str(body), "-vf", "reverse",
+        "-frames:v", "1", str(frozen),
     ]
+    _run(dependencies, freeze_args, "brand-outro-frame")
+    args = _ffmpeg_prefix(dependencies) + ["-loop", "1", "-i", str(frozen)]
     if outro.get("media_type") == "image":
         args += ["-loop", "1"]
     args += ["-i", str(outro["path"])]
     graph = (
-        f"[0:v]trim=duration={1 / 30:.6f},setpts=PTS-STARTPTS,"
-        f"tpad=stop_mode=clone:stop_duration={duration:.6f},trim=duration={duration:.6f},"
+        f"[0:v]trim=duration={duration:.6f},setpts=PTS-STARTPTS,"
         f"fps=30,settb=AVTB,format=yuv420p,split=2[hold][bg-source];"
         f"[bg-source]{background_filter}[bg];"
         f"[1:v]scale={logo_width}:-1,format=rgba,fps=30,trim=duration={duration:.6f},"
@@ -632,7 +634,7 @@ def render_video_staged(
                 outro = work / "outro.mp4"
                 _render_outro(
                     dependencies, decorated, brand["outro"], width, height,
-                    format_label, body_duration, outro,
+                    format_label, outro,
                 )
                 video_parts.append(outro)
             silent = work / "silent-final.mp4"

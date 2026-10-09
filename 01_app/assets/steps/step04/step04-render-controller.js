@@ -135,7 +135,7 @@
           d.applyCompositeFormatProgress(roles[2], 0, true);
           d.applySequentialSceneProgress(roles[2], d.getScenes().length);
           if (!roles[2].classList.contains('done')) complete(2);
-          activate(3); d.recordCurrentProduction(result); await d.sleep(700); complete(3);
+          activate(3); await d.recordCurrentProduction(result); await d.sleep(700); complete(3);
           modal.classList.add('complete'); now.classList.remove('processing'); now.textContent = '배포 파일 준비가 완료되었습니다.';
           const exports = Array.isArray(result.exports) && result.exports.length ? result.exports : [{ filename: result.filename, url: result.url }];
           summary.textContent = `선택한 설정으로 출력 규격별 MP4 ${exports.length}개를 만들고 콘텐츠 캘린더에 기록했습니다.`;
