@@ -65,6 +65,7 @@ class RenderSettingsIntegrationTests(unittest.TestCase):
         self.assertEqual(catalog["defaults"]["music"], "satie")
         self.assertEqual(["youtube", "instagram", "naver"], catalog["defaults"]["platforms"])
         self.assertEqual(0.5, catalog["defaults"]["scene_dissolve_seconds"])
+        self.assertEqual(3.0, catalog["defaults"]["music_start_offset_seconds"])
         self.assertEqual("preview-square", catalog["ratio_profiles"]["1x1"]["className"])
         self.assertEqual(["square"], catalog["ratio_profiles"]["1x1"]["platforms"])
         self.assertEqual((1080, 1080, "1x1"), SERVER.PLATFORM_FORMATS["square"])

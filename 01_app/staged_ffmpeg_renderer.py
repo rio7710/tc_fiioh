@@ -442,11 +442,14 @@ def _mux_audio(
     music_path = dependencies.music[config["music"]]
     if music_path is not None:
         args += ["-stream_loop", "-1", "-i", str(music_path)]
-        fadeout_start = max(0.0, output_duration - 2.0)
+        music_start = max(0.0, float(dependencies.render_defaults.get("music_start_offset_seconds", 3.0)))
+        fadein_duration = max(0.0, float(dependencies.render_defaults.get("music_fade_in_seconds", 2.0)))
+        fadeout_duration = max(0.0, float(dependencies.render_defaults.get("music_fade_out_seconds", 2.0)))
+        fadeout_start = max(0.0, output_duration - fadeout_duration)
         filters.append(
-            f"[{input_index}:a:0]atrim=start=2:duration={output_duration:.6f},asetpts=PTS-STARTPTS,"
-            f"volume={float(config['volume']):.3f},afade=t=in:st=0:d=2,"
-            f"afade=t=out:st={fadeout_start:.6f}:d=2[bg]"
+            f"[{input_index}:a:0]atrim=start={music_start:.6f}:duration={output_duration:.6f},asetpts=PTS-STARTPTS,"
+            f"volume={float(config['volume']):.3f},afade=t=in:st=0:d={fadein_duration:.6f},"
+            f"afade=t=out:st={fadeout_start:.6f}:d={fadeout_duration:.6f}[bg]"
         )
         labels.append("[bg]")
         input_index += 1

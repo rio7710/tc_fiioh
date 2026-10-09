@@ -31,6 +31,7 @@ let catalog = { music: { satie: { uri: 'media/catalog-satie.mp3' } } };
 let saves = 0, syncs = 0, stops = 0, narrationSyncs = 0, panUpdates = 0, errors = 0;
 const controller = PlaybackController.create({
   root, getSelectedMusic: () => selected, setSelectedMusic: value => { selected = value; }, getCatalog: () => catalog,
+  getCurrentVolume: () => 0.5,
   saveEditorSettings: () => { saves += 1; }, sync: () => { syncs += 1; }, stopNarration: () => { stops += 1; },
   syncNarration: (time, force) => { assert.equal(time, video.currentTime); assert.equal(force, true); narrationSyncs += 1; },
   updatePanAvailability: () => { panUpdates += 1; }, onError: () => { errors += 1; }
@@ -48,8 +49,9 @@ assert.equal(musicButtons[0].classList.contains('active'), true);
 assert.equal(musicButtons[0].attrs['aria-pressed'], 'true');
 assert.equal(saves, 1);
 video.paused = false; bgm.emit('loadedmetadata');
-assert.equal(bgm.currentTime, 2, 'loaded metadata aligns BGM modulo video time');
+assert.equal(bgm.currentTime, 0, 'loaded metadata skips the configured three-second silent music head');
 assert.equal(bgm.playCount, 1, 'loaded metadata resumes BGM while video plays');
+assert.equal(bgm.volume, 0.5, 'music reaches the selected volume after the fade-in window');
 
 catalog = { music: {} };
 controller.setMusic('custom');
@@ -58,11 +60,14 @@ const loadsBeforeNone = bgm.loadCount;
 controller.setMusic('none');
 assert.equal(bgm.loadCount, loadsBeforeNone, 'none does not load or play BGM');
 
-selected = 'satie'; video.currentTime = 12; bgm.duration = 5; bgm.readyState = 1; bgm.currentTime = 2.25;
+selected = 'satie'; video.currentTime = 12; bgm.duration = 5; bgm.readyState = 1; bgm.currentTime = 0.25;
 controller.alignMusic();
-assert.equal(bgm.currentTime, 2.25, 'drift at 0.25 is preserved');
-bgm.currentTime = 2.251; controller.alignMusic();
-assert.equal(bgm.currentTime, 2, 'drift above 0.25 is corrected');
+assert.equal(bgm.currentTime, 0.25, 'drift at 0.25 is preserved');
+bgm.currentTime = 0.251; controller.alignMusic();
+assert.equal(bgm.currentTime, 0, 'drift above 0.25 is corrected to the trimmed music position');
+video.currentTime = 0; video.emit('timeupdate'); assert.equal(bgm.volume, 0, 'music starts silent at the trimmed three-second source point');
+video.currentTime = 1; video.emit('timeupdate'); assert.equal(bgm.volume, 0.25, 'music fades to half of the selected volume after one second');
+video.currentTime = 2; video.emit('timeupdate'); assert.equal(bgm.volume, 0.5, 'music fade-in completes after two seconds');
 
 video.paused = true; controller.togglePlay(); assert.equal(video.playCount, 1);
 video.paused = false; controller.togglePlay(); assert.equal(video.pauseCount, 1);

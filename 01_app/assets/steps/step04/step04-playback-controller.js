@@ -28,14 +28,35 @@
       return /^(?:https?:)?\/\//i.test(value) ? value : `/${value.replace(/^\/+/, '')}`;
     }
 
+    function musicTiming() {
+      const defaults = deps.getCatalog?.()?.defaults || {};
+      const number = (value, fallback) => Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : fallback;
+      return {
+        startOffset: number(defaults.music_start_offset_seconds, 3),
+        fadeIn: number(defaults.music_fade_in_seconds, 2)
+      };
+    }
+
+    function syncMusicVolume(time) {
+      const bgm = query('#bgm');
+      if (!bgm) return 0;
+      const timelineTime = Math.max(0, Number(time ?? query('#video')?.currentTime) || 0);
+      const fadeIn = musicTiming().fadeIn;
+      const target = Math.max(0, Math.min(1, Number(deps.getCurrentVolume?.()) || 0));
+      const gain = fadeIn > 0 ? Math.max(0, Math.min(1, timelineTime / fadeIn)) : 1;
+      bgm.volume = target * gain;
+      return bgm.volume;
+    }
+
     function alignMusic() {
       const video = query('#video');
       const bgm = query('#bgm');
       if (!video || !bgm || deps.getSelectedMusic?.() === 'none') return;
       if (bgm.readyState >= 1 && Number.isFinite(bgm.duration) && bgm.duration > 0) {
-        const target = video.currentTime % bgm.duration;
+        const target = (video.currentTime + musicTiming().startOffset) % bgm.duration;
         if (Math.abs(bgm.currentTime - target) > 0.25) bgm.currentTime = target;
       }
+      syncMusicVolume(video.currentTime);
     }
 
     function setMusic(track) {
@@ -95,12 +116,13 @@
         deps.syncNarration?.(video.currentTime, true);
         deps.sync?.();
       });
+      video.addEventListener('timeupdate', () => syncMusicVolume(video.currentTime));
       video.addEventListener('loadedmetadata', () => { deps.updatePanAvailability?.(); deps.sync?.(); });
       video.addEventListener('ended', () => { query('#bgm')?.pause?.(); deps.sync?.(); });
       return true;
     }
 
-    return { mount, setMusic, alignMusic, togglePlay, musicUri };
+    return { mount, setMusic, alignMusic, togglePlay, musicUri, syncMusicVolume };
   }
 
   return { create };

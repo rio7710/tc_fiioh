@@ -37,7 +37,8 @@ class StagedFfmpegRendererTests(unittest.TestCase):
         self.watermark = self.root / "watermark.png"
         self.outro_wide = self.root / "outro-wide.png"
         self.outro_tall = self.root / "outro-tall.png"
-        for path in (self.image, self.watermark, self.outro_wide, self.outro_tall):
+        self.music = self.root / "music.mp3"
+        for path in (self.image, self.watermark, self.outro_wide, self.outro_tall, self.music):
             path.write_bytes(b"asset")
         self.progress = []
         self.runner = FakeRunner()
@@ -67,9 +68,9 @@ class StagedFfmpegRendererTests(unittest.TestCase):
                 "youtube": (1920, 1080, "16x9"),
                 "instagram": (1080, 1920, "9x16"),
             },
-            music={"none": None},
+            music={"none": None, "satie": self.music},
             narration_tracks=[],
-            render_defaults={"scene_dissolve_seconds": 0.3},
+            render_defaults={"scene_dissolve_seconds": 0.3, "music_start_offset_seconds": 3.0, "music_fade_in_seconds": 2.0, "music_fade_out_seconds": 2.0},
             timeline_from_data=self.timeline,
             timed_script_scenes=self.title_scenes,
             storyboard_image_path=lambda uri: self.image if uri else None,
@@ -149,6 +150,15 @@ class StagedFfmpegRendererTests(unittest.TestCase):
         graph = outro[outro.index("-filter_complex") + 1]
         self.assertIn("scale=756:-1", graph)
         self.assertIn("color=white@0.400", graph)
+
+    def test_music_skips_silent_head_and_keeps_fade_in(self):
+        config = self.config()
+        config["music"] = "satie"
+        render_video_staged(config, "music-offset", dependencies=self.dependencies())
+        audio = next(args for stage, args in self.runner.calls if stage == "audio-mux")
+        graph = audio[audio.index("-filter_complex") + 1]
+        self.assertIn("atrim=start=3.000000", graph)
+        self.assertIn("afade=t=in:st=0:d=2.000000", graph)
 
     def test_job_output_is_idempotent_and_work_directory_is_cleaned(self):
         dependencies = self.dependencies()
