@@ -99,13 +99,14 @@
                 d.applySequentialCaptionProgress(roles[1], completedCaptions); roles[1].querySelector('.ai-role-state').textContent = `${completedCaptions} / ${job.caption_total || captionBadgeTotal}`;
                 progress.style.width = `${(1 + completedCaptions / Math.max(1, job.caption_total || captionBadgeTotal)) / roles.length * 100}%`;
                 now.textContent = `자막 PNG 생성 중 · ${String(completedCaptions).padStart(2, '0')} / ${String(job.caption_total || captionBadgeTotal).padStart(2, '0')}`;
-              } else if (job.phase === 'caption_ready' || job.phase === 'composite') {
+              } else if (['caption_ready', 'composite', 'staged_scenes', 'audio_mux'].includes(job.phase)) {
                 await completeCaptionStage();
                 const formatIndex = Math.max(1, Number(job.format_index) || 1); const formatId = job.format_id || `${formatIndex}번 비율`;
                 d.applyCompositeFormatProgress(roles[2], formatIndex);
                 d.applySequentialSceneProgress(roles[2], completedScenes); roles[2].querySelector('.ai-role-state').textContent = `${completedScenes} / ${sceneTotal}`;
                 progress.style.width = `${(2 + jobProgress) / roles.length * 100}%`;
-                now.textContent = `FFmpeg Worker · ${formatId} (${formatIndex}/${job.format_total || 1}) 합성 중 · ${percent}% · 장면 ${String(completedScenes).padStart(2, '0')} / ${String(sceneTotal).padStart(2, '0')}`;
+                const phaseLabel = job.phase === 'staged_scenes' ? '장면 정규화' : job.phase === 'audio_mux' ? '음성·BGM 합성' : '최종 합성';
+                now.textContent = `FFmpeg Worker · ${formatId} (${formatIndex}/${job.format_total || 1}) ${phaseLabel} 중 · ${percent}% · 장면 ${String(completedScenes).padStart(2, '0')} / ${String(sceneTotal).padStart(2, '0')}`;
               } else { now.textContent = '자막 PNG 생성 작업을 준비하고 있습니다'; foot.textContent = '자막 작업 등록 대기 중'; }
               foot.textContent = job.detail || `장면 ${String(completedScenes).padStart(2, '0')} / ${String(sceneTotal).padStart(2, '0')} 완료 · ${job.rendered_seconds || 0}초 / ${d.timelineDuration()}초 처리 중`;
             } catch (error) { if (!String(error.message).includes('찾을 수 없습니다')) foot.textContent = '합성 진행률을 확인하고 있습니다.'; }
