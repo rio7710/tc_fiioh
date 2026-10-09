@@ -83,6 +83,7 @@
 <script src="/01_app/assets/steps/step05/step05-production-calendar-controller.js?v=20261009_v71"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-presentation-controller.js?v=20261009_v72"></script>
 <script src="/01_app/assets/steps/step05/step05-calendar-data-controller.js?v=20261009_v73"></script>
+<script src="/01_app/assets/steps/step05/step05-latest-export-controller.js?v=20261009_v74"></script>
 
 <link rel="stylesheet" href="/01_app/assets/steps/step02/step02-keyword.css?v=20261007_v2">
 <link rel="stylesheet" href="/01_app/assets/steps/step03/step03-flow.css?v=20261007_v2">
@@ -1528,32 +1529,11 @@ function calendarContentVersions(entry){
 function saveCalendarEntries(){
   return calendarDataController.save();
 }
-function exportPreviewClass(item){
-  const width=Number(item?.width);const height=Number(item?.height);
-  if(width>0&&height>0){const ratio=width/height;if(Math.abs(ratio-16/9)<.03)return 'preview-landscape';if(Math.abs(ratio-9/16)<.03)return 'preview-portrait';if(Math.abs(ratio-4/5)<.03)return 'preview-feed';if(Math.abs(ratio-1/1)<.03)return 'preview-square'}
-  return platformPreviewFormats[item?.platform]?.className||'preview-landscape';
-}
 function showLatestExport(result){
-  const exports=Array.isArray(result?.exports)&&result.exports.length?result.exports:result?.url?[{url:result.url,filename:result.filename,platform:result.platform}]:[];
-  if(!exports.length)return;
-  latestExportList.replaceChildren();
-  exports.forEach(item=>{
-    const platforms=Array.isArray(item.platforms)&&item.platforms.length?item.platforms:[item.platform].filter(Boolean);
-    const article=document.createElement('article');article.className=`latest-export-item ${exportPreviewClass(item)}`;
-    const preview=document.createElement('video');preview.controls=true;preview.playsInline=true;preview.preload='metadata';preview.src=item.url;
-    preview.addEventListener('loadedmetadata',()=>{article.classList.remove('preview-landscape','preview-portrait','preview-feed');article.classList.add(exportPreviewClass({width:preview.videoWidth,height:preview.videoHeight,platform:item.platform}))},{once:true});
-    const copy=document.createElement('div');copy.className='latest-export-copy';
-    const kicker=document.createElement('small');kicker.textContent=platforms.map(platform=>calendarPlatformLabels[platform]||platform).join(' · ')||'LATEST FINAL OUTPUT';
-    const name=document.createElement('strong');name.textContent=item.filename||'최종 변환 영상.mp4';
-    const actions=document.createElement('div');actions.className='latest-export-actions';
-    const download=document.createElement('a');download.href=item.url;download.download=item.filename||'';download.textContent='MP4 다운로드';
-    actions.append(download);copy.append(kicker,name,actions);article.append(preview,copy);latestExportList.append(article);
-  });
-  latestExport.hidden=false;
-  try{localStorage.setItem(LATEST_EXPORT_STORAGE_KEY,JSON.stringify({exports,savedAt:new Date().toISOString()}))}catch(error){}
+  return latestExportController.show(result);
 }
 function loadLatestExport(){
-  try{showLatestExport(JSON.parse(localStorage.getItem(LATEST_EXPORT_STORAGE_KEY)||'null'))}catch(error){}
+  return latestExportController.load();
 }
 function groupCalendarEntries(entries){
   return Step05Calendar.groupCalendarEntries(entries);
@@ -1834,6 +1814,7 @@ calendarContentView.addEventListener('click',()=>{
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!platformGuideModal.hidden)closePlatformGuide()});
 const calendarStore=Step05CalendarStore.create({storage:localStorage,storageKey:CALENDAR_STORAGE_KEY,request:(...args)=>api(...args),collapseDuplicates:Step05Calendar.collapseDuplicates,uniquenessKey:Step05Calendar.uniquenessKey});
 const calendarDataController=Step05CalendarDataController.create({store:calendarStore,getEntries:()=>calendarEntries,setEntries:entries=>{calendarEntries=entries},render:renderCalendar});
+const latestExportController=Step05LatestExportController.create({section:latestExport,list:latestExportList,storage:localStorage,storageKey:LATEST_EXPORT_STORAGE_KEY,platformLabels:calendarPlatformLabels,platformFormats:window.VideoEditorRatioProfiles?.PLATFORM_PREVIEW_FORMATS||{},createElement:tag=>document.createElement(tag),now:()=>new Date(),onError:(feature,error)=>console.warn(`[LatestExport:${feature}]`,error)});
 const calendarViewController=Step05CalendarViewController.create({storage:localStorage,storageKey:CALENDAR_UI_STORAGE_KEY,now:()=>new Date(),isDateKey:value=>/^\d{4}-\d{2}-\d{2}$/.test(value||''),dateKey:Step05Calendar.dateKey});
 const calendarRenderer=Step05CalendarRenderer.create({dateKey:Step05Calendar.dateKey,groupEntries:Step05Calendar.groupCalendarEntries,statusTimestamp:Step05Calendar.calendarStatusTimestamp,formatTime:Step05Calendar.formatCalendarTime,minuteOfDay:Step05Calendar.calendarMinuteOfDay,escapeHtml,statusLabels:calendarStatusLabels,platformLabels:calendarPlatformLabels,timeLabels:calendarTimeLabels});
 const calendarPresentationController=Step05CalendarPresentationController.create({grid:calendarGrid,scroller:calendarGrid.parentElement,title:calendarMonthTitle,viewButtons:[...document.querySelectorAll('.calendar-view-btn')],prevButton:document.querySelector('#calendarPrev'),nextButton:document.querySelector('#calendarNext'),viewController:calendarViewController,renderer:calendarRenderer,getEntries:()=>calendarEntries,now:()=>new Date(),requestFrame:callback=>requestAnimationFrame(callback),cancelFrame:frame=>cancelAnimationFrame(frame),getPageScroll:()=>({x:window.scrollX,y:window.scrollY}),scrollWindow:(x,y)=>window.scrollTo(x,y)});
