@@ -269,7 +269,14 @@ class AutomationRunner:
                     return result
                 step('crop_'+scene['id'],align,stage='person_crop')
         def design():
-            selections=[{'role':role,'enabled':enabled,'version_id':config['brand_versions'].get(role,''),'settings':{}}
+            saved_settings = config.get('brand_settings') if isinstance(config.get('brand_settings'), dict) else {}
+            current_settings = {
+                item['role']: item.get('settings', {})
+                for item in self.auth.content_brand_selections(user)
+                if isinstance(item, dict) and isinstance(item.get('settings'), dict)
+            }
+            selections=[{'role':role,'enabled':enabled,'version_id':config['brand_versions'].get(role,''),
+                         'settings':saved_settings.get(role, current_settings.get(role, {}))}
                         for role,enabled in config['brand'].items()]
             brands=self.auth.save_content_brand_selections(user,project,selections)
             source=self.auth.latest_stage_data(user,project,4)

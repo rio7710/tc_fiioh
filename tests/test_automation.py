@@ -212,6 +212,39 @@ class AutomationTests(unittest.TestCase):
         self.assertEqual(FakeAPI.calls[0][1]['count'],5)
         c=config('4');c['brand']['intro']=True
         with self.assertRaises(ValueError):self.request('start',c,version=1)
+
+    def test_automation_preserves_selected_brand_versions_and_settings(self):
+        outro = self.auth.add_brand_asset_version(
+            self.user, 'outro', '아웃트로', 'outro-main.png', 'image', 'image/png'
+        )
+        self.auth.add_brand_asset_version(
+            self.user, 'outro', '아웃트로', 'outro-companion.png', 'image', 'image/png'
+        )
+        watermark = self.auth.add_brand_asset_version(
+            self.user, 'watermark', '워터마크', 'watermark.png', 'image', 'image/png'
+        )
+        expected = {
+            'outro': {'position': 'bottom-center', 'width_ratio': 0.72,
+                      'profiles': {'16x9': {'position': 'bottom-center', 'width_ratio': 0.72}}},
+            'watermark': {'position': 'top-right', 'opacity': 0.63, 'width_ratio': 0.14},
+        }
+        self.auth.save_content_brand_selections(self.user, None, [
+            {'role': 'outro', 'enabled': True, 'version_id': outro['version_id'], 'settings': expected['outro']},
+            {'role': 'watermark', 'enabled': True, 'version_id': watermark['version_id'], 'settings': expected['watermark']},
+        ])
+        configured = config('4')
+        configured['brand'].update({'outro': True, 'watermark': True})
+        self.request('start', configured)
+        stored = self.store.snapshot(self.user)['settings']['config']
+        self.assertEqual(stored['brand_versions']['outro'], outro['version_id'])
+        self.assertEqual(stored['brand_settings'], expected)
+        self.store.enqueue_due(NOW)
+        run = self.store.claim('brand-worker', NOW)
+        AutomationRunner(self.store, FakeAPI, BASE).execute(run)
+        selections = {item['role']: item for item in self.auth.content_brand_selections(self.user)}
+        self.assertEqual(selections['outro']['version_id'], outro['version_id'])
+        self.assertEqual(selections['outro']['settings'], expected['outro'])
+        self.assertEqual(selections['watermark']['settings'], expected['watermark'])
     def test_changed_keywords_on_retry_stop_before_more_paid_calls(self):
         run=self.start('3');FakeAPI.fail='/api/script/generate'
         runner=AutomationRunner(self.store,FakeAPI,BASE);runner.execute(run)

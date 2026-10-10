@@ -176,15 +176,29 @@ class AutomationStore:
             if action == 'start' and config['endpoint'] == 'manual':
                 raise ValueError('자동화할 단계를 선택해 주세요.')
             config['brand_versions'] = {}
+            config['brand_settings'] = {}
             if STAGES.index(config['endpoint']) >= 4:
                 assets = self.auth.list_brand_assets(user_id)
+                selections = {
+                    item['role']: item for item in self.auth.content_brand_selections(user_id)
+                    if isinstance(item, dict) and item.get('role') in config['brand']
+                }
                 for role, enabled in config['brand'].items():
-                    if not enabled:
-                        continue
                     candidates = [a for a in assets if a['role'] == role and a['active']]
-                    if not candidates:
+                    current = selections.get(role, {})
+                    current_version = str(current.get('version_id') or '')
+                    candidate_ids = {item['version_id'] for item in candidates}
+                    if current_version in candidate_ids:
+                        config['brand_versions'][role] = current_version
+                        settings = current.get('settings')
+                        config['brand_settings'][role] = settings if isinstance(settings, dict) else {}
+                    elif enabled and candidates:
+                        config['brand_versions'][role] = max(
+                            candidates, key=lambda item: (item['created_at'], item['version'])
+                        )['version_id']
+                        config['brand_settings'][role] = {}
+                    elif enabled:
                         raise ValueError(f'{role} 브랜드 리소스를 먼저 등록해 주세요.')
-                    config['brand_versions'][role] = max(candidates, key=lambda a: a['created_at'])['version_id']
         with closing(self.auth._connect()) as db:
             db.execute('BEGIN IMMEDIATE')
             previous = db.execute('SELECT fingerprint FROM automation_requests WHERE user_id=? AND request_id=?', (user_id, request_id)).fetchone()
