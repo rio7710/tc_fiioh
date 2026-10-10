@@ -120,6 +120,11 @@ class AuthStoreTests(unittest.TestCase):
             )
             summary = store.usage_summary(user["user_id"], project["project_id"])
             self.assertEqual({"requests": 1, "input_tokens": 120, "output_tokens": 30, "total_tokens": 150}, summary)
+            provider = store.provider_usage_summary(user["user_id"], "openai")
+            self.assertEqual(150, provider["month"]["total_tokens"])
+            self.assertEqual(1, provider["total"]["requests"])
+            with self.assertRaises(ValueError):
+                store.provider_usage_summary(user["user_id"], "unknown")
             self.assertEqual("가을", store.seasonal_keywords(project["project_id"], "2026-09-17")[0]["label"])
 
     def test_personal_group_owns_projects_and_inherited_resources(self):

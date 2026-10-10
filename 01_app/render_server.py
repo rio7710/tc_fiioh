@@ -2582,6 +2582,21 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/provider-usage":
+            user = self.current_user()
+            if not user:
+                self.send_json(401, {"error": "로그인 후 이용해 주세요."});return
+            openai_usage = get_auth_store().provider_usage_summary(user["user_id"], "openai")
+            kling_usage = {"available": False, "error": "Kling API가 연결되지 않았습니다."}
+            api_key = provider_values("kling").get("api_key", "")
+            if api_key:
+                try:
+                    kling_usage = {"available": True, **kling_account_usage(api_key)}
+                except Exception:
+                    kling_usage = {"available": False, "error": "Kling 사용량을 조회하지 못했습니다."}
+            self.send_json(200, {"ok": True, "openai": openai_usage, "kling": kling_usage},
+                           {"Cache-Control": "private, no-store, max-age=0"})
+            return
         if parsed.path == "/api/render-settings":
             user = self.current_user()
             if not user:

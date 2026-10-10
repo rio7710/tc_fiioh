@@ -230,7 +230,12 @@ function projectCreatedDate(value){if(!value)return '날짜 미정';const parts=
 function renderProjectIndex(projects){
   return projectIndexController.render(projects);
 }
-function refreshProjectIndex(){return projectIndexController.refresh()}
+let providerUsageController=null;
+function refreshProjectIndex(){
+  const pending=projectIndexController.refresh();
+  Promise.resolve(pending).then(()=>providerUsageController?.refresh()).catch(error=>console.warn('[ProviderUsage:refresh]',error));
+  return pending;
+}
 function openIndexProject(projectId,historyMode='push'){
   return contentIndexController.openProject(projectId,historyMode);
 }
@@ -558,6 +563,8 @@ const projectHydrationController=ThinkCastProjectHydrationController.create({req
 const projectIndexView=Step01ProjectIndexView.create({getRoot:()=>document,getCalendarEntries:()=>calendarEntries,calendarContentVersions,escapeHtml,projectDate,automationStageLabel});
 const projectIndexController=Step01ProjectIndexController.create({projectsIndex:indexProjects,view:projectIndexView,getRememberedProjectId:()=>localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY),getActiveProjectId:()=>activeProjectId,setActiveProjectId,request:(...args)=>api(...args),refreshBrandLibrary,setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:id=>clearInterval(id),onPollError:error=>console.error('[ProjectIndex:poll]',error)});
 projectIndexController.startPolling();
+providerUsageController=ThinkCastProviderUsageController.create({request:(...args)=>api(...args),onError:error=>console.warn('[ProviderUsage]',error)});
+providerUsageController.mount(document);
 const authUIController=ThinkCastAuthUIController.create({getRoot:()=>document,request:(...args)=>api(...args),setDemoState:state=>{demoData.state=state},refreshProjectIndex,showStep,setActiveProjectId,setKeywordStageLocked});
 authUIController.mount(document);
 const shellNavigationController=ThinkCastShellNavigationController.create({contentRoute:ThinkCastContentRoute,getLocation:()=>location,getHistory:()=>history,getWindow:()=>window,isLoggedIn:()=>authUIController.isLoggedIn(),getActiveProjectId:()=>activeProjectId,setActiveProjectId,getProjects:()=>indexProjects,refreshProjectIndex,loadProjectState,loadProjectContent,openIndexProject,updateContentUuidLabels,getPreviewVideo:()=>typeof video!=='undefined'&&video?video:document.querySelector('#video'),scrollTo:options=>window.scrollTo(options),renderStoryboardGrid,connectStoryboardAssetsToEditor,setContentIndexError,onError:(feature,error)=>console.error(`[ShellNavigation:${feature}]`,error)});

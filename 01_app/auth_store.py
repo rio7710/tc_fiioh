@@ -1807,6 +1807,43 @@ class AuthStore:
             ).fetchone()
         return dict(row)
 
+    def provider_usage_summary(self, user_id: str, provider: str) -> dict:
+        if provider not in {"openai", "kling"}:
+            raise ValueError("사용량을 조회할 수 없는 API 공급자입니다.")
+        kst = timezone(timedelta(hours=9))
+        month_start = datetime.now(kst).replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        ).astimezone(timezone.utc).isoformat()
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """SELECT COUNT(*) AS total_requests,
+                          COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
+                          COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
+                          COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                          COALESCE(SUM(CASE WHEN created_at>=? THEN 1 ELSE 0 END), 0) AS month_requests,
+                          COALESCE(SUM(CASE WHEN created_at>=? THEN input_tokens ELSE 0 END), 0) AS month_input_tokens,
+                          COALESCE(SUM(CASE WHEN created_at>=? THEN output_tokens ELSE 0 END), 0) AS month_output_tokens,
+                          COALESCE(SUM(CASE WHEN created_at>=? THEN total_tokens ELSE 0 END), 0) AS month_tokens
+                     FROM api_usage_events WHERE user_id=? AND provider=?""",
+                (month_start, month_start, month_start, month_start, user_id, provider),
+            ).fetchone()
+        return {
+            "provider": provider,
+            "month_started_at": month_start,
+            "month": {
+                "requests": int(row["month_requests"]),
+                "input_tokens": int(row["month_input_tokens"]),
+                "output_tokens": int(row["month_output_tokens"]),
+                "total_tokens": int(row["month_tokens"]),
+            },
+            "total": {
+                "requests": int(row["total_requests"]),
+                "input_tokens": int(row["total_input_tokens"]),
+                "output_tokens": int(row["total_output_tokens"]),
+                "total_tokens": int(row["total_tokens"]),
+            },
+        }
+
     def seasonal_keywords(self, project_id: str, local_date: str) -> list[dict] | None:
         with closing(self._connect()) as connection:
             row = connection.execute(

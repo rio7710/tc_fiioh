@@ -311,7 +311,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-c
 assert.ok(html.indexOf('step01-project-index-view.js') < html.indexOf('step01-project-index-controller.js'), 'project index view loads before controller');
 assert.ok(html.indexOf('step01-project-index-controller.js') < html.indexOf('step01-content-index-controller.js'), 'project index controller loads before interaction controller');
 assert.match(html, /function renderProjectIndex\(projects\)\{\s*return projectIndexController\.render\(projects\);\s*\}/, 'P1 keeps a thin project index render wrapper');
-assert.match(html, /function refreshProjectIndex\(\)\{return projectIndexController\.refresh\(\)\}/, 'P1 keeps a thin project index refresh wrapper');
+assert.match(html, /function refreshProjectIndex\(\)\{[\s\S]*?projectIndexController\.refresh\(\)[\s\S]*?providerUsageController\?\.refresh\(\)[\s\S]*?return pending;[\s\S]*?\}/, 'bootstrap refreshes provider usage without blocking project index refresh');
 assert.match(html, /projectIndexController\.startPolling\(\)/, 'P1 starts project polling after controller creation');
 assert.match(html, /view:projectIndexView/, 'P1 explicitly injects project index view');
 assert.doesNotMatch(html, /projectStatusPollBusy|setInterval\(async\(\)=>\{const holder=document\.querySelector\('#contentIndex'\)/, 'P1 does not retain raw project polling');
@@ -563,6 +563,7 @@ function createPrePartialContext() {
     ThinkCastProjectHydrationComposer: require('../01_app/assets/core/project-hydration-composer.js'),
     ThinkCastPromptLabController: require('../01_app/assets/core/prompt-lab-controller.js'),
     ThinkCastProviderSettingsController: require('../01_app/assets/core/provider-settings-controller.js'),
+    ThinkCastProviderUsageController: require('../01_app/assets/core/provider-usage-controller.js'),
     ThinkCastUserSettingsController: require('../01_app/assets/core/user-settings-controller.js'),
     ThinkCastWorkflowProgressController: require('../01_app/assets/core/workflow-progress-controller.js'),
     Step03ScriptEditorController: require('../01_app/assets/steps/step03/step03-script-editor-controller.js'),

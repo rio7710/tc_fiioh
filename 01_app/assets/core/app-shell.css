@@ -785,10 +785,12 @@ body::before{content:"";position:fixed;z-index:-1;inset:-3px;background-image:li
 .keyword-loading[hidden]{display:none}.keyword-loading-spinner{flex:0 0 auto;width:24px;height:24px;border:3px solid #bdcdbf;border-top-color:var(--green);border-radius:50%;animation:image-generation-spin .85s linear infinite}
 .keyword-loading small{display:block;font-size:11px;color:#647566}
 @media(prefers-reduced-motion:reduce){.keyword-loading-spinner{animation:none}}
-.user-settings-launch{display:flex;justify-content:flex-end;margin:0 0 10px}
+.user-settings-launch{display:flex;justify-content:flex-end;align-items:stretch;gap:9px;margin:0 0 10px}
+.provider-usage-strip{display:flex;justify-content:flex-end;gap:7px;min-width:0}.provider-usage-card{display:grid;min-width:178px;padding:8px 11px;border:1px solid #b7c9bf;border-radius:8px;background:#edf4ef;color:var(--green-deep);box-shadow:2px 2px 0 #d8d0bf}.provider-usage-card.kling{border-color:#c8b58e;background:#fff5dd}.provider-usage-card small{font-size:8px;font-weight:900;letter-spacing:.08em}.provider-usage-card strong{margin-top:3px;font-size:14px;line-height:1.2}.provider-usage-card span{margin-top:2px;color:#746b5d;font-size:9px;white-space:nowrap}
 .user-settings-icon{display:inline-grid;width:44px;height:44px;place-items:center;border:1px solid #c5b89f;border-radius:50%;background:#fff9ed;color:var(--green-deep);cursor:pointer;transition:background .15s,transform .15s}
 .user-settings-icon:hover{background:#e4ede5;transform:rotate(12deg)}
 .user-settings-icon:focus-visible,.user-settings-range:focus-visible{outline:3px solid #ba7948;outline-offset:4px}
+@media(max-width:720px){.user-settings-launch{align-items:flex-end;flex-direction:column}.provider-usage-strip{width:100%}.provider-usage-card{box-sizing:border-box;min-width:0;flex:1}.provider-usage-card span{white-space:normal}}
 .user-settings-dialog{width:min(680px,calc(100% - 24px));max-height:calc(100dvh - 32px);padding:0;overflow:auto;border:1px solid #c5b89f;border-radius:14px;background:#fbf5e8;color:var(--ink);box-shadow:0 24px 80px #102b264d}
 .user-settings-dialog::backdrop{background:#102b2699;backdrop-filter:blur(6px)}
 .user-settings-head{display:flex;justify-content:space-between;gap:12px;padding:24px;background:var(--green-deep);color:#fff}
