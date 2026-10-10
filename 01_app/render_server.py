@@ -8,6 +8,7 @@ import ipaddress
 import math
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -4201,6 +4202,25 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     os.chdir(ROOT)
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+    shutdown_started = threading.Event()
+
+    def graceful_shutdown(signum, _frame):
+        """Stop accepting work, then let active request threads finish."""
+        if shutdown_started.is_set():
+            return
+        shutdown_started.set()
+        print(json.dumps({
+            "event": "api_graceful_shutdown",
+            "signal": int(signum),
+            "active_script_generations": len(active_script_generation_projects),
+        }, ensure_ascii=False), file=sys.stderr, flush=True)
+        # BaseServer.shutdown() must be called from a thread other than the one
+        # currently running serve_forever(). server_close() below waits for the
+        # non-daemon request threads after the accept loop has stopped.
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGTERM, graceful_shutdown)
+    signal.signal(signal.SIGINT, graceful_shutdown)
     local_url = f"http://127.0.0.1:{PORT}/01_app/P1_title_design_preview.html"
     network_url = f"http://{get_lan_ip()}:{PORT}/01_app/P1_title_design_preview.html"
     print(f"이 PC에서 열기: {local_url}")
@@ -4211,7 +4231,5 @@ if __name__ == "__main__":
         threading.Timer(0.7, lambda: webbrowser.open(local_url)).start()
     try:
         server.serve_forever()
-    except KeyboardInterrupt:
-        pass
     finally:
         server.server_close()

@@ -124,6 +124,37 @@ class WorkerJobIntegrationTests(unittest.TestCase):
         finally:
             api.close()
 
+    def test_script_plan_reconnects_after_api_replacement(self):
+        settings = WorkerRuntimeSettings.from_env({
+            "AUTOMATION_API_RETRY_COUNT": "3",
+            "AUTOMATION_API_RETRY_BACKOFF_SECONDS": "0",
+        })
+        api = InternalAPI(self.auth, self.user, settings=settings)
+        response = BytesIO(b'{"ok": true, "plan": {}}')
+        response.__enter__ = lambda value: value
+        response.__exit__ = lambda *args: None
+        try:
+            with mock.patch("automation_runner.urlopen", side_effect=[URLError("api replaced"), response]) as urlopen_mock:
+                result = api.call("/api/script/plan", {"project_id": "project-a"})
+            self.assertTrue(result["ok"])
+            self.assertEqual(urlopen_mock.call_count, 2)
+        finally:
+            api.close()
+
+    def test_script_plan_reports_exhausted_safe_retries(self):
+        settings = WorkerRuntimeSettings.from_env({
+            "AUTOMATION_API_RETRY_COUNT": "3",
+            "AUTOMATION_API_RETRY_BACKOFF_SECONDS": "0",
+        })
+        api = InternalAPI(self.auth, self.user, settings=settings)
+        try:
+            with mock.patch("automation_runner.urlopen", side_effect=URLError("api replaced")) as urlopen_mock:
+                with self.assertRaisesRegex(AdapterFailure, "3회 모두"):
+                    api.call("/api/script/plan", {"project_id": "project-a"})
+            self.assertEqual(urlopen_mock.call_count, 3)
+        finally:
+            api.close()
+
     def test_paid_generation_does_not_replay_ambiguous_transport_failure(self):
         settings = WorkerRuntimeSettings.from_env({
             "AUTOMATION_API_RETRY_COUNT": "3",

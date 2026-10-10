@@ -1,5 +1,14 @@
 # Access and deployment runbook
 
+The API service drains active requests on `SIGTERM`, and Compose gives it up to
+330 seconds before force-killing it. A replacement deployment can therefore
+pause while an OpenAI script request finishes. Do not bypass this with
+`docker kill`, `docker compose kill`, or a reduced stop timeout while an
+automation run is active. The automation worker may safely reconnect the
+idempotent `/api/script/plan` and `/api/production/prepare` endpoints; paid
+image/video submission endpoints remain non-replayable after an ambiguous
+transport failure.
+
 Last updated: 2026-10-06 (Asia/Seoul)
 
 ## Access information

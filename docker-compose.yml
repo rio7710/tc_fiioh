@@ -47,6 +47,10 @@ services:
       - tc_temp_internal
     security_opt:
       - no-new-privileges:true
+    # OpenAI script calls can legitimately take several minutes.  During a
+    # replacement deployment, allow the SIGTERM handler to drain them instead
+    # of Docker escalating to SIGKILL after its 10-second default.
+    stop_grace_period: 330s
 
   worker:
     container_name: tc_temp_worker

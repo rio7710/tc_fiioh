@@ -27,6 +27,17 @@ class RenderResultUnknown(AdapterFailure):
     """Submission may have started, so replaying it would be unsafe."""
 
 
+REPLAY_SAFE_API_PATHS = frozenset({
+    # WAV output is content-addressed and completed files are reused.
+    '/api/production/prepare',
+    # The plan endpoint checks the saved candidate before calling OpenAI.  If a
+    # response was committed but lost during an API replacement, replay returns
+    # that candidate.  If the process died while OpenAI was in flight, finishing
+    # the requested plan is preferable to leaving the entire automation dead.
+    '/api/script/plan',
+})
+
+
 def _render_settings(config, settings):
     render = config.get('render', {}) if isinstance(config.get('render', {}), dict) else {}
     render_type = render.get('type') if isinstance(render.get('type'), str) and render.get('type').strip() else settings.render_type
@@ -60,10 +71,7 @@ class InternalAPI:
         self.auth.delete_session(self.token)
         self.token = self.auth.create_session(self.user_id, days=1/8)
         body = json.dumps(payload, ensure_ascii=False).encode() if payload is not None else None
-        # Voice preparation is replay-safe: the API names WAV files from the cue
-        # identity/text hash and reuses completed files. This lets the worker
-        # reconnect after an API restart without replaying other paid providers.
-        replay_safe = path == '/api/production/prepare'
+        replay_safe = path in REPLAY_SAFE_API_PATHS
         for attempt in range(self.settings.api_retry_count):
             req = Request(self.base + path, body, headers={'Content-Type':'application/json', 'Cookie':'thinkcast_session='+self.token}, method='POST' if body is not None else 'GET')
             try:
@@ -88,7 +96,15 @@ class InternalAPI:
                 if replay_safe and attempt + 1 < self.settings.api_retry_count:
                     time.sleep(self.settings.api_retry_backoff_seconds * (2 ** attempt))
                     continue
-                raise AdapterFailure('제작 API 응답을 확인하지 못했습니다. 중복 과금을 피하기 위해 실행을 멈췄습니다.') from None
+                if replay_safe:
+                    raise AdapterFailure(
+                        f'제작 API 연결이 {self.settings.api_retry_count}회 모두 끊겨 '
+                        f'안전 재시도를 완료하지 못했습니다 ({path}).'
+                    ) from None
+                raise AdapterFailure(
+                    f'제작 API 응답을 확인하지 못했습니다 ({path}). '
+                    '중복 과금을 피하기 위해 실행을 멈췄습니다.'
+                ) from None
 
 
 class AutomationRunner:
