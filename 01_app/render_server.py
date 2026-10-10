@@ -3967,7 +3967,12 @@ class Handler(SimpleHTTPRequestHandler):
                         base_motion = str((scene.get("motion_prompt") or {}).get("text", "")).strip()
                         user_motion = str(payload.get("motion_prompt", "")).strip()[:1200]
                         user_negative = str(payload.get("negative_prompt", "")).strip()[:1200]
-                        prompt = (f"{base_motion}\nAdditional motion direction: {user_motion}\n" if user_motion else f"{base_motion}\n") + KLING_I2V_HARNESS
+                        proposed_motion = (f"{base_motion}\nAdditional motion direction: {user_motion}" if user_motion else base_motion)
+                        motion_review = VisualDecisions(
+                            get_auth_store(), storyboard_image_path, scene_video_path,
+                            find_ffmpeg(), provider_values("openai").get("api_key", ""),
+                        ).review_motion(user["user_id"], project_id, scene_id, proposed_motion)
+                        prompt = f"{motion_review['reviewed_motion_prompt']}\n{KLING_I2V_HARNESS}"
                         negative = (user_negative + ", " if user_negative else "") + KLING_I2V_NEGATIVE
                         voice_clips = get_auth_store().list_scene_voice_clips(
                             user["user_id"], project_id, latest["revision_id"]
@@ -3996,11 +4001,13 @@ class Handler(SimpleHTTPRequestHandler):
                             "model": model, "duration": duration, "provider_duration": provider_duration,
                             "playback_rate": round(provider_duration / duration, 6), "status": "queued",
                             "has_tail_frame": False, "prompt_harness_version": "i2v-single-frame-v2",
+                            "motion_review": motion_review,
                             "created_at": datetime.now(timezone.utc).isoformat(),
                         })
                         scene_video_job = {"status": "queued", "task_id": task_id, "scene_id": scene_id,
                                            "model": model, "provider_duration": provider_duration,
                                            "timeline_duration": round(duration, 3), "has_tail_frame": False,
+                                           "motion_review": motion_review,
                                            "prompt_harness_version": "i2v-single-frame-v2"}
                 elif self.path == "/api/production/prepare":
                     user = self.current_user()

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision", "reason", "content_preserved", "revised_motion_prompt"],
+  "properties": {
+    "decision": {"enum": ["keep", "revise"]},
+    "reason": {"type": "string", "minLength": 1, "maxLength": 500},
+    "content_preserved": {"type": "boolean"},
+    "revised_motion_prompt": {"type": "string", "maxLength": 1200}
+  }
+}
