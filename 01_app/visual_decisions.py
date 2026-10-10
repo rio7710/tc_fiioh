@@ -152,11 +152,18 @@ def normalize_motion_review(raw, original):
     revised=raw['revised_motion_prompt'].strip()
     if not raw['content_preserved'] or not revised:
         raise ValueError('영상 프롬프트 수정이 원래 내용을 보존하지 못했습니다.')
+    protected=[phrase.strip() for phrase in raw['protected_phrases']]
+    if not protected or any(phrase not in original or phrase not in revised for phrase in protected):
+        raise ValueError('영상 프롬프트의 핵심 내용이 수정 전후에 그대로 유지되지 않았습니다.')
+    protected_length=sum(len(re.sub(r'\s+','',phrase)) for phrase in protected)
+    minimum_protected=min(20,max(4,round(len(re.sub(r'\s+','',original))*.15)))
+    if protected_length<minimum_protected:
+        raise ValueError('영상 프롬프트의 핵심 내용 보존 범위가 부족합니다.')
     original_tokens=set(re.findall(r'[A-Za-z0-9가-힣]+',original.casefold()))
     revised_tokens=set(re.findall(r'[A-Za-z0-9가-힣]+',revised.casefold()))
     significant={token for token in original_tokens if len(token)>1}
     retained=len(significant & revised_tokens)/max(1,len(significant))
-    if retained<.6:
+    if retained<.35:
         raise ValueError('영상 프롬프트 수정 범위가 커서 원래 내용을 유지했습니다.')
     structural_change=re.compile(
         r'\b(grow|grows|growing|sprout|sprouts|bloom|blooms|enlarge|transform|morph|spawn|materialize)\b|'
@@ -274,14 +281,15 @@ CONTENT LOCK: Never change the people, identities, count, location, objects, act
 If the motion is ordinary and physically plausible for what is visibly present, decision must be "keep" and revised_motion_prompt must exactly equal the proposed prompt.
 Use "revise" only when the proposed motion would make the visible image behave abnormally, such as a tree or structure growing, rigid objects moving by themselves, matter appearing, anatomy deforming, implausible synchronized movement, or motion that contradicts the visible pose/support/contact.
 For "revise", preserve the same intended action and camera direction. Make the smallest wording change needed: reduce amplitude, stabilize structure, or remove only the impossible secondary motion. Reuse the original nouns and verbs; introduce no new subject, object, action, event, or camera move.
-Return one JSON object only: {"decision":"keep|revise","reason":"short Korean reason","content_preserved":true,"revised_motion_prompt":"..."}.
+For revise, protected_phrases must contain 1-4 exact contiguous phrases copied verbatim from the proposed prompt that express the primary action, subjects, and camera intent; every protected phrase must remain verbatim in revised_motion_prompt. For keep, use an empty protected_phrases array.
+Return one JSON object only: {"decision":"keep|revise","reason":"short Korean reason","content_preserved":true,"protected_phrases":[],"revised_motion_prompt":"..."}.
 Scene data: '''+canonical({'scene_id':scene_id,'scene':scene,'proposed_motion_prompt':original})
             raw=self.ask(user,project,'gpt_motion_prompt_review',prompt,images)
             return {**normalize_motion_review(raw,original),'scene_id':scene_id,
                     'revision_id':latest['revision_id'],'source_signature':signature,
-                    'review_model':self.model,'policy_version':1}
+                    'review_model':self.model,'policy_version':2}
         result=self.cached(user,project,latest['revision_id'],'motion_prompt_review',
-                           {'policy':1,'source':signature,'motion':original},perform)
+                           {'policy':2,'source':signature,'motion':original},perform)
         current,_=self.context(user,project)
         current_source=self.sources(user,project,current,[scene])[0]
         if current['revision_id']!=latest['revision_id'] or self.signature([current_source])!=signature:

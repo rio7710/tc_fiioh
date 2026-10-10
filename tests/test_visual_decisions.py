@@ -137,7 +137,7 @@ class VisualDecisionTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.service.select(self.user,self.project,2)
     def test_motion_review_keeps_ordinary_prompt_byte_for_byte_and_caches(self):
         original='The resident slowly raises one hand while the camera remains fixed.'
-        self.vision.return_value=({'decision':'keep','reason':'이미지와 동작이 자연스럽습니다.','content_preserved':True,'revised_motion_prompt':original},{'id':'review-1','usage':{}})
+        self.vision.return_value=({'decision':'keep','reason':'이미지와 동작이 자연스럽습니다.','content_preserved':True,'protected_phrases':[],'revised_motion_prompt':original},{'id':'review-1','usage':{}})
         result=self.service.review_motion(self.user,self.project,'scene_a',original)
         self.assertEqual(result['reviewed_motion_prompt'],original)
         self.assertEqual(result['decision'],'keep')
@@ -146,7 +146,7 @@ class VisualDecisionTests(unittest.TestCase):
     def test_motion_review_only_accepts_minimal_physical_correction(self):
         original='The resident smiles while the tree grows rapidly behind her.'
         revised='The resident smiles while the tree remains stable behind her.'
-        self.vision.return_value=({'decision':'revise','reason':'나무의 급격한 성장은 부자연스럽습니다.','content_preserved':True,'revised_motion_prompt':revised},{'id':'review-2','usage':{}})
+        self.vision.return_value=({'decision':'revise','reason':'나무의 급격한 성장은 부자연스럽습니다.','content_preserved':True,'protected_phrases':['The resident smiles'],'revised_motion_prompt':revised},{'id':'review-2','usage':{}})
         result=self.service.review_motion(self.user,self.project,'scene_a',original)
         self.assertEqual(result['reviewed_motion_prompt'],revised)
         self.assertEqual(result['decision'],'revise')
@@ -154,7 +154,7 @@ class VisualDecisionTests(unittest.TestCase):
         original='The resident smiles while the camera remains fixed.'
         for revised,preserved in [('A dog runs into a different garden.',True),(original,False)]:
             self.paths['/test/scene_a'].write_bytes(revised.encode())
-            self.vision.return_value=({'decision':'revise','reason':'수정','content_preserved':preserved,'revised_motion_prompt':revised},{'usage':{}})
+            self.vision.return_value=({'decision':'revise','reason':'수정','content_preserved':preserved,'protected_phrases':[],'revised_motion_prompt':revised},{'usage':{}})
             with self.assertRaises(ValueError):self.service.review_motion(self.user,self.project,'scene_a',original)
 
 if __name__=='__main__':unittest.main()
