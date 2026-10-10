@@ -1,13 +1,16 @@
 import sys
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
+from unittest import mock
+from urllib.error import URLError
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "01_app"))
 
 from auth_store import AuthStore
-from automation_runner import AdapterFailure, AutomationRunner, _FinalExportAdapter, _render_settings
+from automation_runner import AdapterFailure, AutomationRunner, InternalAPI, _FinalExportAdapter, _render_settings
 from automation_store import AutomationStore
 from worker_core import ConfigurationError, JobStore, WorkerRuntimeSettings
 from worker import create_job_store
@@ -103,6 +106,37 @@ class WorkerJobIntegrationTests(unittest.TestCase):
         for env in ({"AUTOMATION_API_TIMEOUT_SECONDS": "nope"}, {"AUTOMATION_RENDER_PAN_X": "nan"}, {"WORKER_JOB_LEASE_SECONDS": "0"}):
             with self.assertRaises(ConfigurationError):
                 WorkerRuntimeSettings.from_env(env)
+
+    def test_voice_prepare_reconnects_after_ambiguous_transport_failure(self):
+        settings = WorkerRuntimeSettings.from_env({
+            "AUTOMATION_API_RETRY_COUNT": "3",
+            "AUTOMATION_API_RETRY_BACKOFF_SECONDS": "0",
+        })
+        api = InternalAPI(self.auth, self.user, settings=settings)
+        response = BytesIO(b'{"ok": true, "voice_output": {}}')
+        response.__enter__ = lambda value: value
+        response.__exit__ = lambda *args: None
+        try:
+            with mock.patch("automation_runner.urlopen", side_effect=[URLError("restart"), response]) as urlopen_mock:
+                result = api.call("/api/production/prepare", {"project_id": "project-a"})
+            self.assertTrue(result["ok"])
+            self.assertEqual(urlopen_mock.call_count, 2)
+        finally:
+            api.close()
+
+    def test_paid_generation_does_not_replay_ambiguous_transport_failure(self):
+        settings = WorkerRuntimeSettings.from_env({
+            "AUTOMATION_API_RETRY_COUNT": "3",
+            "AUTOMATION_API_RETRY_BACKOFF_SECONDS": "0",
+        })
+        api = InternalAPI(self.auth, self.user, settings=settings)
+        try:
+            with mock.patch("automation_runner.urlopen", side_effect=URLError("restart")) as urlopen_mock:
+                with self.assertRaisesRegex(AdapterFailure, "중복 과금"):
+                    api.call("/api/script/generate", {"project_id": "project-a"})
+            self.assertEqual(urlopen_mock.call_count, 1)
+        finally:
+            api.close()
 
     def test_deployment_examples_list_all_runtime_settings(self):
         names = (

@@ -60,8 +60,10 @@ class InternalAPI:
         self.auth.delete_session(self.token)
         self.token = self.auth.create_session(self.user_id, days=1/8)
         body = json.dumps(payload, ensure_ascii=False).encode() if payload is not None else None
-        # 409 means the local API did not start this request. Other errors may have
-        # incurred provider cost; never automatically replay an ambiguous request.
+        # Voice preparation is replay-safe: the API names WAV files from the cue
+        # identity/text hash and reuses completed files. This lets the worker
+        # reconnect after an API restart without replaying other paid providers.
+        replay_safe = path == '/api/production/prepare'
         for attempt in range(self.settings.api_retry_count):
             req = Request(self.base + path, body, headers={'Content-Type':'application/json', 'Cookie':'thinkcast_session='+self.token}, method='POST' if body is not None else 'GET')
             try:
@@ -71,7 +73,8 @@ class InternalAPI:
                     raise AdapterFailure('기존 제작 API가 작업을 완료하지 못했습니다.')
                 return result
             except HTTPError as exc:
-                if exc.code == 409 and attempt + 1 < self.settings.api_retry_count:
+                retryable_status = exc.code == 409 or (replay_safe and exc.code in {502, 503, 504})
+                if retryable_status and attempt + 1 < self.settings.api_retry_count:
                     time.sleep(self.settings.api_retry_backoff_seconds * (2 ** attempt))
                     continue
                 try:
@@ -82,6 +85,9 @@ class InternalAPI:
                 message = detail or '결과 확인 후 다시 시도해 주세요.'
                 raise AdapterFailure(f'제작 API 요청이 실패했습니다 (HTTP {exc.code}): {message}') from None
             except (URLError, TimeoutError, ConnectionError, json.JSONDecodeError):
+                if replay_safe and attempt + 1 < self.settings.api_retry_count:
+                    time.sleep(self.settings.api_retry_backoff_seconds * (2 ** attempt))
+                    continue
                 raise AdapterFailure('제작 API 응답을 확인하지 못했습니다. 중복 과금을 피하기 위해 실행을 멈췄습니다.') from None
 
 
