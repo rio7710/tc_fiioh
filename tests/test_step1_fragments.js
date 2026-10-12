@@ -17,7 +17,7 @@ assert.match(fragments.login, /id="step1"/);
 });
 
 assert.match(fragments.index, /id="stepIndex"/);
-['contentIndex', 'contentIndexMessage', 'createProjectButton', 'brandLibraryPanel'].forEach(id => {
+['contentIndex', 'contentIndexPagination', 'contentIndexMessage', 'createProjectButton', 'brandLibraryPanel'].forEach(id => {
   assert.match(fragments.index, new RegExp(`id="${id}"`), `index contract keeps #${id}`);
 });
 assert.match(fragments.index, /data-index-filter="all"/);
