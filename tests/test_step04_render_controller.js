@@ -15,7 +15,7 @@ function fixture(overrides = {}) {
     getRenderButton:()=>nodes['#renderBtn'],getRenderStatus:()=>nodes['#renderStatus'],configureWorkflowModal:()=>modal,
     setupCaptionProgressBadges(){},setupCompositeFormatBadges(){},setupSceneProgressBadges(){},
     applySequentialCaptionProgress(_r,n){captionBadges.forEach((b,i)=>b.dataset.status=i<n?'succeeded':'queued');},applyCompositeFormatProgress(){},applySequentialSceneProgress(){},
-    getScenes:()=>[{id:'s1',end:5}],timelineDuration:()=>5,getPayload:id=>({job_id:id,project_id:'p',scene_crop_positions:{},scene_videos:[]}),
+    getScenes:()=>[{id:'s1',end:5}],hasMissingNarrationVoice:()=>false,timelineDuration:()=>5,getPayload:id=>({job_id:id,project_id:'p',narration:true,scene_crop_positions:{},scene_videos:[]}),
     fetch:async(_url,options)=>{fetchBody=JSON.parse(options.body);return {ok:true,json:async()=>({exports:[{filename:'<one>.mp4',url:'/one',platforms:['youtube']} ]})};},
     api:async()=>({phase:'captions'}),sleep:async()=>{},recordCurrentProduction(){productions++;},showLatestExport(){},showStep(step){shown=step;},
     platformLabels:{youtube:'유튜브'},escapeHtml:value=>String(value).replaceAll('<','&lt;').replaceAll('>','&gt;'),now:()=>123,random:()=>.5,
@@ -35,6 +35,16 @@ function fixture(overrides = {}) {
   assert.match(success.get().fetchBody.job_id,/^render-123-/); assert.equal(success.get().productions,1); assert.equal(success.get().shown,5);
   assert.match(success.nodes['#renderStatus'].innerHTML,/유튜브/); assert.match(success.nodes['#renderStatus'].innerHTML,/&lt;one&gt;\.mp4/);
   assert.equal(success.nodes['#renderBtn'].disabled,false); assert.equal(success.nodes['#renderBtn'].textContent,'최종 영상 제작'); assert.ok(result.exports);
+  assert.match(success.nodes['#aiNow'].textContent,/완료/);
+
+  let releaseMissing, releaseMissingDelay;
+  const missingVoice=fixture({hasMissingNarrationVoice:()=>true,fetch:()=>new Promise(resolve=>{releaseMissing=resolve;}),sleep:ms=>ms===700&&!releaseMissingDelay?new Promise(resolve=>{releaseMissingDelay=resolve;}):Promise.resolve()});
+  const missingPending=missingVoice.controller.start();
+  while(!releaseMissing||!releaseMissingDelay) await Promise.resolve();
+  assert.equal(missingVoice.nodes['#aiNow'].textContent,'모든 씬에 음성이 생성되지 않았습니다. 자동 검증·보완 중입니다.');
+  releaseMissingDelay();
+  releaseMissing({ok:true,json:async()=>({filename:'voice-ready.mp4',url:'/voice-ready'})});
+  await missingPending;
 
   let release; const duplicate=fixture({fetch:()=>new Promise(resolve=>{release=resolve;})});
   const first=duplicate.controller.start(); const second=await duplicate.controller.start(); assert.equal(second,undefined);

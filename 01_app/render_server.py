@@ -813,6 +813,66 @@ def _generate_voice_clips(api_key, user_id, project_id, script_revision, documen
     }
 
 
+def ensure_render_voice_ready(api_key, user_id, project_id):
+    """Complete and validate the selected revision's narration before export.
+
+    Final export used to fall through to the compositor when a voice-profile
+    change had created a new revision without WAV artifacts. The compositor
+    then surfaced the problem as a caption-stage failure. This preflight is
+    content-addressed through ``generate_voice_clips`` and is safe to repeat.
+    """
+    store = get_auth_store()
+    latest = store.latest_stage_data(user_id, project_id, 3)
+    document = (latest or {}).get("data", {}).get("document")
+    if not latest or not isinstance(document, dict):
+        raise ValueError("최종 출력할 콘텐츠 대본을 찾을 수 없습니다.")
+    cues = list((document.get("production") or {}).get("narration_cues") or [])
+    if not cues:
+        raise ValueError("최종 영상에 사용할 나레이션 문장이 없습니다.")
+    profile_id = str(latest["data"].get("voice_profile", "warm_female"))
+
+    def missing_cue_ids():
+        clips = store.list_scene_voice_clips(user_id, project_id, latest["revision_id"])
+        expected = {
+            str(cue.get("id") or f"cue-{index + 1:02d}"): hashlib.sha256(
+                str((cue.get("narration") or {}).get("text", "")).strip().encode("utf-8")
+            ).hexdigest()[:16]
+            for index, cue in enumerate(cues)
+        }
+        valid = set()
+        for clip in clips:
+            cue_id = str(clip.get("cue_id") or "")
+            path = voice_audio_path(clip.get("uri"))
+            if (
+                cue_id in expected
+                and clip.get("text_hash") == expected[cue_id]
+                and path and path.is_file() and path.stat().st_size > 0
+            ):
+                valid.add(cue_id)
+        return set(expected) - valid, clips
+
+    missing, clips = missing_cue_ids()
+    generated = False
+    if missing:
+        generate_voice_clips(
+            api_key, user_id, project_id, latest, document, profile_id,
+        )
+        generated = True
+        missing, clips = missing_cue_ids()
+    if missing:
+        raise RuntimeError(
+            "나레이션 음성 준비에 실패했습니다: " + ", ".join(sorted(missing))
+        )
+    if latest.get("status") != "confirmed":
+        store.confirm_stage_revision(user_id, project_id, latest["revision_id"])
+    return {
+        "revision_id": latest["revision_id"],
+        "profile_id": profile_id,
+        "clip_count": len(clips),
+        "generated": generated,
+    }
+
+
 def group_story_reference_context(resources, character_limit=45_000, included_types=None):
     """Build a bounded prompt context from one project's already-authorized group resources."""
     sections = []
@@ -3812,6 +3872,11 @@ class Handler(SimpleHTTPRequestHandler):
                         voice_revision = get_auth_store().save_stage_draft(
                             user["user_id"], project_id, 3, voice_data
                         )
+                    if voice_revision.get("status") != "confirmed":
+                        get_auth_store().confirm_stage_revision(
+                            user["user_id"], project_id, voice_revision["revision_id"]
+                        )
+                        voice_revision = {**voice_revision, "status": "confirmed"}
                 elif self.path == "/api/voice/generate-scene":
                     user = self.current_user()
                     project_id = str(payload.get("project_id", "")).strip()
@@ -4158,6 +4223,13 @@ class Handler(SimpleHTTPRequestHandler):
             project_id = str(data.get("project_id", "")).strip()
             if not project_id:
                 raise ValueError("최종 출력할 콘텐츠를 선택해 주세요.")
+            explicit = {key: data[key] for key in RENDER_SETTING_KEYS if key in data}
+            effective_settings = resolve_render_settings(user["user_id"], explicit)
+            if effective_settings["narration"]:
+                ensure_render_voice_ready(
+                    provider_values("openai").get("api_key", ""),
+                    user["user_id"], project_id,
+                )
             job_id = str(data.get("job_id", "")).strip()[:100]
             if not job_id:
                 job_id = f"render-{time.time_ns()}"
@@ -4194,6 +4266,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json(409, {"error": str(exc)})
         except ValueError as exc:
             self.send_json(400, {"error": str(exc)})
+        except RuntimeError as exc:
+            self.send_json(502, {"error": str(exc)})
         except Exception:
             self.send_json(500, {"error": "최종 영상 작업을 등록하지 못했습니다."})
         return

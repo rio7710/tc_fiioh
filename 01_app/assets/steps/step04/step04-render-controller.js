@@ -36,16 +36,22 @@
         const foot = query('#aiFootStatus');
         const summary = query('#aiWorkflowSummary');
         const now = query('#aiNow');
+        const renderJobId = `render-${d.now()}-${d.random().toString(36).slice(2, 8)}`;
+        const payload = d.getPayload(renderJobId);
+        const hasMissingNarrationVoice = Boolean(payload?.narration && d.hasMissingNarrationVoice?.());
         const actions = [
-          '콘티에서 선택한 장면 미디어와 타이밍을 확정 중입니다',
-          '선택한 디자인으로 문장별 투명 자막 PNG를 생성 중입니다',
+          hasMissingNarrationVoice
+            ? '모든 씬에 음성이 생성되지 않았습니다. 자동 검증·보완 중입니다.'
+            : '영상 구성 검증·보완 중입니다. 장면 미디어와 타이밍을 확인하고 있습니다',
+          '누락된 나레이션 음성을 준비하고 문장별 투명 자막 PNG를 생성 중입니다',
           'FFmpeg Worker가 비율별 영상·자막·음성·BGM을 H.264/AAC로 최종 합성 중입니다',
           'MP4 파일을 등록하고 콘텐츠 캘린더에 기록 중입니다'
         ];
-        const renderJobId = `render-${d.now()}-${d.random().toString(36).slice(2, 8)}`;
-        const payload = d.getPayload(renderJobId);
         modal.hidden = false; modal.classList.remove('complete'); root().body?.classList.add('modal-open');
-        progress.style.width = '0%'; now.classList.add('processing'); now.textContent = '영상 생성·최종 출력 워커를 호출하고 있습니다';
+        progress.style.width = '0%'; now.classList.add('processing');
+        now.textContent = hasMissingNarrationVoice
+          ? '모든 씬에 음성이 생성되지 않았습니다. 자동 검증·보완 중입니다.'
+          : '영상 구성 검증·보완 중입니다';
         roles.forEach(role => { role.className = 'ai-role'; role.querySelector('.ai-role-state').textContent = '대기'; });
         // Start the durable job before optional progress decoration. A broken
         // badge renderer must never prevent the actual export from reaching
@@ -107,7 +113,7 @@
                 progress.style.width = `${(2 + jobProgress) / roles.length * 100}%`;
                 const phaseLabel = job.phase === 'staged_scenes' ? '장면 정규화' : job.phase === 'audio_mux' ? '음성·BGM 합성' : '최종 합성';
                 now.textContent = `FFmpeg Worker · ${formatId} (${formatIndex}/${job.format_total || 1}) ${phaseLabel} 중 · ${percent}% · 장면 ${String(completedScenes).padStart(2, '0')} / ${String(sceneTotal).padStart(2, '0')}`;
-              } else { now.textContent = '자막 PNG 생성 작업을 준비하고 있습니다'; foot.textContent = '자막 작업 등록 대기 중'; }
+              } else { now.textContent = '나레이션 음성과 자막 PNG 생성 작업을 준비하고 있습니다'; foot.textContent = '음성·자막 작업 등록 대기 중'; }
               foot.textContent = job.detail || `장면 ${String(completedScenes).padStart(2, '0')} / ${String(sceneTotal).padStart(2, '0')} 완료 · ${job.rendered_seconds || 0}초 / ${d.timelineDuration()}초 처리 중`;
             } catch (error) { if (!String(error.message).includes('찾을 수 없습니다')) foot.textContent = '합성 진행률을 확인하고 있습니다.'; }
             finally { renderPollBusy = false; }

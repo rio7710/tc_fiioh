@@ -77,6 +77,20 @@ class SharedVoiceTests(unittest.TestCase):
                 results.append(handler.send_json.call_args.args[1]['voice'])
         self.assertEqual(results[0]['scene_id'],'s1')
         self.assertEqual(results[0]['uri'],results[1]['uri']);self.assertEqual(self.provider.call_count,1)
+
+    def test_voice_selection_keeps_the_new_revision_confirmed(self):
+        handler=object.__new__(self.server.Handler);handler.path='/api/voice/select'
+        handler.current_user=mock.Mock(return_value={'user_id':self.user})
+        handler.read_json=mock.Mock(return_value={
+            'project_id':self.project,'profile_id':'qwen_narrator'
+        })
+        handler.send_json=mock.Mock()
+        with mock.patch.object(self.server,'load_demo_data',return_value={}):
+            handler.do_POST()
+        self.assertEqual(handler.send_json.call_args.args[0],200)
+        latest=self.auth.latest_stage_data(self.user,self.project,3)
+        self.assertEqual(latest['data']['voice_profile'],'qwen_narrator')
+        self.assertEqual(latest['status'],'confirmed')
     def test_inherited_old_revision_uri_remains_playable(self):
         old=self.generate('s1')['clips'][0]
         self.revision=self.auth.save_stage_draft(self.user,self.project,3,{'document':self.document})
@@ -91,5 +105,24 @@ class SharedVoiceTests(unittest.TestCase):
             self.auth.register_artifact(self.user,self.project,self.revision['revision_id'],'s1','narration_wav',clip['uri'],'fixture',{'cue_id':'c1','text_hash':clip['text_hash']})
         clips=self.auth.list_scene_voice_clips(self.user,self.project,self.revision['revision_id'])
         self.assertEqual(len(clips),1);self.assertEqual(clips[0]['profile_id'],'steady_male')
+
+    def test_render_preflight_generates_missing_voice_and_confirms_revision(self):
+        result=self.server.ensure_render_voice_ready('test',self.user,self.project)
+        self.assertTrue(result['generated'])
+        self.assertEqual(result['clip_count'],2)
+        self.assertEqual(self.provider.call_count,2)
+        latest=self.auth.latest_stage_data(self.user,self.project,3)
+        self.assertEqual(latest['status'],'confirmed')
+        again=self.server.ensure_render_voice_ready('test',self.user,self.project)
+        self.assertFalse(again['generated'])
+        self.assertEqual(self.provider.call_count,2)
+
+    def test_render_preflight_recreates_missing_audio_file(self):
+        generated=self.generate()
+        Path(self.server.voice_audio_path(generated['clips'][0]['uri'])).unlink()
+        result=self.server.ensure_render_voice_ready('test',self.user,self.project)
+        self.assertTrue(result['generated'])
+        self.assertEqual(len(self.auth.list_scene_voice_clips(
+            self.user,self.project,self.revision['revision_id'])),2)
 
 if __name__=='__main__':unittest.main()

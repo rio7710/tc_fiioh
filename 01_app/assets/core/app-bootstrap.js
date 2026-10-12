@@ -492,6 +492,7 @@ const renderController=Step04RenderController.create({
   applyCompositeFormatProgress,
   applySequentialSceneProgress,
   getScenes:()=>scenes,
+  hasMissingNarrationVoice:()=>scenes.some(scene=>!sceneVoiceContext(scene.id).voice),
   timelineDuration:()=>scenes.length?Number(scenes[scenes.length-1].end)||0:0,
   getPayload:renderJobId=>{
     const effectiveSettings=(window.Step04VideoEditor&&typeof window.Step04VideoEditor.getEffectiveSettingsPayload==='function')
