@@ -9,7 +9,7 @@
 
   function create(dependencies) {
     const deps = dependencies || {};
-    for (const name of ['request', 'isOutroRatioCompanion', 'openWatermarkPreview', 'openOutroPreview', 'readFileAsDataUrl', 'escapeHtml']) {
+    for (const name of ['request', 'isOutroRatioCompanion', 'openWatermarkPreview', 'openOutroPreview', 'readFileAsDataUrl', 'escapeHtml', 'refreshContentPagination']) {
       if (typeof deps[name] !== 'function') throw new TypeError(`Step04BrandLibraryController requires ${name}`);
     }
     if (!deps.selectionController || typeof deps.selectionController.hydrate !== 'function' ||
@@ -36,8 +36,10 @@
     function show(visible) {
       const value = Boolean(visible);
       requireNode('#contentIndex').hidden = value;
+      requireNode('#contentIndexPagination').hidden = value;
       requireNode('#brandLibraryPanel').hidden = !value;
       requireNode('#brandLibraryOpen').classList.toggle('active', value);
+      if (!value) deps.refreshContentPagination();
     }
 
     async function refresh() {

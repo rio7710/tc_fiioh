@@ -15,7 +15,7 @@ const Library = require('../01_app/assets/steps/step04/step04-brand-library-cont
   }
 
   const nodes = {
-    '#contentIndex': node(), '#brandLibraryPanel': node({hidden: true}), '#brandLibraryOpen': node(),
+    '#contentIndex': node(), '#contentIndexPagination': node(), '#brandLibraryPanel': node({hidden: true}), '#brandLibraryOpen': node(),
     '#brandLibraryClose': node(), '#brandLibraryList': node(), '#brandUploadButton': node(),
     '#brandVersionCount': node(), '#brandLibraryMessage': node(), '#brandUploadFile': node(),
     '#brandUploadRole': node({value: 'watermark'}), '#brandUploadName': node({value: 'My <Mark>'})
@@ -40,12 +40,13 @@ const Library = require('../01_app/assets/steps/step04/step04-brand-library-cont
     openWatermarkPreview: id => calls.push(['watermark', id]),
     openOutroPreview: id => calls.push(['outro', id]),
     readFileAsDataUrl: async file => { calls.push(['read', file]); if (readError) throw readError; return 'data:image/png;base64,AA'; },
-    escapeHtml: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;')
+    escapeHtml: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
+    refreshContentPagination: () => { calls.push(['pagination']); nodes['#contentIndexPagination'].hidden = false; }
   });
 
   assert.equal(Object.isFrozen(controller), true);
   assert.throws(() => Library.create(), /requires request/);
-  assert.throws(() => Library.create({request() {}, isOutroRatioCompanion() {}, openWatermarkPreview() {}, openOutroPreview() {}, readFileAsDataUrl() {}, escapeHtml() {}}), /requires selectionController/);
+  assert.throws(() => Library.create({request() {}, isOutroRatioCompanion() {}, openWatermarkPreview() {}, openOutroPreview() {}, readFileAsDataUrl() {}, escapeHtml() {}, refreshContentPagination() {}}), /requires selectionController/);
   assert.throws(() => controller.mount({}), /mount requires root/);
 
   assert.equal(controller.mount(root), true);
@@ -78,10 +79,13 @@ const Library = require('../01_app/assets/steps/step04/step04-brand-library-cont
 
   controller.show(true);
   assert.equal(nodes['#contentIndex'].hidden, true);
+  assert.equal(nodes['#contentIndexPagination'].hidden, true);
   assert.equal(nodes['#brandLibraryPanel'].hidden, false);
   assert.equal(nodes['#brandLibraryOpen'].classList.values.has('active'), true);
   controller.show(false);
   assert.equal(nodes['#contentIndex'].hidden, false);
+  assert.equal(nodes['#contentIndexPagination'].hidden, false);
+  assert.deepEqual(calls.at(-1), ['pagination']);
   assert.equal(nodes['#brandLibraryPanel'].hidden, true);
 
   response = {assets: [], selections: []};

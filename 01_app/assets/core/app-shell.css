@@ -80,6 +80,7 @@ thinkcast-top-nav{display:block}
 .script-paper{position:relative;isolation:isolate;background-color:#fbf7ed;background-image:linear-gradient(rgba(151,83,67,.065) 1px,transparent 1px),linear-gradient(90deg,rgba(151,83,67,.055) 1px,transparent 1px);background-position:0 0;background-size:32px 32px}
 .script-paper>*{position:relative;z-index:1}
 .script-paper .flow-kicker{color:#985f50}
+.content-index-heading{white-space:nowrap;font-size:clamp(25px,4vw,44px)}
 .index-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:104px;gap:10px;margin:0 0 18px}.index-summary-item{display:grid;height:104px;grid-template-rows:12px 31px 14px;align-content:center;gap:5px;padding:13px 14px;border:1px solid rgba(151,83,67,.3);background:rgba(255,250,240,.72);color:inherit;text-align:left;cursor:pointer}.index-summary-item:hover,.index-summary-item.active{border-color:#985f50;background:#fff7e7;box-shadow:3px 3px 0 rgba(151,83,67,.16)}.index-summary-item small{overflow:hidden;color:#985f50;font-size:9px;font-weight:900;letter-spacing:.1em;line-height:12px;white-space:nowrap;text-overflow:ellipsis}.index-summary-item strong{color:var(--green-deep);font-family:Georgia,"Song Myung",serif;font-size:24px;line-height:31px}.index-summary-item span{color:#756b5d;font-size:10px;line-height:14px}
 .content-index{display:grid;gap:0;margin:4px 0 24px;border-top:2px solid rgba(151,83,67,.5)}
 .content-index-row{display:grid;grid-template-columns:54px minmax(0,1.4fr) minmax(130px,.55fr) minmax(110px,.45fr) auto;gap:16px;align-items:center;padding:17px 8px;border-bottom:1px solid rgba(151,83,67,.3)}.content-index-row[data-project-id]{cursor:pointer}.content-index-row[data-project-id]:hover{background:rgba(255,250,240,.72)}.content-index-row[hidden]{display:none}
@@ -787,11 +788,12 @@ body::before{content:"";position:fixed;z-index:-1;inset:-3px;background-image:li
 .keyword-loading small{display:block;font-size:11px;color:#647566}
 @media(prefers-reduced-motion:reduce){.keyword-loading-spinner{animation:none}}
 .user-settings-launch{display:flex;justify-content:flex-end;align-items:stretch;gap:9px;margin:0 0 10px}
+.content-index-create-top{align-self:stretch;white-space:nowrap}
 .provider-usage-strip{display:flex;justify-content:flex-end;gap:7px;min-width:0}.provider-usage-card{display:grid;min-width:178px;padding:8px 11px;border:1px solid #b7c9bf;border-radius:8px;background:#edf4ef;color:var(--green-deep);box-shadow:2px 2px 0 #d8d0bf}.provider-usage-card.kling{border-color:#c8b58e;background:#fff5dd}.provider-usage-card small{font-size:8px;font-weight:900;letter-spacing:.08em}.provider-usage-card strong{margin-top:3px;font-size:14px;line-height:1.2}.provider-usage-card span{margin-top:2px;color:#746b5d;font-size:9px;white-space:nowrap}
 .user-settings-icon{display:inline-grid;width:44px;height:44px;place-items:center;border:1px solid #c5b89f;border-radius:50%;background:#fff9ed;color:var(--green-deep);cursor:pointer;transition:background .15s,transform .15s}
 .user-settings-icon:hover{background:#e4ede5;transform:rotate(12deg)}
 .user-settings-icon:focus-visible,.user-settings-range:focus-visible{outline:3px solid #ba7948;outline-offset:4px}
-@media(max-width:720px){.user-settings-launch{align-items:flex-end;flex-direction:column}.provider-usage-strip{width:100%}.provider-usage-card{box-sizing:border-box;min-width:0;flex:1}.provider-usage-card span{white-space:normal}}
+@media(max-width:720px){.user-settings-launch{align-items:stretch;flex-direction:column}.content-index-create-top{width:100%}.provider-usage-strip{width:100%}.provider-usage-card{box-sizing:border-box;min-width:0;flex:1}.provider-usage-card span{white-space:normal}}
 .user-settings-dialog{width:min(680px,calc(100% - 24px));max-height:calc(100dvh - 32px);padding:0;overflow:auto;border:1px solid #c5b89f;border-radius:14px;background:#fbf5e8;color:var(--ink);box-shadow:0 24px 80px #102b264d}
 .user-settings-dialog::backdrop{background:#102b2699;backdrop-filter:blur(6px)}
 .user-settings-head{display:flex;justify-content:space-between;gap:12px;padding:24px;background:var(--green-deep);color:#fff}

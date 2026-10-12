@@ -551,7 +551,7 @@ async function restoreLoginSession(){
 const brandOverlayController=BrandOverlayController.create({state:brandOverlayState,getBrandAssets:()=>brandSelectionController.getAssets(),prepareOutroPreview:item=>ensureOutroRatioAssets(item,{force:true}),saveSelection:saveBrandSelections,applyPosition:applyWatermarkPosition,backgroundColor:outroBackgroundColor,updateWatermarkPreview,updateOutroPreview:updateCommonOutroPreview,onError:(feature,error)=>console.error(`[BrandOverlay:${feature}]`,error)});
 function openWatermarkPreview(versionId){return brandOverlayController.openWatermarkPreview(versionId)}
 function openOutroPreview(versionId){return brandOverlayController.openOutroPreview(versionId)}
-const brandLibraryController=Step04BrandLibraryController.create({request:(...args)=>api(...args),selectionController:brandSelectionController,isOutroRatioCompanion,openWatermarkPreview,openOutroPreview,readFileAsDataUrl:file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file)}),escapeHtml});
+const brandLibraryController=Step04BrandLibraryController.create({request:(...args)=>api(...args),selectionController:brandSelectionController,isOutroRatioCompanion,openWatermarkPreview,openOutroPreview,readFileAsDataUrl:file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file)}),escapeHtml,refreshContentPagination:()=>contentIndexView.refreshPagination()});
 function refreshBrandLibrary(){return brandLibraryController.refresh()}
 function showBrandLibrary(show){return brandLibraryController.show(show)}
 brandLibraryController.mount(document);
