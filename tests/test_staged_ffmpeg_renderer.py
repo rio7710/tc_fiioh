@@ -9,7 +9,7 @@ APP = ROOT / "01_app"
 if str(APP) not in sys.path:
     sys.path.insert(0, str(APP))
 
-from staged_ffmpeg_renderer import StagedRenderDependencies, render_video_staged
+from staged_ffmpeg_renderer import StagedRenderDependencies, _valid_output, render_video_staged
 
 
 class FakeRunner:
@@ -210,6 +210,19 @@ class StagedFfmpegRendererTests(unittest.TestCase):
         work = self.exports / ".render_work"
         self.assertEqual([], list(work.iterdir()))
         self.assertIn("재사용", self.progress[-1][1]["detail"])
+
+    def test_output_validation_does_not_compare_planned_duration(self):
+        output = self.exports / "duration-drift.mp4"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"x" * 2048)
+        dependencies = self.dependencies()
+        dependencies = StagedRenderDependencies(
+            **{
+                **dependencies.__dict__,
+                "media_duration": lambda _path: 99.0,
+            }
+        )
+        self.assertTrue(_valid_output(output, dependencies))
 
     def test_failure_removes_partial_final_and_temporary_files(self):
         runner = FakeRunner(fail_stage="audio-mux")

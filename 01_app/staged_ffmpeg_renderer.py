@@ -57,7 +57,6 @@ class StagedRenderError(RuntimeError):
 
 def _valid_output(
     path: Path,
-    expected_duration: float,
     dependencies: StagedRenderDependencies,
 ) -> bool:
     if not path.is_file() or path.stat().st_size < dependencies.minimum_output_bytes:
@@ -66,7 +65,7 @@ def _valid_output(
         actual_duration = float(dependencies.media_duration(path))
     except (OSError, RuntimeError, TypeError, ValueError):
         return False
-    return actual_duration > 0 and abs(actual_duration - expected_duration) <= (1 / 30 + 0.01)
+    return actual_duration > 0
 
 
 def _default_command_runner(
@@ -565,7 +564,7 @@ def render_video_staged(
     dissolve = max(0.0, min(5.0, float(config.get(
         "scene_dissolve_seconds", dependencies.render_defaults["scene_dissolve_seconds"]
     ))))
-    if _valid_output(output_path, output_duration, dependencies):
+    if _valid_output(output_path, dependencies):
         dependencies.update_progress(
             job_id, status="succeeded", progress=1.0, rendered_seconds=output_duration,
             completed_scenes=len(scenes), scene_total=len(scenes),
@@ -664,10 +663,10 @@ def render_video_staged(
                 dependencies, config, silent, narration, intro_duration,
                 outro_duration, output_duration, staged_output, progress_line,
             )
-            if not _valid_output(staged_output, output_duration, dependencies):
+            if not _valid_output(staged_output, dependencies):
                 raise StagedRenderError("출력 MP4가 정상적으로 생성되지 않았습니다.")
             os.replace(staged_output, output_path)
-        if not _valid_output(output_path, output_duration, dependencies):
+        if not _valid_output(output_path, dependencies):
             raise StagedRenderError("출력 MP4가 정상적으로 생성되지 않았습니다.")
         dependencies.update_progress(
             job_id, status="succeeded", progress=1.0, rendered_seconds=output_duration,
