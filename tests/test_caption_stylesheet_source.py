@@ -22,6 +22,7 @@ class CaptionStylesheetSourceTests(unittest.TestCase):
         source = (APP / "P1_title_design_preview.html").read_text(encoding="utf-8")
         self.assertNotIn("<style>", source)
         self.assertGreater(len(render_server.caption_stylesheet_text()), 1000)
+        self.assertIn('white-space: nowrap', render_server.caption_stylesheet_text())
 
 
 if __name__ == "__main__":

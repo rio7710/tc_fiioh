@@ -118,7 +118,7 @@
           "required": ["duration_source", "scenes"],
           "properties": {
             "duration_source": {"const": "timeline.scenes[-1].end"},
-            "scenes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/scene"}}
+            "scenes": {"type": "array", "minItems": 12, "maxItems": 20, "items": {"$ref": "#/$defs/scene"}}
           }
         },
         "narration_cues": {

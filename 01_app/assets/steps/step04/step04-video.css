@@ -466,4 +466,5 @@
   color: var(--green-deep);
   font-family: "Noto Serif KR", "Batang", serif;
   font-size: calc(6cqmin + var(--caption-size-offset, 0px));
+  white-space: nowrap;
 }

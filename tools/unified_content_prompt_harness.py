@@ -820,6 +820,13 @@ def validate_document(document: dict[str, Any], selected_keywords: list[str], st
     validate_visual_continuity(document)
     if locked_plan:
         scenes = document.get("production", {}).get("timeline", {}).get("scenes", [])
+        locked_beats = locked_plan.get("narration_beats") or []
+        if strict_schema and len(scenes) < len(locked_beats):
+            raise UnifiedContentError(
+                "각 짧은 한 줄 자막이 최소 한 씬에서 시작되도록 씬 수를 구성해야 합니다"
+            )
+        if strict_schema and any(len(str(beat).strip()) > 13 or "\n" in str(beat) for beat in locked_beats):
+            raise UnifiedContentError("각 자막은 줄바꿈 없이 13자 이하여야 합니다")
         if any(float(scene.get("end", 0)) - float(scene.get("start", 0)) < 1.5 - 1e-6
                for scene in scenes):
             raise UnifiedContentError("새 콘티의 모든 시각 씬은 최소 1.5초여야 합니다")
@@ -851,8 +858,8 @@ def build_repair_prompt(candidate: str, error: Exception,
     empty_scene_recovery = ""
     if "timeline.scenes" in error_text and "too few items" in error_text:
         empty_scene_recovery = (
-            "production.timeline.scenes가 비어 있다. 이전 빈 배열을 유지하지 말고, 확정 1차 대본의 각 "
-            "narration_beats를 화면으로 보여 주는 완전한 씬을 최소 하나씩 새로 작성한다. 모든 씬은 최소 "
+            "production.timeline.scenes는 반드시 12~20개여야 한다. 이전의 부족한 배열을 유지하지 말고, 확정 1차 대본의 각 "
+            "narration_beats를 여러 시각 행동과 구도 변화로 풍부하게 확장해 총 12~20개의 완전한 씬을 작성한다. 모든 씬은 최소 "
             "1.5초이며 시작·종료 시간이 연속되어야 한다. narration_cues도 각 확정 문장과 같은 순서로 "
             "만들고 각 씬을 정확히 연결한다. 아래 전체 JSON 스키마의 scene, sequenceContinuity, "
             "narrationCue 필수 필드를 모두 채운다.\n"
@@ -868,6 +875,8 @@ def build_repair_prompt(candidate: str, error: Exception,
         "테이블 형태 누락 오류라면 오류에 표시된 한국어 형태명을 해당 scene의 image_prompt.text에 직접 넣고, continuity.props 및 기준 레퍼런스와 일치시킨다.\n"
         "캐릭터 버전 오류라면 해당 character_id에 등록된 V2 reference asset 하나를 선택해 모든 씬의 reference_ids에서 동일하게 사용한다. V2가 없는 캐릭터만 V1을 유지하며, 동일 캐릭터의 의상 variant도 콘티 중간에 바꾸지 않는다.\n"
         "참조 자산 오류라면 제공된 레퍼런스 인덱스의 정식 character/location 자산만 사용하고 id·uri·status·버전·의상 값을 추측하거나 변형하지 않는다. style은 연출 메타데이터로 유지하되 이미지 파일 URI를 만들어 내지 않는다.\n"
+        "씬 수 오류라면 확정 내레이션 문장은 바꾸지 않고 행동·리액션·손과 소품 디테일·공간 확립·연결 구도를 추가하거나 합쳐 production.timeline.scenes를 12~20개로 맞춘다. 각 씬은 최소 1.5초이며 인접 구도를 반복하지 않는다.\n"
+        "자막 연결 오류라면 확정된 13자 이하 narration beat 각각이 최소 한 씬에서 새로 시작하도록 narration_cue_ids를 순서대로 배치한다. caption.text는 해당 narration.text와 동일하게 유지하고 줄바꿈이나 두 자막 합치기를 금지한다.\n"
         "기준 metadata에 테이블 형태가 없으면 형태를 추측하지 않는다. 해당 씬의 image_prompt.text에 기준 레퍼런스의 테이블 실루엣·비율·방향을 그대로 유지하라고 명시한다.\n"
         "한 씬의 테이블 후보가 복수라면 오류에 표시된 scene ID의 장소 reference_assets.usage와 그 장소를 이름으로 특정한 continuity.props만 사용해 정확히 하나를 선택하고, 선택한 형태를 그 씬 image_prompt.text에 명시한다. 위치별 정보가 없으면 형태를 추측하지 말고 기준 레퍼런스 잠금을 명시한다.\n"
         f"검증 오류: {type(error).__name__}: {error}\n"

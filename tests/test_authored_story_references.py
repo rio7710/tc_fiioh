@@ -32,12 +32,7 @@ class AuthoredStoryReferenceTests(unittest.TestCase):
             "schema_version": "unexpected-provider-version",
             "title": "  문턱에 머문 따뜻한 마음  ",
             "synopsis": "기다림과 배려를 화면의 작은 행동으로 보여 준다.",
-            "narration_beats": [
-                "찬 기운이 문틈에 머문 아침, 먼저 문을 두드리는 소리가 조용히 하루를 엽니다.",
-                "대답을 기다린 뒤 건넨 담요 한 장은 서두르지 말자는 마음이 되고, 문턱 앞 작은 살핌은 오늘의 길을 편안히 놓습니다.",
-                "작은 예의와 따뜻한 배려가 오가는 곳에서, 혼자였던 잠깐의 시간이 서로를 믿는 하루로 이어집니다.",
-                "돌봄은 큰 말보다 먼저 살피고 기다리는 마음으로 오래 남습니다.",
-            ],
+            "narration_beats": ["작은 미소가 머뭅니다."] * 15,
             "cast_choices": ["은지 — 여성 돌봄 직원", "정희 — 여성 입소자"],
             "location_choices": "시설 출입구",
             "provider_note": "remove me",

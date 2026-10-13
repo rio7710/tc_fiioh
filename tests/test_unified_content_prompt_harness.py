@@ -29,6 +29,20 @@ def document(keywords):
 
 
 class UnifiedContentPromptHarnessTests(unittest.TestCase):
+    def test_storyboard_contract_requires_twelve_to_twenty_scenes(self):
+        schema = json.loads(__import__('pathlib').Path(
+            'contracts/unified-content-production.schema.json'
+        ).read_text(encoding='utf-8'))
+        scenes = schema['$defs']['production']['properties']['timeline']['properties']['scenes']
+        self.assertEqual(12, scenes['minItems'])
+        self.assertEqual(20, scenes['maxItems'])
+        self.assertIn('12~20개 씬', build_prompt(['안심'], '시설 자료', reference_material=''))
+        script_schema = json.loads(__import__('pathlib').Path(
+            'contracts/script-plan.schema.json'
+        ).read_text(encoding='utf-8'))
+        beats = script_schema['properties']['narration_beats']
+        self.assertEqual((15, 18, 13), (beats['minItems'], beats['maxItems'], beats['items']['maxLength']))
+
     def test_canonical_reference_metadata_repairs_missing_uri_and_generated_variant(self):
         value = document(["안심"])
         value["production"]["reference_assets"] = [{
@@ -117,7 +131,7 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
             ),
             {"title": "확정 제목", "narration_beats": ["확정 문장"]},
         )
-        self.assertIn("production.timeline.scenes가 비어 있다", prompt)
+        self.assertIn("production.timeline.scenes는 반드시 12~20개", prompt)
         self.assertIn("확정 제목", prompt)
         self.assertIn('"$defs"', prompt)
         self.assertIn("각 확정 문장", prompt)
@@ -351,7 +365,7 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertIn("충분한 전경·중경·후경", prompt)
         self.assertIn("협소한 구도", prompt)
         self.assertIn("기획 길이는 최소 1.5초", prompt)
-        self.assertIn("장면 수나 컷 길이를 하드코딩하지 않는다", prompt)
+        self.assertIn("계약의 12~20 범위를 사용한다", prompt)
         self.assertIn("전체 시간 ÷ 씬 수", prompt)
         self.assertIn("각 씬의 길이를 다르게 배정", prompt)
         self.assertIn("LOCATION LATCH", prompt)
