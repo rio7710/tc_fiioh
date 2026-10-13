@@ -502,12 +502,45 @@ def scene_reference_paths(document, scene):
         if not uri:
             raise ValueError(f"이 씬의 참조 이미지 URI가 없습니다: {reference_id}")
         folder = "characters" if kind == "character" else "locations"
-        candidate = Path(os.environ.get("DATA_DIR", str(APP_DIR / "data"))) / "group_resources" / "defaults" / folder / Path(uri).name
+        root = (Path(os.environ.get("DATA_DIR", str(APP_DIR / "data")))
+                / "group_resources" / "defaults" / folder)
+        basename = Path(uri).name
+        candidate = root / basename
+        if not candidate.is_file() and root.is_dir():
+            normalized_name = unicodedata.normalize("NFC", basename)
+            normalized_matches = [
+                item for item in root.iterdir()
+                if item.is_file() and unicodedata.normalize("NFC", item.name) == normalized_name
+            ]
+            if len(normalized_matches) == 1:
+                candidate = normalized_matches[0]
+            else:
+                fingerprint = re.search(r"_([0-9a-f]{12,64})(\.[^.]+)$", basename, re.IGNORECASE)
+                if fingerprint:
+                    suffix = f"_{fingerprint.group(1).lower()}{fingerprint.group(2).lower()}"
+                    fingerprint_matches = [
+                        item for item in root.iterdir()
+                        if item.is_file() and item.name.lower().endswith(suffix)
+                    ]
+                    if len(fingerprint_matches) == 1:
+                        candidate = fingerprint_matches[0]
         if candidate.is_file():
             paths.append(candidate)
     if len(paths) != required_media:
         raise ValueError("이 씬의 시설·캐릭터 참조 이미지가 서버에 모두 준비되지 않았습니다.")
     return paths
+
+
+def validate_storyboard_reference_paths(document):
+    scenes = ((document.get("production") or {}).get("timeline") or {}).get("scenes", [])
+    checked = 0
+    for scene in scenes:
+        try:
+            checked += len(scene_reference_paths(document, scene))
+        except ValueError as exc:
+            scene_id = str(scene.get("id") or "unknown")
+            raise ValueError(f"{scene_id} 참조 이미지 확인 실패: {exc}") from None
+    return {"scene_count": len(scenes), "reference_count": checked, "status": "ready"}
 
 
 def storyboard_image_path(uri):
@@ -3931,6 +3964,21 @@ class Handler(SimpleHTTPRequestHandler):
                             user["user_id"], project_id, latest["revision_id"]
                         ),
                     )
+                elif self.path == "/api/storyboard/image-reference-check":
+                    user = self.current_user()
+                    project_id = str(payload.get("project_id", "")).strip()
+                    latest = get_auth_store().latest_stage_data(user["user_id"], project_id, 3) if user else None
+                    document = (latest or {}).get("data", {}).get("document")
+                    if not isinstance(document, dict):
+                        raise ValueError("이미지를 생성할 최종대본을 먼저 준비해 주세요.")
+                    reference_resources = get_auth_store().project_group_resources(
+                        user["user_id"], project_id,
+                        ("default_asset_manifest", "reference_library", "prompt_contract"),
+                    )
+                    normalize_reference_asset_metadata(
+                        document, group_reference_asset_catalog(reference_resources)
+                    )
+                    reference_check = validate_storyboard_reference_paths(document)
                 elif self.path == "/api/storyboard/image-generate":
                     user = self.current_user()
                     project_id = str(payload.get("project_id", "")).strip()
@@ -4203,7 +4251,7 @@ class Handler(SimpleHTTPRequestHandler):
                 else:
                     self.send_json(404, {"error": "지원하지 않는 요청입니다."})
                     return
-                if self.path not in {"/api/provider-settings", "/api/prompt-harness/test", "/api/prompt-harness/image", "/api/voice/select", "/api/voice/generate-scene", "/api/storyboard/image-generate", "/api/storyboard/image-select", "/api/storyboard/video-generate"}:
+                if self.path not in {"/api/provider-settings", "/api/prompt-harness/test", "/api/prompt-harness/image", "/api/voice/select", "/api/voice/generate-scene", "/api/storyboard/image-reference-check", "/api/storyboard/image-generate", "/api/storyboard/image-select", "/api/storyboard/video-generate"}:
                     save_demo_data(data)
                 response = {"ok": True, "state": state}
                 if self.path == "/api/script/generate":
@@ -4223,6 +4271,8 @@ class Handler(SimpleHTTPRequestHandler):
                 if self.path == "/api/voice/generate-scene":
                     response["voice"] = scene_voice
                     response["timeline"] = voice_timeline
+                if self.path == "/api/storyboard/image-reference-check":
+                    response["reference_check"] = reference_check
                 if self.path == "/api/storyboard/image-generate":
                     response["image"] = storyboard_image
                 if self.path == "/api/storyboard/image-select":

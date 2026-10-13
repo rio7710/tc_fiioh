@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+import unicodedata
 from pathlib import Path
 from unittest import mock
 from test_pipeline_contracts import load_render_server, ROOT
@@ -35,6 +36,32 @@ class CompositionRuleTests(unittest.TestCase):
                 document['production']['reference_assets'][0]['uri']=None
                 with self.assertRaisesRegex(ValueError,'URI'):
                     server.scene_reference_paths(document,scene)
+
+    def test_scene_reference_paths_normalizes_unicode_and_recovers_unique_fingerprint(self):
+        server=load_render_server()
+        with tempfile.TemporaryDirectory() as directory:
+            location_dir=Path(directory)/'group_resources/defaults/locations'
+            location_dir.mkdir(parents=True)
+            rehab=location_dir/'시설_재활물리치료실_631578fb8a381.png'
+            rooftop=location_dir/'시설_옥상정원_a11f764dd173f.png'
+            rehab.write_bytes(b'rehab')
+            rooftop.write_bytes(b'rooftop')
+            document={'production':{'reference_assets':[
+                {'id':'rehab','kind':'location','uri':'시설/시설_재활물리치료실_631578fb8a381.png'},
+                {'id':'rooftop','kind':'location','uri':'시설/시설_옥상정워_a11f764dd173f.png'},
+            ],'timeline':{'scenes':[
+                {'id':'scene-01','reference_ids':['rehab']},
+                {'id':'scene-02','reference_ids':['rooftop']},
+            ]}}}
+            with mock.patch.dict(os.environ,{'DATA_DIR':directory}):
+                scenes=document['production']['timeline']['scenes']
+                resolved_rehab=server.scene_reference_paths(document,scenes[0])[0]
+                resolved_rooftop=server.scene_reference_paths(document,scenes[1])[0]
+                self.assertEqual(unicodedata.normalize('NFC',str(resolved_rehab)),unicodedata.normalize('NFC',str(rehab)))
+                self.assertEqual(unicodedata.normalize('NFC',str(resolved_rooftop)),unicodedata.normalize('NFC',str(rooftop)))
+                self.assertEqual(server.validate_storyboard_reference_paths(document),{
+                    'scene_count':2,'reference_count':2,'status':'ready',
+                })
 
     def test_storyboard_prompt_includes_main_extra_motion_and_shot_delta(self):
         prompt=build_prompt(['산책'],'격리 테스트 자료',reference_material='')
