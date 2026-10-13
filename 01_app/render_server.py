@@ -39,7 +39,7 @@ from staged_ffmpeg_renderer import StagedRenderDependencies, render_video_staged
 from final_export_queue import FinalExportConflict, FinalExportNotFound, FinalExportQueue
 kling_submission_lock = threading.Lock()
 from keyword_pool import load_month_pool
-from tools.unified_content_prompt_harness import run_generation_harness
+from tools.unified_content_prompt_harness import normalize_reference_asset_metadata, run_generation_harness
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema_file
 
 APP_DIR = Path(__file__).resolve().parent
@@ -3942,6 +3942,13 @@ class Handler(SimpleHTTPRequestHandler):
                     document = (latest or {}).get("data", {}).get("document")
                     if not isinstance(document, dict):
                         raise ValueError("이미지를 생성할 최종대본을 먼저 준비해 주세요.")
+                    reference_resources = get_auth_store().project_group_resources(
+                        user["user_id"], project_id,
+                        ("default_asset_manifest", "reference_library", "prompt_contract"),
+                    )
+                    normalize_reference_asset_metadata(
+                        document, group_reference_asset_catalog(reference_resources)
+                    )
                     storyboard_scene = next((item for item in document["production"]["timeline"]["scenes"] if item.get("id") == scene_id), None)
                     if not storyboard_scene:
                         raise ValueError("생성할 씬을 찾을 수 없습니다.")
