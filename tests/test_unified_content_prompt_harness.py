@@ -245,6 +245,33 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertEqual("fixed", scene["sequence"]["camera_motion"])
         self.assertNotIn("extra", scene["sequence"])
 
+    def test_location_reference_alias_is_folded_into_canonical_reference_ids(self):
+        value = document(["안심"])
+        scene = value["production"]["timeline"]["scenes"][0]
+        scene["reference_ids"] = ["ref-character-elder"]
+        scene["location_reference_id"] = "ref-location-dining"
+
+        normalized = normalize_document_shape(value)
+        scene = normalized["production"]["timeline"]["scenes"][0]
+
+        self.assertEqual(
+            ["ref-character-elder", "ref-location-dining"],
+            scene["reference_ids"],
+        )
+        self.assertNotIn("location_reference_id", scene)
+
+    def test_location_reference_alias_does_not_duplicate_existing_reference(self):
+        value = document(["안심"])
+        scene = value["production"]["timeline"]["scenes"][0]
+        scene["location_reference_id"] = "ref-location-dining"
+
+        normalized = normalize_document_shape(value)
+
+        self.assertEqual(
+            ["ref-character-elder", "ref-location-dining"],
+            normalized["production"]["timeline"]["scenes"][0]["reference_ids"],
+        )
+
     def test_concept_shorthand_is_completed_and_canonicalized(self):
         value = document(["안심"])
         value["concept_variants"] = [{"id": "draft", "extra": True}]
@@ -346,6 +373,7 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertIn("실사 장소 레퍼런스를 기본 매체", prompt)
         self.assertIn("고정 `character_id`", prompt)
         self.assertIn("서로 다른 공간을 두 곳 이상", prompt)
+        self.assertIn("`location_reference_id` 별칭 필드를 생성하지 않는다", prompt)
         self.assertIn("관광식 나열은 금지", prompt)
         self.assertIn("원문·순서 그대로", prompt)
         self.assertIn("각 큐의 `caption.text`는 `narration.text`와 완전히 동일", prompt)

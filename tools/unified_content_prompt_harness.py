@@ -255,6 +255,23 @@ def normalize_document_shape(document: dict[str, Any]) -> dict[str, Any]:
     for index, scene in enumerate(scenes):
         if not isinstance(scene, dict):
             continue
+        # Some providers split the canonical reference list into a convenience
+        # location field even though the production contract has one ordered
+        # ``reference_ids`` collection. Preserve that reference by folding the
+        # alias into the canonical collection before strict schema validation.
+        location_reference_id = scene.pop("location_reference_id", None)
+        current_reference_ids = scene.get("reference_ids")
+        if isinstance(current_reference_ids, list):
+            normalized_reference_ids = [
+                item for item in current_reference_ids
+                if isinstance(item, str) and item.strip()
+            ]
+        else:
+            normalized_reference_ids = []
+        if isinstance(location_reference_id, str) and location_reference_id.strip():
+            normalized_reference_ids.append(location_reference_id.strip())
+        if normalized_reference_ids:
+            scene["reference_ids"] = list(dict.fromkeys(normalized_reference_ids))
         title = str(scene.get("title") or f"장면 {index + 1}").strip()
         scene["title"] = title
         scene.setdefault("media_type", "image")
