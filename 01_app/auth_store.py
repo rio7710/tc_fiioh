@@ -662,6 +662,10 @@ class AuthStore:
         """Save selected recommendations atomically; never replace scripted content."""
         if not isinstance(keywords, list) or not 1 <= len(keywords) <= 5:
             raise ValueError("키워드는 1~5개여야 합니다.")
+        from keyword_pool import normalize_keyword_label
+        labels = [normalize_keyword_label(item.get("label", "")) for item in keywords]
+        if any(not label for label in labels) or len(set(labels)) != len(labels):
+            raise ValueError("같은 키워드는 중복 저장할 수 없습니다.")
         data = {"selected_keyword_ids": [item["id"] for item in keywords],
                 "selected_keywords": [item["label"] for item in keywords],
                 "seasonal_keywords": keywords}

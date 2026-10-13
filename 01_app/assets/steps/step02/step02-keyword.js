@@ -12,6 +12,26 @@
     return String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[character]);
   }
 
+  function normalizeKeywordLabel(value) {
+    return String(value ?? '').normalize('NFKC').toLocaleLowerCase('ko-KR').replace(/\s+/gu, '');
+  }
+
+  function uniqueKeywordIds(requestedIds, keywords, limit = 8) {
+    const keywordMap = new Map(keywords.map(item => [item.id, item]));
+    const result = [];
+    const seen = new Set();
+    const add = id => {
+      const item = keywordMap.get(id);
+      const label = normalizeKeywordLabel(item?.label || item?.id);
+      if (!item || !label || seen.has(label) || result.length >= limit) return;
+      seen.add(label);
+      result.push(id);
+    };
+    requestedIds.forEach(add);
+    keywords.filter(item => !item.seasonal).forEach(item => add(item.id));
+    return result;
+  }
+
   function create(dependencies) {
     const deps = dependencies || {};
     for (const name of ['getRoot','getKeywords','getVisibleKeywordIds','setVisibleKeywordIds','getSelectedKeywords','getActiveProjectId','beginNav','isStaleNav','loadProjectContent','showStep','ensureStepApiReady','request','setDemoState','runAiWorkflow','random']) {
@@ -44,9 +64,15 @@
       const {nodes} = current();
       const keywords = deps.getKeywords();
       const selected = deps.getSelectedKeywords();
-      const keywordMap = new Map(keywords.map(item => [item.id, item]));
       const requested = deps.getVisibleKeywordIds();
-      const visible = (requested.length ? requested : keywords.slice(0, 8).map(item => item.id)).map(id => keywordMap.get(id)).filter(Boolean);
+      const visibleIds = uniqueKeywordIds(
+        requested.length ? requested : keywords.map(item => item.id), keywords, requested.length || 8
+      );
+      if (visibleIds.length !== requested.length || visibleIds.some((id, index) => id !== requested[index])) {
+        deps.setVisibleKeywordIds(visibleIds);
+      }
+      const keywordMap = new Map(keywords.map(item => [item.id, item]));
+      const visible = visibleIds.map(id => keywordMap.get(id)).filter(Boolean);
       nodes.keywordGrid.innerHTML = visible.map(item => {
         const isSelected = selected.has(item.id);
         if (isSelected && !tilts.has(item.id)) {
@@ -81,11 +107,13 @@
       render();
     }
     function refresh() {
-      const currentIds = deps.getVisibleKeywordIds().slice(0, 8);
+      const keywords = deps.getKeywords();
+      const currentIds = uniqueKeywordIds(deps.getVisibleKeywordIds(), keywords);
       const currentSet = new Set(currentIds);
       const selected = deps.getSelectedKeywords();
-      const replacements = deps.getKeywords().filter(item => !item.seasonal && !selected.has(item.id) && !currentSet.has(item.id)).map(item => item.id).sort(() => deps.random() - .5);
-      deps.setVisibleKeywordIds(currentIds.map(id => selected.has(id) ? id : (replacements.shift() || id)));
+      const replacements = keywords.filter(item => !item.seasonal && !selected.has(item.id) && !currentSet.has(item.id)).map(item => item.id).sort(() => deps.random() - .5);
+      const next = currentIds.map(id => selected.has(id) ? id : (replacements.shift() || id));
+      deps.setVisibleKeywordIds(uniqueKeywordIds(next, keywords, currentIds.length));
       render();
     }
     async function saveAndContinue() {
@@ -141,5 +169,5 @@
     }
     return Object.freeze({mount,unmount,render,refresh,setLocked,saveAndContinue,isLocked:()=>locked,isBusy:()=>busy});
   }
-  return Object.freeze({MAX_SELECTION,create,escapeHtml});
+  return Object.freeze({MAX_SELECTION,create,escapeHtml,normalizeKeywordLabel,uniqueKeywordIds});
 });

@@ -2,7 +2,12 @@
 import json
 import random
 import re
+import unicodedata
 from pathlib import Path
+
+
+def normalize_keyword_label(value):
+    return ''.join(unicodedata.normalize('NFKC', str(value)).casefold().split())
 
 
 def load_month_pool(month, directory=None):
@@ -18,10 +23,11 @@ def load_month_pool(month, directory=None):
     ids, labels = set(), set()
     for item in items:
         key, label = item.get('id'), item.get('label')
-        if not isinstance(key, str) or not isinstance(label, str) or not label.strip() or key in ids or ''.join(label.split()) in labels:
+        normalized = normalize_keyword_label(label)
+        if not isinstance(key, str) or not isinstance(label, str) or not label.strip() or key in ids or normalized in labels:
             raise ValueError('월별 키워드 후보에 중복 또는 잘못된 값이 있습니다.')
         ids.add(key)
-        labels.add(''.join(label.split()))
+        labels.add(normalized)
     return data
 
 

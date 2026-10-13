@@ -206,6 +206,7 @@ class AutomationRunner:
                     raise AdapterFailure('자동화 중 대본이 변경되어 실행을 멈췄습니다.')
             return api.call(path,{'project_id':project,**(extra or {})})
         def choose_keywords():
+            from keyword_pool import normalize_keyword_label
             # A committed revision is authoritative if a previous response was lost.
             existing=self.auth.latest_stage_data(user,project,2)
             if existing:
@@ -218,9 +219,9 @@ class AutomationRunner:
                 source=self.base_keywords
                 if source is None:
                     source=json.loads((Path(__file__).parent/'data'/'demo_data.json').read_text(encoding='utf-8'))['keywords']
-                unique={item['label']:item for item in source if not item.get('seasonal')}
+                unique={normalize_keyword_label(item['label']):item for item in source if not item.get('seasonal')}
                 items=random.SystemRandom().sample(list(unique.values()),spec['count'])
-            if len(items)!=spec['count'] or len({item['label'] for item in items})!=len(items):
+            if len(items)!=spec['count'] or len({normalize_keyword_label(item['label']) for item in items})!=len(items):
                 raise AdapterFailure('추천 키워드 개수 또는 중복 검증에 실패했습니다.')
             return {'keywords':items}
         chosen=step('keywords_select',choose_keywords)

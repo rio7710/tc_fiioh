@@ -1,4 +1,5 @@
 import random
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -33,6 +34,17 @@ class KeywordPoolTests(unittest.TestCase):
         self.assertIsNone(load_month_pool('2026-11'))
         with self.assertRaises(ValueError):draw_shuffle_bag(['one'],count=3)
 
+    def test_validation_rejects_visually_duplicate_labels(self):
+        with tempfile.TemporaryDirectory() as folder:
+            payload={'month':'2026-11','count':2,'keywords':[
+                {'id':'one','label':'재 활'}, {'id':'two','label':'재활'},
+            ]}
+            (Path(folder)/'keyword_pool_2026-11_ko-KR_nursing-home.json').write_text(
+                json.dumps(payload,ensure_ascii=False),encoding='utf-8'
+            )
+            with self.assertRaisesRegex(ValueError,'중복'):
+                load_month_pool('2026-11',folder)
+
     def test_restart_isolation_and_concurrent_draws(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'pool.sqlite'
@@ -40,6 +52,10 @@ class KeywordPoolTests(unittest.TestCase):
             user=store.create_user('pool-owner','password123')['user_id']
             stranger=store.create_user('pool-stranger','password123')['user_id']
             project=store.ensure_project(user,'pool-test-project','월별 추첨 테스트')['project_id']
+            with self.assertRaisesRegex(ValueError,'중복'):
+                store.apply_keyword_recommendation(user,project,[
+                    {'id':'a','label':'재 활'}, {'id':'b','label':'재활'},
+                ])
             pool=load_month_pool('2026-10')
             first=store.draw_monthly_keywords(user,pool,3,project,'2026-09-30')
             store=server.AuthStore(path)

@@ -12,6 +12,8 @@
     'keywordMessage'
   ];
 
+  const normalizeKeywordLabel = value => String(value ?? '').normalize('NFKC').toLocaleLowerCase('ko-KR').replace(/\s+/gu, '');
+
   function create(dependencies) {
     const deps = dependencies || {};
     for (const name of [
@@ -94,7 +96,13 @@
           body: JSON.stringify({project_id: projectId, refresh: true, month: nodes.trendKeywordMonth.value})
         });
         if (version !== requestVersion || projectId !== deps.getActiveProjectId() || nodes.trendKeywordModal.hidden) return;
-        choices = result.keywords || [];
+        const seenLabels = new Set(deps.getKeywords().map(item => normalizeKeywordLabel(item.label)).filter(Boolean));
+        choices = (result.keywords || []).filter(item => {
+          const label = normalizeKeywordLabel(item.label);
+          if (!label || seenLabels.has(label)) return false;
+          seenLabels.add(label);
+          return true;
+        });
         deps.showTokenUsage(result.usage);
         nodes.trendTokenUsage.textContent = nodes.tokenUsage.textContent;
         nodes.trendKeywordMessage.textContent = result.source === 'monthly_pool'

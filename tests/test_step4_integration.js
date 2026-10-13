@@ -156,8 +156,8 @@ assert.ok(html.indexOf('project-editor-hydrator.js') < html.indexOf('project-hyd
 assert.ok(html.indexOf('project-hydration-applier.js') < html.indexOf('project-hydration-composer.js') && html.indexOf('project-hydration-composer.js') < html.indexOf('project-hydration-controller.js'), 'composer loads after applier and before controller');
 assert.match(html, /src="\/01_app\/assets\/core\/prompt-lab-controller\.js\?v=20261009_v37"/, 'HTML cache-busts prompt lab controller');
 assert.match(html, /src="\/01_app\/assets\/core\/provider-settings-controller\.js\?v=20261009_v39"/, 'HTML cache-busts provider settings controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step02\/trend-keyword-controller\.js\?v=20261009_v40"/, 'HTML cache-busts trend keyword controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step02\/step02-keyword\.js\?v=20261009_v41"/, 'HTML cache-busts Step 2 keyword controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step02\/trend-keyword-controller\.js\?v=20261013_v41"/, 'HTML cache-busts trend keyword controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step02\/step02-keyword\.js\?v=20261013_v42"/, 'HTML cache-busts Step 2 keyword controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/script-generation-controller\.js\?v=20261009_v42"/, 'HTML cache-busts script generation controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/production-workflow-controller\.js\?v=20261009_v43"/, 'HTML cache-busts production workflow controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-video-controller\.js\?v=20261009_v44"/, 'HTML cache-busts scene video controller');

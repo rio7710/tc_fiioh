@@ -38,7 +38,7 @@ from visual_decisions import VisualDecisions, DecisionConflict
 from staged_ffmpeg_renderer import StagedRenderDependencies, render_video_staged
 from final_export_queue import FinalExportConflict, FinalExportNotFound, FinalExportQueue
 kling_submission_lock = threading.Lock()
-from keyword_pool import load_month_pool
+from keyword_pool import load_month_pool, normalize_keyword_label
 from tools.unified_content_prompt_harness import normalize_reference_asset_metadata, run_generation_harness
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema_file
 
@@ -413,14 +413,14 @@ def openai_seasonal_keywords(api_key, local_date, existing_labels, count=None):
     if not isinstance(raw_keywords, list) or (len(raw_keywords) != count if count is not None else not 2 <= len(raw_keywords) <= 3):
         raise RuntimeError("OpenAI 시즌 추천 항목 수가 올바르지 않습니다.")
     keywords = []
-    seen = {''.join(str(label).split()).casefold() for label in existing_labels}
+    seen = {normalize_keyword_label(label) for label in existing_labels}
     for index, item in enumerate(raw_keywords):
         if not isinstance(item, dict) or not str(item.get("label", "")).strip():
             raise RuntimeError("OpenAI 시즌 추천 형식이 올바르지 않습니다.")
         label = str(item["label"]).strip()[:30]
-        if ''.join(label.split()).casefold() in seen:
+        if normalize_keyword_label(label) in seen:
             raise RuntimeError("추천 키워드가 중복되었습니다. 다시 시도해 주세요.")
-        seen.add(''.join(label.split()).casefold())
+        seen.add(normalize_keyword_label(label))
         keywords.append({
             "id": f"season-{local_date}-{index + 1}",
             "label": label,
@@ -3737,6 +3737,8 @@ class Handler(SimpleHTTPRequestHandler):
                     selected = list(dict.fromkeys(selected))
                     keyword_map = {str(item["id"]): item for item in [*data.get("keywords", []), *seasonal]}
                     selected_labels = [str(keyword_map[item]["label"]).strip() for item in selected]
+                    if len({normalize_keyword_label(label) for label in selected_labels}) != len(selected_labels):
+                        raise ValueError("같은 키워드는 한 화면에서 중복 선택할 수 없습니다.")
                     state["selected_keywords"] = selected
                     keyword_draft = get_auth_store().save_stage_draft(user["user_id"], project_id, 2, {
                         "selected_keyword_ids": selected,
