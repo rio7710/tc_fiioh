@@ -13,6 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "contracts" / "unified-content-production.schema.json"
 PROMPT_PATH = ROOT / "prompts" / "unified_content_production_v1.md"
 CHARACTER_POLICY_PATH = ROOT / "config" / "character-reference-policy.json"
+CANONICAL_REFERENCE_FIELDS = (
+    "kind", "uri", "status", "usage", "character_id", "display_name",
+    "identity_group", "appearance_lock", "reference_version", "wardrobe_variant",
+)
 REFERENCE_DIR = ROOT / "docs" / "reference_samples"
 PRODUCTION_SECTION_KEYS = (
     "reference_assets", "continuity", "global_prompts", "timing_policy",
@@ -409,6 +413,25 @@ def normalize_document_shape(document: dict[str, Any]) -> dict[str, Any]:
     return document
 
 
+def normalize_reference_asset_metadata(
+    document: dict[str, Any], canonical_assets: dict[str, dict[str, Any]] | None,
+) -> dict[str, Any]:
+    """Replace generated asset metadata with the server-owned catalog values."""
+    if not canonical_assets:
+        return document
+    assets = ((document.get("production") or {}).get("reference_assets") or [])
+    for asset in assets:
+        if not isinstance(asset, dict):
+            continue
+        canonical = canonical_assets.get(str(asset.get("id") or ""))
+        if not isinstance(canonical, dict):
+            continue
+        for key in CANONICAL_REFERENCE_FIELDS:
+            if key in canonical:
+                asset[key] = json.loads(json.dumps(canonical[key], ensure_ascii=False))
+    return document
+
+
 def reference_context(limit: int = 4) -> str:
     summaries = []
     for path in sorted(REFERENCE_DIR.glob("*_STANDARD_v1.md"))[:limit]:
@@ -757,6 +780,28 @@ def validate_character_reference_versions(document: dict[str, Any]) -> None:
                 )
 
 
+def validate_scene_reference_media(document: dict[str, Any]) -> None:
+    """Require renderable media only for character/location scene references."""
+    production = document.get("production") or {}
+    assets = {
+        str(item.get("id")): item for item in production.get("reference_assets", [])
+        if isinstance(item, dict) and item.get("id")
+    }
+    for scene in (production.get("timeline") or {}).get("scenes", []):
+        for reference_id in scene.get("reference_ids") or []:
+            asset = assets.get(str(reference_id))
+            if not asset:
+                raise UnifiedContentError(
+                    f"{scene.get('id', 'scene')} references unknown asset {reference_id}"
+                )
+            if asset.get("kind") not in {"character", "location"}:
+                continue
+            if asset.get("status") != "ready" or not str(asset.get("uri") or "").strip():
+                raise UnifiedContentError(
+                    f"{reference_id} requires a ready character/location uri before image generation"
+                )
+
+
 def validate_document(document: dict[str, Any], selected_keywords: list[str], strict_schema: bool = False,
                       locked_plan: dict[str, Any] | None = None) -> float:
     if strict_schema:
@@ -770,6 +815,8 @@ def validate_document(document: dict[str, Any], selected_keywords: list[str], st
     if actual != selected_keywords:
         raise UnifiedContentError("project.selected_keywords must exactly preserve the input order and values")
     validate_character_reference_versions(document)
+    if strict_schema:
+        validate_scene_reference_media(document)
     validate_visual_continuity(document)
     if locked_plan:
         scenes = document.get("production", {}).get("timeline", {}).get("scenes", [])
@@ -820,6 +867,7 @@ def build_repair_prompt(candidate: str, error: Exception,
         "화면축 검증 오류라면 camera_bridge·entry_action·exit_action에 실제로 보이는 카메라/인물의 축 횡단 이동이 명시된 경우에만 motivated_cross를 유지한다. 이동 근거가 없으면 해당 씬을 same_side로 고치며, 단순한 샷 크기·각도 변화는 축 횡단으로 취급하지 않는다.\n"
         "테이블 형태 누락 오류라면 오류에 표시된 한국어 형태명을 해당 scene의 image_prompt.text에 직접 넣고, continuity.props 및 기준 레퍼런스와 일치시킨다.\n"
         "캐릭터 버전 오류라면 해당 character_id에 등록된 V2 reference asset 하나를 선택해 모든 씬의 reference_ids에서 동일하게 사용한다. V2가 없는 캐릭터만 V1을 유지하며, 동일 캐릭터의 의상 variant도 콘티 중간에 바꾸지 않는다.\n"
+        "참조 자산 오류라면 제공된 레퍼런스 인덱스의 정식 character/location 자산만 사용하고 id·uri·status·버전·의상 값을 추측하거나 변형하지 않는다. style은 연출 메타데이터로 유지하되 이미지 파일 URI를 만들어 내지 않는다.\n"
         "기준 metadata에 테이블 형태가 없으면 형태를 추측하지 않는다. 해당 씬의 image_prompt.text에 기준 레퍼런스의 테이블 실루엣·비율·방향을 그대로 유지하라고 명시한다.\n"
         "한 씬의 테이블 후보가 복수라면 오류에 표시된 scene ID의 장소 reference_assets.usage와 그 장소를 이름으로 특정한 continuity.props만 사용해 정확히 하나를 선택하고, 선택한 형태를 그 씬 image_prompt.text에 명시한다. 위치별 정보가 없으면 형태를 추측하지 말고 기준 레퍼런스 잠금을 명시한다.\n"
         f"검증 오류: {type(error).__name__}: {error}\n"
@@ -852,9 +900,11 @@ def run_generation_harness(
     strict_schema: bool = False,
     provenance: dict[str, Any] | None = None,
     locked_plan: dict[str, Any] | None = None,
+    canonical_reference_assets: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     def complete_provenance(document: dict[str, Any]) -> dict[str, Any]:
         document = normalize_document_shape(document)
+        document = normalize_reference_asset_metadata(document, canonical_reference_assets)
         project = document.get("project")
         if not isinstance(project, dict):
             project = {}

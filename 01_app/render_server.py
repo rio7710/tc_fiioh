@@ -489,15 +489,23 @@ def openai_tts_audio(api_key, text, profile_id, response_format="wav"):
 def scene_reference_paths(document, scene):
     references = {item.get("id"): item for item in (document.get("production") or {}).get("reference_assets", [])}
     paths = []
+    required_media = 0
     for reference_id in scene.get("reference_ids", []):
-        reference = references.get(reference_id, {})
-        uri = str(reference.get("uri", ""))
+        reference = references.get(reference_id)
+        if not isinstance(reference, dict):
+            raise ValueError(f"이 씬의 참조 자산을 찾을 수 없습니다: {reference_id}")
         kind = str(reference.get("kind", ""))
-        folder = "characters" if kind == "character" else "locations" if kind == "location" else ""
+        if kind not in {"character", "location"}:
+            continue
+        required_media += 1
+        uri = str(reference.get("uri") or "").strip()
+        if not uri:
+            raise ValueError(f"이 씬의 참조 이미지 URI가 없습니다: {reference_id}")
+        folder = "characters" if kind == "character" else "locations"
         candidate = Path(os.environ.get("DATA_DIR", str(APP_DIR / "data"))) / "group_resources" / "defaults" / folder / Path(uri).name
-        if folder and candidate.is_file():
+        if candidate.is_file():
             paths.append(candidate)
-    if len(paths) != len(scene.get("reference_ids", [])):
+    if len(paths) != required_media:
         raise ValueError("이 씬의 시설·캐릭터 참조 이미지가 서버에 모두 준비되지 않았습니다.")
     return paths
 
@@ -918,6 +926,30 @@ def group_story_reference_context(resources, character_limit=45_000, included_ty
     return "\n".join(sections)
 
 
+def group_reference_asset_catalog(resources):
+    """Index canonical reference metadata from authorized group resources."""
+    fields = {
+        "id", "kind", "uri", "status", "usage", "character_id", "display_name",
+        "identity_group", "appearance_lock", "reference_version", "wardrobe_variant",
+    }
+    catalog = {}
+
+    def visit(value):
+        if isinstance(value, dict):
+            reference_id = str(value.get("id") or "")
+            if reference_id.startswith("ref-") and value.get("kind") in {"character", "location", "style"}:
+                catalog[reference_id] = {key: value[key] for key in fields if key in value}
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+
+    for resource in resources:
+        visit(resource.get("payload", {}))
+    return catalog
+
+
 def human_storyboard_reference_context(resources, character_limit=70_000):
     """Return the complete authored corpus, excluding generated contract fixtures.
 
@@ -1211,6 +1243,7 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
             "notes": ["그룹 리소스를 참조해 AI가 생성한 필드는 source=ai_inferred로 구분함."],
         },
         locked_plan=script_plan,
+        canonical_reference_assets=group_reference_asset_catalog(resources),
     )
     usage = {
         key: sum(int(item.get("usage", {}).get(key, 0)) for item in responses)

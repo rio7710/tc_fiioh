@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from tools.unified_content_prompt_harness import build_prompt, build_repair_prompt, normalize_document_shape, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_character_reference_versions, validate_document, validate_visual_continuity
+from tools.unified_content_prompt_harness import build_prompt, build_repair_prompt, normalize_document_shape, normalize_reference_asset_metadata, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_character_reference_versions, validate_document, validate_scene_reference_media, validate_visual_continuity
 from tools.validate_unified_content import UnifiedContentError
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema
 
@@ -29,6 +29,37 @@ def document(keywords):
 
 
 class UnifiedContentPromptHarnessTests(unittest.TestCase):
+    def test_canonical_reference_metadata_repairs_missing_uri_and_generated_variant(self):
+        value = document(["안심"])
+        value["production"]["reference_assets"] = [{
+            "id": "ref-character-v2", "kind": "character", "uri": None,
+            "status": "ready", "usage": "generated", "wardrobe_variant": "v2-cardigan",
+        }]
+        normalize_reference_asset_metadata(value, {"ref-character-v2": {
+            "id": "ref-character-v2", "kind": "character", "uri": "캐릭터/v2.png",
+            "status": "ready", "usage": "canonical", "wardrobe_variant": "cardigan",
+        }})
+        asset = value["production"]["reference_assets"][0]
+        self.assertEqual(asset["uri"], "캐릭터/v2.png")
+        self.assertEqual(asset["usage"], "canonical")
+        self.assertEqual(asset["wardrobe_variant"], "cardigan")
+
+    def test_scene_reference_media_requires_uri_but_ignores_style_media(self):
+        value = document(["안심"])
+        value["production"]["reference_assets"] = [
+            {"id": "ref-character-v2", "kind": "character", "uri": None,
+             "status": "ready", "usage": "character"},
+            {"id": "ref-style-film", "kind": "style", "uri": None,
+             "status": "ready", "usage": "style"},
+        ]
+        value["production"]["timeline"]["scenes"][0]["reference_ids"] = [
+            "ref-character-v2", "ref-style-film"
+        ]
+        with self.assertRaisesRegex(UnifiedContentError, "requires a ready character/location uri"):
+            validate_scene_reference_media(value)
+        value["production"]["reference_assets"][0]["uri"] = "캐릭터/v2.png"
+        validate_scene_reference_media(value)
+
     def test_character_reference_prefers_v2_but_allows_v1_for_uncovered_identity(self):
         value = document(["안심"])
         value["production"]["reference_assets"] = [
