@@ -235,6 +235,8 @@
         ,"display_name": {"type": "string", "minLength": 1}
         ,"identity_group": {"type": "string", "minLength": 1}
         ,"appearance_lock": {"type": "string", "minLength": 1}
+        ,"reference_version": {"enum": ["v1", "v2"]}
+        ,"wardrobe_variant": {"type": "string", "minLength": 1}
       }
     }
   }

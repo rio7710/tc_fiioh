@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from tools.unified_content_prompt_harness import build_prompt, build_repair_prompt, normalize_document_shape, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_document, validate_visual_continuity
+from tools.unified_content_prompt_harness import build_prompt, build_repair_prompt, normalize_document_shape, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_character_reference_versions, validate_document, validate_visual_continuity
 from tools.validate_unified_content import UnifiedContentError
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema
 
@@ -29,6 +29,50 @@ def document(keywords):
 
 
 class UnifiedContentPromptHarnessTests(unittest.TestCase):
+    def test_character_reference_prefers_v2_but_allows_v1_for_uncovered_identity(self):
+        value = document(["안심"])
+        value["production"]["reference_assets"] = [
+            {"id": "ref-character-asset-st-cm02-uniform-v2-cardigan", "kind": "character",
+             "character_id": "character-caregiver-m02", "reference_version": "v2",
+             "wardrobe_variant": "cardigan"},
+            {"id": "ref-character-family-v1", "kind": "character",
+             "character_id": "character-family-f01", "reference_version": "v1"},
+        ]
+        value["production"]["timeline"]["scenes"][0]["reference_ids"] = [
+            "ref-character-asset-st-cm02-uniform-v2-cardigan", "ref-character-family-v1"
+        ]
+        validate_character_reference_versions(value)
+
+    def test_character_reference_rejects_v1_when_v2_exists(self):
+        value = document(["안심"])
+        value["production"]["reference_assets"] = [{
+            "id": "ref-character-old", "kind": "character",
+            "character_id": "character-caregiver-m02", "reference_version": "v1",
+        }]
+        value["production"]["timeline"]["scenes"][0]["reference_ids"] = ["ref-character-old"]
+        with self.assertRaisesRegex(UnifiedContentError, "must use V2"):
+            validate_character_reference_versions(value)
+
+    def test_character_reference_rejects_mid_storyboard_wardrobe_change(self):
+        value = document(["안심"])
+        value["production"]["reference_assets"] = [
+            {"id": "ref-character-asset-st-cm02-uniform-v2-scrub", "kind": "character",
+             "character_id": "character-caregiver-m02", "reference_version": "v2",
+             "wardrobe_variant": "scrub"},
+            {"id": "ref-character-asset-st-cm02-uniform-v2-cardigan", "kind": "character",
+             "character_id": "character-caregiver-m02", "reference_version": "v2",
+             "wardrobe_variant": "cardigan"},
+        ]
+        first = value["production"]["timeline"]["scenes"][0]
+        first["reference_ids"] = ["ref-character-asset-st-cm02-uniform-v2-scrub"]
+        second = json.loads(json.dumps(first))
+        second.update(id="scene-02", start=30, end=60,
+                      reference_ids=["ref-character-asset-st-cm02-uniform-v2-cardigan"])
+        second["sequence"]["continuity_from"] = "scene-01"
+        value["production"]["timeline"]["scenes"].append(second)
+        with self.assertRaisesRegex(UnifiedContentError, "changes reference version or wardrobe"):
+            validate_character_reference_versions(value)
+
     def test_schema_version_is_pinned_to_the_validated_contract(self):
         value = document(["안심"])
         value["schema_version"] = "1.1"

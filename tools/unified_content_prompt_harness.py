@@ -12,6 +12,7 @@ from tools.validate_json_schema import JsonSchemaError, validate_json_schema_fil
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "contracts" / "unified-content-production.schema.json"
 PROMPT_PATH = ROOT / "prompts" / "unified_content_production_v1.md"
+CHARACTER_POLICY_PATH = ROOT / "config" / "character-reference-policy.json"
 REFERENCE_DIR = ROOT / "docs" / "reference_samples"
 PRODUCTION_SECTION_KEYS = (
     "reference_assets", "continuity", "global_prompts", "timing_policy",
@@ -715,6 +716,47 @@ def validate_visual_continuity(document: dict[str, Any]) -> None:
                 )
 
 
+def validate_character_reference_versions(document: dict[str, Any]) -> None:
+    """Prefer V2 per identity and freeze one asset/wardrobe for the storyboard."""
+    production = document.get("production") or {}
+    assets = {
+        str(item.get("id")): item
+        for item in production.get("reference_assets", [])
+        if isinstance(item, dict) and item.get("kind") == "character"
+    }
+    policy = json.loads(CHARACTER_POLICY_PATH.read_text(encoding="utf-8"))
+    v2_by_character = {
+        character_id: set(values.get("v2_reference_ids") or [])
+        for character_id, values in (policy.get("characters") or {}).items()
+    }
+    chosen: dict[str, str] = {}
+    for scene in (production.get("timeline") or {}).get("scenes", []):
+        scene_choices: dict[str, str] = {}
+        for reference_id in scene.get("reference_ids") or []:
+            asset = assets.get(str(reference_id))
+            if not asset:
+                continue
+            character_id = str(asset.get("character_id") or asset.get("identity_group") or "").strip()
+            if not character_id:
+                raise UnifiedContentError(f"{reference_id} character reference requires character_id")
+            version = str(asset.get("reference_version") or "v1")
+            preferred = v2_by_character.get(character_id, set())
+            if preferred and (version != "v2" or str(reference_id) not in preferred):
+                raise UnifiedContentError(
+                    f"{character_id} has a V2 reference and must use V2 for this storyboard"
+                )
+            previous_in_scene = scene_choices.setdefault(character_id, str(reference_id))
+            if previous_in_scene != str(reference_id):
+                raise UnifiedContentError(
+                    f"{scene.get('id', 'scene')} mixes character references for {character_id}"
+                )
+            previous = chosen.setdefault(character_id, str(reference_id))
+            if previous != str(reference_id):
+                raise UnifiedContentError(
+                    f"{character_id} changes reference version or wardrobe inside one storyboard"
+                )
+
+
 def validate_document(document: dict[str, Any], selected_keywords: list[str], strict_schema: bool = False,
                       locked_plan: dict[str, Any] | None = None) -> float:
     if strict_schema:
@@ -727,6 +769,7 @@ def validate_document(document: dict[str, Any], selected_keywords: list[str], st
     actual = document.get("project", {}).get("selected_keywords")
     if actual != selected_keywords:
         raise UnifiedContentError("project.selected_keywords must exactly preserve the input order and values")
+    validate_character_reference_versions(document)
     validate_visual_continuity(document)
     if locked_plan:
         scenes = document.get("production", {}).get("timeline", {}).get("scenes", [])
@@ -776,6 +819,7 @@ def build_repair_prompt(candidate: str, error: Exception,
         f"{empty_scene_recovery}"
         "화면축 검증 오류라면 camera_bridge·entry_action·exit_action에 실제로 보이는 카메라/인물의 축 횡단 이동이 명시된 경우에만 motivated_cross를 유지한다. 이동 근거가 없으면 해당 씬을 same_side로 고치며, 단순한 샷 크기·각도 변화는 축 횡단으로 취급하지 않는다.\n"
         "테이블 형태 누락 오류라면 오류에 표시된 한국어 형태명을 해당 scene의 image_prompt.text에 직접 넣고, continuity.props 및 기준 레퍼런스와 일치시킨다.\n"
+        "캐릭터 버전 오류라면 해당 character_id에 등록된 V2 reference asset 하나를 선택해 모든 씬의 reference_ids에서 동일하게 사용한다. V2가 없는 캐릭터만 V1을 유지하며, 동일 캐릭터의 의상 variant도 콘티 중간에 바꾸지 않는다.\n"
         "기준 metadata에 테이블 형태가 없으면 형태를 추측하지 않는다. 해당 씬의 image_prompt.text에 기준 레퍼런스의 테이블 실루엣·비율·방향을 그대로 유지하라고 명시한다.\n"
         "한 씬의 테이블 후보가 복수라면 오류에 표시된 scene ID의 장소 reference_assets.usage와 그 장소를 이름으로 특정한 continuity.props만 사용해 정확히 하나를 선택하고, 선택한 형태를 그 씬 image_prompt.text에 명시한다. 위치별 정보가 없으면 형태를 추측하지 말고 기준 레퍼런스 잠금을 명시한다.\n"
         f"검증 오류: {type(error).__name__}: {error}\n"
