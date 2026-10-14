@@ -1024,6 +1024,13 @@ def run_generation_harness(
             project = {}
             document["project"] = project
         concepts = document.get("concept_variants") or []
+        for concept in concepts:
+            if isinstance(concept, dict):
+                # These are immutable user inputs. Provider output sometimes
+                # omits them from a concept during repair, so restore the
+                # exact selected order locally instead of spending another
+                # model call on a deterministic field.
+                concept["keywords"] = list(selected_keywords)
         concept_title = concepts[0].get("title", "") if concepts and isinstance(concepts[0], dict) else ""
         locked_title = (locked_plan or {}).get("title", "")
         if locked_title:

@@ -591,6 +591,21 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertEqual("16:9", project["aspect_ratio"])
         self.assertEqual({"width": 1920, "height": 1080}, project["resolution"])
 
+    def test_concept_keywords_are_restored_from_selected_inputs(self):
+        value = document(["안심", "가족 소통", "따뜻한 관계"])
+        value["concept_variants"][0]["keywords"] = []
+
+        result = run_generation_harness(
+            lambda prompt: json.dumps(value, ensure_ascii=False),
+            ["안심", "가족 소통", "따뜻한 관계"], "시설 자료",
+        )
+
+        self.assertEqual(
+            ["안심", "가족 소통", "따뜻한 관계"],
+            result["document"]["concept_variants"][0]["keywords"],
+        )
+        self.assertEqual(0, result["repair_count"])
+
     def test_second_bounded_repair_handles_followup_validation_error(self):
         value = document(["안심"])
         base = value["production"]["timeline"]["scenes"][0]
