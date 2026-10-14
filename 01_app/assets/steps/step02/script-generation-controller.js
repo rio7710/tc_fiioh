@@ -73,7 +73,6 @@
       const sceneCompleted = nodes.aiSceneCompleted;
       const sceneTotal = nodes.aiSceneTotal;
       const sceneFailed = nodes.aiSceneFailed;
-      roles[1].classList.add('has-scene-progress');
       roles[1].append(sceneProgress);
       const updateSceneProgress = (values, showPending=false) => {
         const total = Math.max(0, Number(values?.total_scenes) || 0);
@@ -116,7 +115,7 @@
       nowNode.textContent = 'GPT에 최종대본 생성 요청을 전송하고 있습니다';
       foot.textContent = '요청 1건 전송 중 · 중복 요청은 차단됩니다.';
       updateSceneProgress(null);
-      roles.forEach((role, index) => { role.className = `ai-role ${index === 0 ? 'active' : ''}`; role.querySelector('.ai-role-state').textContent = index === 0 ? '요청 전송' : '대기'; role.querySelector('.ai-role-result').textContent = ''; });
+      roles.forEach((role, index) => { role.className = `ai-role${index === 0 ? ' active' : ''}${index === 1 ? ' has-scene-progress' : ''}`; role.querySelector('.ai-role-state').textContent = index === 0 ? '요청 전송' : '대기'; role.querySelector('.ai-role-result').textContent = ''; });
       updateWaitingState();
       let waitingTimer = deps.setInterval(updateWaitingState, 1000);
       const stopWaiting = () => { if (waitingTimer !== null) { deps.clearInterval(waitingTimer); waitingTimer = null; } };
