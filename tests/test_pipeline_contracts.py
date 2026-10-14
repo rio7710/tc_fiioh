@@ -61,6 +61,20 @@ class PipelineContractTests(unittest.TestCase):
         self.assertEqual("timeline.scenes[-1].end", self.manifest["project_clock"]["duration_source"])
         self.assertTrue(all(scene["media_type"] in {"image", "video"} for scene in scenes))
 
+    def test_active_script_job_is_scoped_to_owner_and_project(self):
+        jobs = [
+            {"job_id": "old", "project_id": "p1", "status": "running", "updated_at": "2026-10-14T01:00:00Z", "input": {"user_id": "u1"}},
+            {"job_id": "new", "project_id": "p2", "status": "queued", "updated_at": "2026-10-14T02:00:00Z", "input": {"user_id": "u1"}},
+            {"job_id": "other", "project_id": "p3", "status": "running", "updated_at": "2026-10-14T03:00:00Z", "input": {"user_id": "u2"}},
+            {"job_id": "done", "project_id": "p4", "status": "succeeded", "updated_at": "2026-10-14T04:00:00Z", "input": {"user_id": "u1"}},
+        ]
+        queue = mock.Mock()
+        queue.list.return_value = jobs
+        with mock.patch.object(self.server, "get_script_job_store", return_value=queue):
+            self.assertEqual("new", self.server.latest_active_script_job("u1")["job_id"])
+            self.assertEqual("old", self.server.latest_active_script_job("u1", "p1")["job_id"])
+            self.assertIsNone(self.server.latest_active_script_job("u1", "missing"))
+
     def test_title_and_narration_contracts_match(self):
         timed_scenes = self.server.timed_script_scenes(self.demo_data)
         script_lines = self.demo_data["state"]["script"]["lines"]

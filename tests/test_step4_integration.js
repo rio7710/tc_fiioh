@@ -140,7 +140,7 @@ const appBootstrapSource = fs.readFileSync('01_app/assets/core/app-bootstrap.js'
 const html = `${shellHtml}\n${appBootstrapSource}`;
 assert.match(html, /src="\/01_app\/assets\/core\/shell-navigation-controller\.js\?v=20261009_v32"/, 'HTML cache-busts shell navigation controller');
 assert.match(html, /src="\/01_app\/assets\/core\/session-bootstrap-controller\.js\?v=20261009_v33"/, 'HTML cache-busts session bootstrap controller');
-assert.match(html, /src="\/01_app\/assets\/core\/auth-ui-controller\.js\?v=20261009_v34"/, 'HTML cache-busts auth UI controller');
+assert.match(html, /src="\/01_app\/assets\/core\/auth-ui-controller\.js\?v=20261014_v35"/, 'HTML cache-busts auth UI controller');
 assert.match(html, /src="\/01_app\/assets\/core\/project-keyword-hydrator\.js\?v=20261009_v58"/, 'HTML cache-busts project keyword hydrator');
 assert.match(html, /src="\/01_app\/assets\/core\/project-media-hydrator\.js\?v=20261009_v59"/, 'HTML cache-busts project media hydrator');
 assert.match(html, /src="\/01_app\/assets\/core\/project-brand-platform-hydrator\.js\?v=20261010_v1"/, 'HTML cache-busts project brand platform hydrator');
@@ -158,7 +158,7 @@ assert.match(html, /src="\/01_app\/assets\/core\/prompt-lab-controller\.js\?v=20
 assert.match(html, /src="\/01_app\/assets\/core\/provider-settings-controller\.js\?v=20261009_v39"/, 'HTML cache-busts provider settings controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/trend-keyword-controller\.js\?v=20261013_v41"/, 'HTML cache-busts trend keyword controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/step02-keyword\.js\?v=20261013_v42"/, 'HTML cache-busts Step 2 keyword controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step02\/script-generation-controller\.js\?v=20261014_v48"/, 'HTML cache-busts script generation controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step02\/script-generation-controller\.js\?v=20261014_v49"/, 'HTML cache-busts script generation controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/production-workflow-controller\.js\?v=20261009_v43"/, 'HTML cache-busts production workflow controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-video-controller\.js\?v=20261009_v44"/, 'HTML cache-busts scene video controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-image-controller\.js\?v=20261013_v46"/, 'HTML cache-busts scene image controller');

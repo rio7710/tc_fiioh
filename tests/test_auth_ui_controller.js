@@ -43,7 +43,8 @@ const AuthUI = require('../01_app/assets/core/auth-ui-controller.js');
       refreshProjectIndex: async () => { calls.push(['refresh']); if (overrides.refreshError) throw overrides.refreshError; },
       showStep: step => calls.push(['show', step]),
       setActiveProjectId: id => calls.push(['project', id]),
-      setKeywordStageLocked: value => calls.push(['locked', value])
+      setKeywordStageLocked: value => calls.push(['locked', value]),
+      ...(overrides.onAuthenticated ? {onAuthenticated: async () => { calls.push(['authenticated']); if (overrides.authenticatedError) throw overrides.authenticatedError; }} : {})
     };
     return {controller: AuthUI.create(deps), root, nodes, toolbar, nav, classes, calls};
   }
@@ -99,6 +100,15 @@ const AuthUI = require('../01_app/assets/core/auth-ui-controller.js');
   assert.equal(h.nodes.loginPassword.value, '');
   assert.equal(h.nodes.loginMessage.textContent, '');
   assert.equal(h.controller.isLoggedIn(), true);
+
+  h = harness({responses: {'/api/login': {state: {user: {name: 'resume-user'}}}}, onAuthenticated: true});
+  await h.controller.login();
+  assert.deepEqual(h.calls.map(call => call[0]), ['request','state','refresh','authenticated','show']);
+
+  h = harness({responses: {'/api/login': {state: {user: {name: 'resume-user'}}}}, onAuthenticated: true, authenticatedError: new Error('resume unavailable')});
+  await h.controller.login();
+  assert.equal(h.nodes.loginMessage.textContent, '', 'background discovery failure does not invalidate a successful login');
+  assert.equal(h.calls.some(call => call[0] === 'show'), true);
 
   h = harness({responses: {'/api/login': new Error('bad login')}});
   h.nodes.loginPassword.value = 'secret';

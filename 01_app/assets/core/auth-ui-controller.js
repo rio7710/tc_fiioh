@@ -23,6 +23,10 @@
     let activeAccount = null;
     let mountedRoot = null;
     let elements = null;
+    const notifyAuthenticated = async () => {
+      if (typeof deps.onAuthenticated !== 'function') return;
+      try { await deps.onAuthenticated(); } catch (_) {}
+    };
 
     function resolveRoot(root) {
       const value = root || deps.getRoot();
@@ -94,6 +98,7 @@
         deps.setDemoState(result.state);
         setAccess(true, result.state);
         await deps.refreshProjectIndex();
+        await notifyAuthenticated();
         deps.showStep('index');
       } catch (error) {
         nodes.loginMessage.textContent = error.message;
@@ -120,6 +125,7 @@
         deps.setDemoState(result.state);
         setAccess(true, result.state);
         await deps.refreshProjectIndex();
+        await notifyAuthenticated();
         deps.showStep('index');
       } catch (error) {
         nodes.registerMessage.textContent = error.message;

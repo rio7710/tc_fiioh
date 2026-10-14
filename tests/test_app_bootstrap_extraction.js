@@ -8,10 +8,10 @@ const bootstrap = fs.readFileSync(bootstrapPath, 'utf8');
 assert.ok(shell.split(/\r?\n/).length <= 400, 'P1 remains a compact root shell of at most 400 lines');
 assert.equal((shell.match(/<style\b/gi) || []).length, 0, 'P1 has no inline style blocks');
 assert.equal((shell.match(/<script(?![^>]*\bsrc=)[^>]*>/g) || []).length, 0, 'P1 has no inline executable script');
-assert.equal((shell.match(/app-shell\.css\?v=20261014_v88/g) || []).length, 1, 'P1 loads app shell CSS once');
-assert.equal((shell.match(/app-bootstrap\.js\?v=20261014_v84/g) || []).length, 1, 'P1 loads one cache-busted bootstrap asset');
-assert.match(shell, /<script src="\/01_app\/assets\/core\/app-bootstrap\.js\?v=20261014_v84"><\/script>/);
-assert.match(shell, /<script src="\/01_app\/assets\/core\/app-bootstrap\.js\?v=20261014_v84"><\/script>\s*<\/body>/, 'bootstrap is the final shell executable entrypoint');
+assert.equal((shell.match(/app-shell\.css\?v=20261014_v89/g) || []).length, 1, 'P1 loads app shell CSS once');
+assert.equal((shell.match(/app-bootstrap\.js\?v=20261014_v85/g) || []).length, 1, 'P1 loads one cache-busted bootstrap asset');
+assert.match(shell, /<script src="\/01_app\/assets\/core\/app-bootstrap\.js\?v=20261014_v85"><\/script>/);
+assert.match(shell, /<script src="\/01_app\/assets\/core\/app-bootstrap\.js\?v=20261014_v85"><\/script>\s*<\/body>/, 'bootstrap is the final shell executable entrypoint');
 
 const requiredMountPoints = [
   'step01LoginContainer',
@@ -42,7 +42,7 @@ const shellIds = [...shell.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
 assert.equal(new Set(shellIds).size, shellIds.length, 'root shell IDs remain unique');
 
 assert.match(bootstrap, /^\(async\(\)=>\{/);
-assert.match(bootstrap, /async function boot\(\)\{await ensureStepPartialsLoaded\(\);await ensureStep4Loaded\(\);await initDemo\(\);await restoreLoginSession\(\);scriptGenerationController\.resume\(\)\.catch/);
+assert.match(bootstrap, /async function boot\(\)\{await ensureStepPartialsLoaded\(\);await ensureStep4Loaded\(\);await initDemo\(\);await restoreLoginSession\(\);if\(authUIController\.isLoggedIn\(\)\)scriptGenerationController\.discover\(\)\.catch/);
 assert.match(bootstrap, /\}\)\(\)\.catch\(error=>\{/);
 assert.match(bootstrap, /const stepPartialDefinitions=\[/);
 assert.match(bootstrap, /const workflowProgressController=ThinkCastWorkflowProgressController\.create/);

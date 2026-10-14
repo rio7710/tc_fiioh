@@ -2814,6 +2814,17 @@ def enqueue_script_job(user_id: str, project_id: str) -> dict:
     return job
 
 
+def latest_active_script_job(user_id: str, project_id: str = "") -> dict:
+    """Return the newest queued/running script job owned by the user."""
+    jobs = [
+        job for job in get_script_job_store().list()
+        if job.get("status") in {"queued", "running"}
+        and job.get("input", {}).get("user_id") == user_id
+        and (not project_id or job.get("project_id") == project_id)
+    ]
+    return max(jobs, key=lambda job: str(job.get("updated_at", "")), default=None)
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         self._byte_range = None
@@ -3386,6 +3397,21 @@ class Handler(SimpleHTTPRequestHandler):
                 "error": job.get("error"), "created_at": job["created_at"],
                 "updated_at": job["updated_at"],
             })
+            return
+        if parsed.path == "/api/script/active-job":
+            user = self.current_user()
+            if not user:
+                self.send_json(401, {"error": "로그인 후 이용해 주세요."}); return
+            project_id = str(parse_qs(parsed.query).get("project_id", [""])[0]).strip()
+            job = latest_active_script_job(user["user_id"], project_id)
+            if not job:
+                self.send_json(200, {"ok": True, "job": None}); return
+            self.send_json(200, {"ok": True, "job": {
+                "job_id": job["job_id"], "project_id": job["project_id"],
+                "status": job["status"], "attempt": job["attempt"],
+                "progress": job.get("progress") or {},
+                "created_at": job["created_at"], "updated_at": job["updated_at"],
+            }})
             return
         super().do_GET()
 
