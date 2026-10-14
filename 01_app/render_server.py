@@ -37,6 +37,7 @@ from automation_store import AutomationStore, VersionConflict, validate_config, 
 from visual_decisions import VisualDecisions, DecisionConflict
 from staged_ffmpeg_renderer import StagedRenderDependencies, render_video_staged
 from final_export_queue import FinalExportConflict, FinalExportNotFound, FinalExportQueue
+from worker_core import JobConflict, JobNotFound, JobStore
 kling_submission_lock = threading.Lock()
 from keyword_pool import load_month_pool, normalize_keyword_label
 from tools.unified_content_prompt_harness import normalize_reference_asset_metadata, run_generation_harness
@@ -73,6 +74,10 @@ PROJECT_KLING_JOBS_FILE = Path(os.environ.get("PROJECT_KLING_JOBS_PATH", str(APP
 VOICE_ARTIFACT_DIR = Path(os.environ.get("VOICE_ARTIFACT_DIR", str(ROOT / "02_media" / "generated" / "voice")))
 STORYBOARD_IMAGE_DIR = Path(os.environ.get("STORYBOARD_IMAGE_DIR", str(ROOT / "02_media" / "generated" / "storyboard")))
 BRAND_ASSET_DIR = Path(os.environ.get("BRAND_ASSET_DIR", str(ROOT / "02_media" / "generated" / "brand")))
+SCRIPT_JOB_STORE_PATH = Path(os.environ.get("SCRIPT_JOB_STORE_PATH", str(SQLITE_PATH.with_name("script_generation_jobs.json"))))
+script_job_store = None
+script_job_store_lock = threading.Lock()
+script_job_executor = ThreadPoolExecutor(max_workers=max(1, int(os.environ.get("SCRIPT_JOB_CONCURRENCY", "1"))))
 KLING_I2V_HARNESS = (
     "Animate only this exact source frame as one continuous shot. Perform only the single primary action described above, "
     "using restrained, low-amplitude, physically plausible motion continuously from the beginning through the end. "
@@ -189,6 +194,22 @@ def get_final_export_queue():
             queue_path = Path(os.environ.get("FINAL_EXPORT_QUEUE_PATH", str(SQLITE_PATH)))
             final_export_queue_instance = FinalExportQueue(queue_path)
         return final_export_queue_instance
+
+
+def get_script_job_store():
+    global script_job_store
+    pending = []
+    with script_job_store_lock:
+        if script_job_store is None:
+            script_job_store = JobStore(SCRIPT_JOB_STORE_PATH)
+            recovered = script_job_store.recover_stale()
+            for job in recovered:
+                pending.append(script_job_store.retry(job["job_id"])["job_id"])
+            pending.extend(job["job_id"] for job in script_job_store.list(status="queued"))
+        queue = script_job_store
+    for job_id in dict.fromkeys(pending):
+        script_job_executor.submit(_run_script_job, job_id)
+    return queue
 
 
 def sync_default_group_resources(user_id):
@@ -1211,7 +1232,8 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage):
                   }}
 
 
-def openai_unified_storyboard(api_key, selected_labels, resources, previous_documents, script_plan=None):
+def openai_unified_storyboard(api_key, selected_labels, resources, previous_documents, script_plan=None,
+                              progress_callback=None):
     if not api_key:
         raise ValueError("OpenAI API 키가 연결되지 않았습니다.")
     model = os.environ.get("OPENAI_SCRIPT_MODEL", "gpt-5.6-luna")
@@ -1277,6 +1299,7 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
         },
         locked_plan=script_plan,
         canonical_reference_assets=group_reference_asset_catalog(resources),
+        progress_callback=progress_callback,
     )
     usage = {
         key: sum(int(item.get("usage", {}).get(key, 0)) for item in responses)
@@ -2561,6 +2584,140 @@ def execute_render_request(user_id: str, payload: dict, progress_callback=None) 
             render_lock.release()
 
 
+def execute_script_generation(user_id: str, project_id: str, progress_callback=None) -> dict:
+    """Generate and persist STEP 03 without depending on an HTTP connection."""
+    store = get_auth_store()
+    project = store.get_project(user_id, project_id)
+    if not project:
+        raise ValueError("작업할 프로젝트를 인덱스에서 다시 선택해 주세요.")
+    keyword_revision = store.latest_stage_data(user_id, project_id, 2)
+    labels = list((keyword_revision or {}).get("data", {}).get("selected_keywords", []))
+    selected_ids = list((keyword_revision or {}).get("data", {}).get("selected_keyword_ids", []))
+    if not 1 <= len(labels) <= 5:
+        raise ValueError("먼저 STEP 02에서 키워드 1~5개를 저장해 주세요.")
+    existing_content = store.latest_stage_data(user_id, project_id, 3)
+    existing_document = (existing_content or {}).get("data", {}).get("document")
+    existing_keywords = ((existing_document or {}).get("project", {}).get("selected_keywords", [])
+                         if isinstance(existing_document, dict) else [])
+    if existing_keywords == labels:
+        media_inheritance = store.inherit_compatible_media_artifacts(
+            user_id, project_id, existing_content["revision_id"]
+        )
+        script, timeline = unified_document_view(existing_document)
+        return {"ok": True, "state": {"selected_keywords": selected_ids, "script": script},
+                "document": existing_document, "timeline": timeline,
+                "generation": {"project_id": project_id, "content_uuid": project_id, "reused": True,
+                               "revision_id": existing_content["revision_id"],
+                               "message": "같은 키워드의 저장된 최종대본을 불러왔습니다.",
+                               "media_inheritance": media_inheritance,
+                               "usage": store.usage_summary(user_id, project_id)}}
+    resource_types = (
+        "default_asset_manifest", "reference_library", "prompt_contract",
+        "canonical_storyboard_spec", "prompt_guidance_source",
+        "human_storyboard_reference", "test_content_sample",
+    )
+    resources = store.project_group_resources(user_id, project_id, resource_types)
+    previous_documents = store.recent_group_documents(user_id, project_id, labels)
+    script_plan_data = store.latest_script_plan(user_id, project_id, labels)
+    if not script_plan_data:
+        raise ValueError("먼저 1차 대본을 작성해 주세요.")
+    if progress_callback:
+        progress_callback({"phase": "context_ready", "percent": 20,
+                           "detail": "키워드·레퍼런스·1차 대본을 불러왔습니다."})
+    generated, openai_response = openai_unified_storyboard(
+        provider_values("openai").get("api_key", ""), labels, resources,
+        previous_documents, script_plan_data["plan"], progress_callback=progress_callback,
+    )
+    document = generated["document"]
+    script, timeline = unified_document_view(document)
+    if progress_callback:
+        progress_callback({"phase": "persisting", "percent": 95,
+                           "detail": "검증된 대본과 콘티를 프로젝트에 저장하고 있습니다.",
+                           "repair_count": generated["repair_count"],
+                           "regeneration_count": generated.get("regeneration_count", 0)})
+    candidate = store.save_stage_candidate(user_id, project_id, 3, {
+        "document": document, "script": script, "selected_keywords": labels,
+        "group_id": project["group_id"], "resource_ids": [item["resource_id"] for item in resources],
+        "repair_count": generated["repair_count"], "maximum_similarity": generated["maximum_similarity"],
+    })
+    draft = store.save_stage_draft(user_id, project_id, 3, {
+        "document": document, "script": script, "timeline": timeline,
+        "selected_keywords": labels, "selected_keyword_ids": selected_ids,
+        "candidate_id": candidate["candidate_id"], "group_id": project["group_id"],
+        "resource_ids": [item["resource_id"] for item in resources], "voice_profile": "warm_female",
+    })
+    store.update_project_name(user_id, project_id, script["headline"])
+    store.record_api_usage(user_id, project_id, "openai", str(openai_response.get("model", "")),
+                           "group_referenced_script_generation", str(openai_response.get("id", "")),
+                           openai_response.get("usage", {}))
+    generation = {
+        "project_id": project_id, "group_id": project["group_id"],
+        "candidate_id": candidate["candidate_id"], "revision_id": draft["revision_id"],
+        "resource_count": len(resources), "resource_types": sorted({item["resource_type"] for item in resources}),
+        "document_id": document["document_id"], "schema_version": document["schema_version"],
+        "scene_count": len(document["production"]["timeline"]["scenes"]),
+        "repair_count": generated["repair_count"], "usage": store.usage_summary(user_id, project_id),
+    }
+    return {"ok": True, "state": {"selected_keywords": selected_ids, "script": script},
+            "document": document, "timeline": timeline, "generation": generation}
+
+
+def _run_script_job(job_id: str) -> None:
+    queue = get_script_job_store()
+    worker_id = f"script-api-{os.getpid()}-{threading.get_ident()}"
+    try:
+        job = queue.claim(job_id, worker_id, lease_seconds=1800)
+    except JobConflict:
+        return
+    stop = threading.Event()
+    def heartbeat():
+        while not stop.wait(60):
+            try:
+                queue.heartbeat(job_id, worker_id, lease_seconds=1800)
+            except (JobConflict, JobNotFound):
+                return
+    threading.Thread(target=heartbeat, daemon=True).start()
+    try:
+        queue.update_progress(job_id, worker_id, {
+            "phase": "starting", "percent": 5, "detail": "대본 생성 작업을 시작했습니다."
+        })
+        def progress(values):
+            queue.update_progress(job_id, worker_id, values)
+        result = execute_script_generation(job["input"]["user_id"], job["project_id"], progress)
+        queue.update_progress(job_id, worker_id, {
+            "phase": "completed", "percent": 100, "detail": "대본과 콘티 저장이 완료됐습니다."
+        })
+        queue.transition(job_id, "succeeded", result=result)
+    except Exception as exc:
+        log_script_generation_failure(job["project_id"], exc)
+        safe = str(exc) if isinstance(exc, (ValueError, RuntimeError)) else "대본 생성을 완료하지 못했습니다."
+        queue.transition(job_id, "failed", error={
+            "code": type(exc).__name__, "message": safe[:500]
+        })
+    finally:
+        stop.set()
+
+
+def enqueue_script_job(user_id: str, project_id: str) -> dict:
+    store = get_auth_store()
+    project = store.get_project(user_id, project_id)
+    if not project:
+        raise ValueError("작업할 프로젝트를 인덱스에서 다시 선택해 주세요.")
+    keywords = store.latest_stage_data(user_id, project_id, 2)
+    revision_id = str((keywords or {}).get("revision_id") or "")
+    if not revision_id:
+        raise ValueError("먼저 STEP 02에서 키워드를 저장해 주세요.")
+    queue = get_script_job_store()
+    job = queue.create(project_id, "script_generate", {
+        "user_id": user_id, "keyword_revision_id": revision_id,
+    })
+    if job["status"] in {"failed", "stale"}:
+        job = queue.retry(job["job_id"])
+    if job["status"] == "queued":
+        script_job_executor.submit(_run_script_job, job["job_id"])
+    return job
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         self._byte_range = None
@@ -3114,6 +3271,25 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_json(404, {"error": "변환 작업을 찾을 수 없습니다."})
                 return
             self.send_json(200, {"ok": True, "job_id": job_id, **job})
+            return
+        if parsed.path == "/api/script/job-status":
+            user = self.current_user()
+            if not user:
+                self.send_json(401, {"error": "로그인 후 이용해 주세요."}); return
+            job_id = str(parse_qs(parsed.query).get("job_id", [""])[0]).strip()
+            try:
+                job = get_script_job_store().get(job_id)
+            except JobNotFound:
+                self.send_json(404, {"error": "대본 생성 작업을 찾을 수 없습니다."}); return
+            if job.get("input", {}).get("user_id") != user["user_id"]:
+                self.send_json(404, {"error": "대본 생성 작업을 찾을 수 없습니다."}); return
+            self.send_json(200, {
+                "ok": True, "job_id": job_id, "project_id": job["project_id"],
+                "status": job["status"], "attempt": job["attempt"],
+                "progress": job.get("progress") or {}, "response": job.get("result"),
+                "error": job.get("error"), "created_at": job["created_at"],
+                "updated_at": job["updated_at"],
+            })
             return
         super().do_GET()
 
@@ -3711,6 +3887,21 @@ class Handler(SimpleHTTPRequestHandler):
                 })
             except (ValueError, RuntimeError) as exc:
                 self.send_json(400 if isinstance(exc, ValueError) else 502, {"error": str(exc)})
+            return
+        if self.path == "/api/script/jobs":
+            user = self.current_user()
+            if not user:
+                self.send_json(401, {"error": "로그인 후 이용해 주세요."}); return
+            try:
+                payload = self.read_json()
+                job = enqueue_script_job(user["user_id"], str(payload.get("project_id", "")).strip())
+                self.send_json(202, {
+                    "ok": True, "job_id": job["job_id"], "project_id": job["project_id"],
+                    "status": job["status"], "attempt": job["attempt"],
+                    "progress": job.get("progress") or {},
+                })
+            except (ValueError, JobConflict) as exc:
+                self.send_json(400 if isinstance(exc, ValueError) else 409, {"error": str(exc)})
             return
         if self.path.startswith("/api/"):
             if IS_RENDER_HOSTED and not self.has_site_auth():

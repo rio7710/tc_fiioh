@@ -927,7 +927,12 @@ def run_generation_harness(
     provenance: dict[str, Any] | None = None,
     locked_plan: dict[str, Any] | None = None,
     canonical_reference_assets: dict[str, dict[str, Any]] | None = None,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
+    def report(phase: str, **values: Any) -> None:
+        if progress_callback:
+            progress_callback({"phase": phase, **values})
+
     def complete_provenance(document: dict[str, Any]) -> dict[str, Any]:
         document = normalize_document_shape(document)
         document = normalize_reference_asset_metadata(document, canonical_reference_assets)
@@ -1027,7 +1032,9 @@ def run_generation_harness(
 
     previous_documents = previous_documents or []
     prompt = build_prompt(selected_keywords, source_material, previous_documents, reference_material)
+    report("generation_requested", percent=30, detail="GPT에 콘티 생성을 요청했습니다.", repair_count=0, regeneration_count=0)
     candidate = generate(prompt)
+    report("response_received", percent=55, detail="GPT 응답을 수신해 검증하고 있습니다.", repair_count=0, regeneration_count=0)
     repair_count = 0
     repairs_in_generation = 0
     regeneration_count = 0
@@ -1038,6 +1045,12 @@ def run_generation_harness(
             break
         except (UnifiedContentError, KeyError, TypeError, ValueError) as validation_error:
             if repairs_in_generation < MAX_VALIDATION_REPAIRS:
+                report(
+                    "repair_requested", percent=60 + repairs_in_generation * 5,
+                    detail=f"검증 보정 {repairs_in_generation + 1}/{MAX_VALIDATION_REPAIRS} 요청 중",
+                    repair_count=repair_count + 1, regeneration_count=regeneration_count,
+                    validation_error=str(validation_error)[:300],
+                )
                 candidate = generate(build_repair_prompt(candidate, validation_error, locked_plan))
                 repair_count += 1
                 repairs_in_generation += 1
@@ -1047,6 +1060,10 @@ def run_generation_harness(
             # Repeatedly patching a malformed structure tends to preserve the
             # same defect.  Discard it after three repairs and ask for one
             # completely new document from the original request instead.
+            report(
+                "regeneration_requested", percent=76, detail="기존 후보를 폐기하고 새 콘티를 생성하고 있습니다.",
+                repair_count=repair_count, regeneration_count=regeneration_count + 1,
+            )
             candidate = generate(prompt)
             regeneration_count += 1
             repairs_in_generation = 0
@@ -1065,6 +1082,7 @@ def run_generation_harness(
             pass
     if persist:
         persist(document)
+    report("validated", percent=90, detail="스키마와 장면 연속성 검증을 통과했습니다.", repair_count=repair_count, regeneration_count=regeneration_count)
     return {
         "document": document,
         "repair_count": repair_count,

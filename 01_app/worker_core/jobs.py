@@ -187,6 +187,7 @@ class JobStore:
             "worker_id": None,
             "result": None,
             "error": None,
+            "progress": {"phase": "queued", "percent": 0, "detail": "작업 대기 중"},
         }
         with self._guard():
             document = self._read()
@@ -239,6 +240,41 @@ class JobStore:
     def get(self, job_id: str) -> dict[str, Any]:
         with self._guard():
             return self._copy_job(self._job(self._read(), job_id))
+
+    def update_progress(
+        self, job_id: str, worker_id: str, progress: Mapping[str, Any],
+        *, now: datetime | str | None = None,
+    ) -> dict[str, Any]:
+        """Persist safe observable progress while one worker owns the job."""
+        progress_copy = _json_copy(dict(progress), "progress")
+        progress_copy.pop("status", None)
+        current = _timestamp(now)
+        with self._guard():
+            document = self._read()
+            job = self._job(document, job_id)
+            if job["status"] != "running" or job.get("worker_id") != worker_id:
+                raise JobConflict(f"job {job_id} is not owned by {worker_id}")
+            job["progress"] = progress_copy
+            job["updated_at"] = current
+            self._write(document)
+            return self._copy_job(job)
+
+    def heartbeat(
+        self, job_id: str, worker_id: str, *, lease_seconds: float = 300,
+        now: datetime | str | None = None,
+    ) -> dict[str, Any]:
+        if lease_seconds <= 0:
+            raise JobValidationError("lease_seconds must be positive")
+        current = _timestamp(now)
+        expires = _timestamp(_instant(current) + timedelta(seconds=lease_seconds))
+        with self._guard():
+            document = self._read()
+            job = self._job(document, job_id)
+            if job["status"] != "running" or job.get("worker_id") != worker_id:
+                raise JobConflict(f"job {job_id} is not owned by {worker_id}")
+            job.update(updated_at=current, lease_expires_at=expires)
+            self._write(document)
+            return self._copy_job(job)
 
     def list(self, *, status: str | None = None) -> list[dict[str, Any]]:
         if status is not None and status not in STATUSES:
@@ -320,6 +356,7 @@ class JobStore:
                 worker_id=None,
                 result=None,
                 error=None,
+                progress={"phase": "queued", "percent": 0, "detail": "재시도 대기 중"},
             )
             self._write(document)
             return self._copy_job(job)

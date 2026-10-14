@@ -86,6 +86,22 @@ class WorkerJobCoreTests(unittest.TestCase):
         self.assertEqual(retried["idempotency_key"], failed["idempotency_key"])
         self.assertEqual(retried["input_hash"], failed["input_hash"])
 
+    def test_running_job_persists_progress_and_heartbeat(self):
+        job = self.create()
+        self.store.claim(job["job_id"], "worker-a", now=NOW, lease_seconds=10)
+        updated = self.store.update_progress(
+            job["job_id"], "worker-a",
+            {"phase": "provider_wait", "percent": 35, "detail": "GPT 응답 대기", "status": "ignored"},
+            now="2026-10-06T00:00:02+00:00",
+        )
+        self.assertEqual(updated["progress"]["phase"], "provider_wait")
+        self.assertNotIn("status", updated["progress"])
+        heartbeat = self.store.heartbeat(
+            job["job_id"], "worker-a", lease_seconds=30,
+            now="2026-10-06T00:00:05+00:00",
+        )
+        self.assertEqual(heartbeat["lease_expires_at"], "2026-10-06T00:00:35+00:00")
+
     def test_dispatch_stops_at_bounded_attempt_limit_without_adapter_replay(self):
         adapter = FixtureAdapter(failure=RuntimeError("retryable failure"))
         first = self.store.dispatch(

@@ -98,7 +98,23 @@
         activePhase = 1; roles[1].classList.add('active'); roles[1].querySelector('.ai-role-state').textContent = '요청 전송';
         progress.classList.remove('indeterminate'); progress.style.width = '33%';
         summary.textContent = '1차 대본이 저장됐습니다. 장소 이동과 씬 연속성을 설계합니다.';
-        const generated = await deps.request('/api/script/generate', {method:'POST',body:JSON.stringify({project_id:projectId})});
+        const queued = await deps.request('/api/script/jobs', {method:'POST',body:JSON.stringify({project_id:projectId})});
+        let generated = null;
+        while (!generated) {
+          await deps.sleep(1000);
+          const job = await deps.request(`/api/script/job-status?job_id=${encodeURIComponent(queued.job_id)}`);
+          const jobProgress = job.progress || {};
+          const percent = Math.max(33, Math.min(99, Number(jobProgress.percent) || 33));
+          progress.classList.remove('indeterminate'); progress.style.width = `${percent}%`;
+          nowNode.textContent = `${jobProgress.detail || '대본·콘티 생성 중'} · ${formatElapsed()}`;
+          const repairCount = Number(jobProgress.repair_count || 0);
+          const regenerationCount = Number(jobProgress.regeneration_count || 0);
+          foot.textContent = `작업 ${job.job_id.slice(0,8)} · 시도 ${job.attempt} · 보정 ${repairCount}/3 · 신규 재생성 ${regenerationCount}/1`;
+          roles[1].querySelector('.ai-role-state').textContent = `${jobProgress.phase || job.status} · ${percent}%`;
+          if (job.status === 'failed') throw new Error(job.error?.message || '대본 생성 작업이 실패했습니다.');
+          if (job.status === 'cancelled') throw new Error('대본 생성 작업이 취소됐습니다.');
+          if (job.status === 'succeeded') generated = job.response;
+        }
         stopWaiting();
         roles[1].classList.remove('active'); roles[1].classList.add('done'); roles[1].querySelector('.ai-role-state').textContent = '완료';
         activePhase = 2; roles[2].classList.add('active'); progress.style.width = '66%';
