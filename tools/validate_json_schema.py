@@ -90,6 +90,8 @@ def validate_json_schema(value: Any, schema: dict[str, Any], root: dict[str, Any
     if isinstance(value, str):
         if len(value) < int(schema.get("minLength", 0)):
             raise JsonSchemaError(f"{path}: string is too short")
+        if "maxLength" in schema and len(value) > int(schema["maxLength"]):
+            raise JsonSchemaError(f"{path}: string is too long")
         if "pattern" in schema and not re.search(schema["pattern"], value):
             raise JsonSchemaError(f"{path}: string does not match pattern")
     if isinstance(value, (int, float)) and not isinstance(value, bool):

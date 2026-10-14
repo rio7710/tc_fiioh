@@ -530,6 +530,10 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertIn("'slow_push'", str(raised.exception))
         self.assertIn("'dolly_in'", str(raised.exception))
 
+    def test_json_schema_enforces_string_max_length(self):
+        with self.assertRaisesRegex(JsonSchemaError, "string is too long"):
+            validate_json_schema("열네글자제한을반드시넘기는긴문장", {"type": "string", "maxLength": 13})
+
     def test_rejects_conflicting_root_and_production_timeline(self):
         value = document(["안심"])
         value["timeline"] = {"scenes": []}

@@ -1232,6 +1232,30 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage):
                   }}
 
 
+def validated_script_plan(store, user_id, project_id, selected_labels, resources):
+    """Reuse a valid saved plan or replace a legacy plan that violates the contract."""
+    saved = store.latest_script_plan(user_id, project_id, selected_labels)
+    if not saved:
+        return None, False
+    try:
+        validate_script_plan(saved["plan"], human_storyboard_reference_context(resources))
+        return saved, False
+    except (JsonSchemaError, TypeError, ValueError):
+        plan, response = openai_script_plan(
+            provider_values("openai").get("api_key", ""), selected_labels, resources,
+            store.recent_group_visual_usage(user_id, project_id),
+        )
+        store.save_stage_candidate(user_id, project_id, 3, {
+            "kind": "script_plan", "schema_version": "1.0.0",
+            "selected_keywords": selected_labels, "plan": plan,
+        })
+        store.record_api_usage(
+            user_id, project_id, "openai", str(response.get("model", "")),
+            "script_plan_validation_recovery", str(response.get("id", "")), response.get("usage", {}),
+        )
+        return {"plan": plan}, True
+
+
 def openai_unified_storyboard(api_key, selected_labels, resources, previous_documents, script_plan=None,
                               progress_callback=None):
     if not api_key:
@@ -2618,12 +2642,13 @@ def execute_script_generation(user_id: str, project_id: str, progress_callback=N
     )
     resources = store.project_group_resources(user_id, project_id, resource_types)
     previous_documents = store.recent_group_documents(user_id, project_id, labels)
-    script_plan_data = store.latest_script_plan(user_id, project_id, labels)
+    script_plan_data, plan_recovered = validated_script_plan(
+        store, user_id, project_id, labels, resources)
     if not script_plan_data:
         raise ValueError("먼저 1차 대본을 작성해 주세요.")
     if progress_callback:
         progress_callback({"phase": "context_ready", "percent": 20,
-                           "detail": "키워드·레퍼런스·1차 대본을 불러왔습니다."})
+                           "detail": "잘못된 1차 대본을 재검증·복구했습니다." if plan_recovered else "키워드·레퍼런스·1차 대본을 불러왔습니다."})
     generated, openai_response = openai_unified_storyboard(
         provider_values("openai").get("api_key", ""), labels, resources,
         previous_documents, script_plan_data["plan"], progress_callback=progress_callback,
@@ -3996,11 +4021,12 @@ class Handler(SimpleHTTPRequestHandler):
                     if not claim_script_generation(project_id):
                         raise ConflictError("이 콘텐츠의 최종대본 요청 1건이 이미 처리 중입니다. 현재 모달에서 완료를 기다려 주세요.")
                     try:
-                        script_plan_data = get_auth_store().latest_script_plan(
-                            user["user_id"], project_id, labels)
+                        script_plan_data, plan_recovered = validated_script_plan(
+                            get_auth_store(), user["user_id"], project_id, labels, resources)
                         if self.path == "/api/script/plan":
                             if script_plan_data:
-                                self.send_json(200, {"ok": True, "plan": script_plan_data["plan"], "reused": True})
+                                self.send_json(200, {"ok": True, "plan": script_plan_data["plan"],
+                                                     "reused": not plan_recovered, "recovered": plan_recovered})
                                 return
                             plan, plan_response = openai_script_plan(
                                 provider_values("openai").get("api_key", ""), labels, resources,
