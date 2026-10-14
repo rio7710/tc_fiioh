@@ -16,8 +16,11 @@ assert.equal(new Set(ids).size, ids.length, 'user settings partial contains no d
 assert.doesNotMatch(shell, /id="userSettingsDialog"|id="userChannelKeyDialog"/);
 assert.match(shell, /<div id="userSettingsContainer"><\/div>/);
 assert.match(bootstrap, /container:'#userSettingsContainer',path:'\/01_app\/pages\/components\/user-settings\.html'/);
-assert.match(shell, /user-settings-controller\.js\?v=20261009_v78/);
+assert.match(shell, /automation-progress-model\.js\?v=20261014_v1/);
+assert.match(shell, /automation-control-panel\.js\?v=20261014_v1/);
+assert.match(shell, /user-settings-controller\.js\?v=20261014_v79/);
 assert.match(bootstrap, /ThinkCastUserSettingsController\.create\(/);
+assert.match(bootstrap, /ThinkCastAutomationControlPanel\.create\(/);
 assert.match(bootstrap, /userSettingsController\.mount\(\)/);
 assert.doesNotMatch(`${shell}\n${bootstrap}`, /Server-owned automation settings|function collectAutomationConfig|function mutateAutomation|keywordRequestGeneration/);
 assert.match(controller, /function collectAutomationConfig/);

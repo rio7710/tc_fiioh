@@ -1,12 +1,14 @@
 const assert = require('node:assert/strict');
 const UserSettings = require('../01_app/assets/core/user-settings-controller.js');
+const AutomationPanel = require('../01_app/assets/core/automation-control-panel.js');
+const AutomationProgress = require('../01_app/assets/core/automation-progress-model.js');
 
 function makeElement(id = '') {
   const listeners = new Map();
   const children = [];
   const element = {
     id, listeners, children, dataset: {}, style: {setProperty() {}, overflow: ''}, classList: {toggle() {}},
-    type: ['userAiKeywords','userUseIntro','userUseOutro','userUseWatermark'].includes(id) ? 'checkbox' : 'text',
+    type: ['userAiKeywords','userUseIntro','userUseOutro','userUseWatermark','userAutomationToggle'].includes(id) ? 'checkbox' : 'text',
     value: id.includes('Count') ? '3' : id.includes('Interval') ? '1' : id.includes('SceneCount') ? '0' : '',
     checked: id === 'userAiKeywords', hidden: false, disabled: false, inert: false, open: false, textContent: '',
     addEventListener(type, listener) { if (!listeners.has(type)) listeners.set(type, []); listeners.get(type).push(listener); },
@@ -68,7 +70,8 @@ function harness(options = {}) {
     clearInterval(timer) { cleared.push(timer); },
     onError(feature, error) { errors.push([feature, error]); },
     authUI: {isLoggedIn: () => true, getActiveAccount: () => ({user: {id: 'user-1'}})},
-    storage: {getItem: () => null}
+    storage: {getItem: () => null},
+    automationPanel: {create: panelOptions => AutomationPanel.create({...panelOptions, model: snapshot => AutomationProgress.view(snapshot)})}
   });
   return {controller, root, get, requests, intervals, cleared, errors};
 }
@@ -89,12 +92,19 @@ assert.equal(fixture.get('#userSettingsOpen').listeners.get('click').length, 1, 
   const stageButton = fixture.get('#userAutomationStages').children[0];
   assert.equal(stageButton.listeners.get('click').length, 1, 'dynamic stage listener is tracked');
 
+  const automaticStage = fixture.get('#userAutomationStages').children[1];
+  await automaticStage.emit('click');
+  fixture.get('#userAutomationToggle').checked = true;
+  await fixture.get('#userAutomationToggle').emit('change');
+  const startPost = fixture.requests.find(([, options]) => options?.method === 'POST' && JSON.parse(options.body).action === 'start');
+  assert.ok(startPost, 'left automation switch starts through the existing automation API');
+
   fixture.get('#userChannelKeyInput').value = 'secret';
   await fixture.get('#userChannelKeyClose').emit('click');
   assert.equal(fixture.get('#userChannelKeyInput').value, '', 'channel key is cleared on close');
 
   await fixture.get('#userSettingsSave').emit('click');
-  const post = fixture.requests.find(([, options]) => options?.method === 'POST');
+  const post = fixture.requests.find(([, options]) => options?.method === 'POST' && JSON.parse(options.body).action === 'save');
   assert.ok(post, 'save dispatches automation POST');
   assert.equal(JSON.parse(post[1].body).request_id, 'request-id');
   assert.equal(JSON.parse(post[1].body).action, 'save');
@@ -124,5 +134,12 @@ assert.equal(fixture.get('#userSettingsOpen').listeners.get('click').length, 1, 
   assert.equal(stale.get('#userUseIntro').checked, false, 'missing intro clears stale enabled setting');
   assert.equal(stale.get('#userUseIntro').disabled, true, 'missing intro cannot be selected');
   assert.equal(stale.get('#userUseOutro').disabled, false, 'available outro remains selectable');
+
+  const closeOnly = harness();
+  closeOnly.controller.mount();
+  await closeOnly.get('#userSettingsOpen').emit('click');
+  await closeOnly.get('#userAutomationStages').children[1].emit('click');
+  await closeOnly.get('#userSettingsClose').emit('click');
+  assert.equal(closeOnly.requests.some(([, options]) => options?.method === 'POST' && JSON.parse(options.body).action === 'start'), false, 'closing settings never starts automation implicitly');
   console.log('User settings controller tests passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

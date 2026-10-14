@@ -719,7 +719,7 @@ async function ensureStep4Loaded() {
 
 async function boot(){await ensureStepPartialsLoaded();await ensureStep4Loaded();await initDemo();await restoreLoginSession();scriptGenerationController.resume().catch(error=>console.warn('[ScriptGeneration:resume]',error))}
 boot();
-const userSettingsController=ThinkCastUserSettingsController.create({getRoot:()=>document,request:(...args)=>api(...args),getIndexProjects:()=>indexProjects,refreshProjectIndex,confirm:message=>window.confirm(message),fetch:(...args)=>fetch(...args),createObjectURL:blob=>URL.createObjectURL(blob),revokeObjectURL:url=>URL.revokeObjectURL(url),createRequestId:()=>crypto.randomUUID(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:timer=>clearInterval(timer),onError:(feature,error)=>console.warn(`[UserSettings:${feature}]`,error),authUI:authUIController,storage:localStorage});
+const userSettingsController=ThinkCastUserSettingsController.create({getRoot:()=>document,request:(...args)=>api(...args),getIndexProjects:()=>indexProjects,refreshProjectIndex,confirm:message=>window.confirm(message),fetch:(...args)=>fetch(...args),createObjectURL:blob=>URL.createObjectURL(blob),revokeObjectURL:url=>URL.revokeObjectURL(url),createRequestId:()=>crypto.randomUUID(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:timer=>clearInterval(timer),onError:(feature,error)=>console.warn(`[UserSettings:${feature}]`,error),authUI:authUIController,storage:localStorage,automationPanel:{create:options=>ThinkCastAutomationControlPanel.create({...options,model:snapshot=>ThinkCastAutomationProgressModel.view(snapshot)})}});
 userSettingsController.mount();
 })().catch(error=>{
   console.error(error);
