@@ -6,7 +6,7 @@ const bootstrap = fs.readFileSync('01_app/assets/core/app-bootstrap.js', 'utf8')
 const partial = fs.readFileSync('01_app/pages/components/workflow-progress.html', 'utf8');
 const controller = fs.readFileSync('01_app/assets/core/workflow-progress-controller.js', 'utf8');
 
-for (const id of ['aiWorkflowModal', 'aiWorkflowKicker', 'aiWorkflowTitle', 'aiWorkflowSummary', 'aiNow', 'aiEngines', 'aiProgressBar', 'aiRoleList', 'aiFootStatus', 'aiSceneProgress', 'aiSceneCompleted', 'aiSceneTotal', 'aiSceneFailed']) {
+for (const id of ['aiWorkflowModal', 'aiWorkflowKicker', 'aiWorkflowTitle', 'aiWorkflowSummary', 'aiNow', 'aiEngines', 'aiProgressBar', 'aiRoleList', 'aiFootStatus', 'aiSceneProgress', 'aiSceneWritten', 'aiSceneWrittenTotal', 'aiSceneReviewed', 'aiSceneReviewedTotal', 'aiSceneCompleted', 'aiSceneTotal', 'aiSceneFailed']) {
   assert.match(partial, new RegExp(`id="${id}"`), `${id} remains in workflow partial`);
   assert.doesNotMatch(shell, new RegExp(`id="${id}"`), `${id} is removed from P1 shell`);
 }

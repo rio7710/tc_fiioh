@@ -21,7 +21,11 @@
     <div class="ai-dialog-foot">
       <span class="ai-foot-status" id="aiFootStatus">AI 팀을 호출하고 있습니다.</span>
       <span class="ai-scene-progress" id="aiSceneProgress" hidden>
-        씬 검수 <strong id="aiSceneCompleted">0</strong>/<span id="aiSceneTotal">0</span>
+        <span>작성 <strong id="aiSceneWritten">0</strong>/<span id="aiSceneWrittenTotal">?</span></span>
+        <span aria-hidden="true">|</span>
+        <span>검증 <strong id="aiSceneReviewed">0</strong>/<span id="aiSceneReviewedTotal">?</span></span>
+        <span aria-hidden="true">|</span>
+        <span>완료 <strong id="aiSceneCompleted">0</strong>/<span id="aiSceneTotal">?</span></span>
         <em id="aiSceneFailed" hidden>실패 0</em>
       </span>
     </div>

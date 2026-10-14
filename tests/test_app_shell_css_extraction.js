@@ -10,15 +10,15 @@ const shell = fs.readFileSync(shellPath, 'utf8');
 const css = fs.readFileSync(cssPath, 'utf8');
 assert.equal((shell.match(/<style\b/g) || []).length, 0, 'P1 contains no inline style opening tag');
 assert.equal((shell.match(/<\/style>/g) || []).length, 0, 'P1 contains no inline style closing tag');
-assert.equal((shell.match(/app-shell\.css\?v=20261014_v87/g) || []).length, 1, 'P1 loads app shell CSS exactly once at v87');
+assert.equal((shell.match(/app-shell\.css\?v=20261014_v88/g) || []).length, 1, 'P1 loads app shell CSS exactly once at v88');
 assert.ok(
-  shell.indexOf('step05-calendar.css?v=20261007_v2') < shell.indexOf('app-shell.css?v=20261014_v87'),
+  shell.indexOf('step05-calendar.css?v=20261007_v2') < shell.indexOf('app-shell.css?v=20261014_v88'),
   'extracted CSS retains the original cascade position after feature stylesheets'
 );
-assert.equal(css.split('\n').length - 1, 894, 'all 894 current CSS lines are preserved');
+assert.equal(css.split('\n').length - 1, 904, 'all 904 current CSS lines are preserved');
 assert.equal(
   crypto.createHash('sha256').update(css).digest('hex'),
-  'c402ebffd1fbc780b46e7f555663ebc97bf7161d3527e220c5de7069b6b8a871',
+  '342ae5d611322847a7a7289f7280d8c2136ed6eb9d877dc5255bd677f501f71d',
   'extracted CSS matches the current reviewed baseline'
 );
 assert.match(css, /\.content-index-hero\{z-index:50;/, 'automation hero establishes a layer above later index objects');

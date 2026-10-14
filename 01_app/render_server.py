@@ -1,4 +1,5 @@
 import json
+import copy
 import hashlib
 import base64
 import binascii
@@ -63,6 +64,7 @@ render_jobs = {}
 final_export_queue_lock = threading.Lock()
 final_export_queue_instance = None
 script_generation_lock = threading.Lock()
+script_diagnostic_lock = threading.Lock()
 active_script_generation_projects = set()
 provider_credentials_lock = threading.Lock()
 provider_credentials = {}
@@ -76,6 +78,8 @@ VOICE_ARTIFACT_DIR = Path(os.environ.get("VOICE_ARTIFACT_DIR", str(ROOT / "02_me
 STORYBOARD_IMAGE_DIR = Path(os.environ.get("STORYBOARD_IMAGE_DIR", str(ROOT / "02_media" / "generated" / "storyboard")))
 BRAND_ASSET_DIR = Path(os.environ.get("BRAND_ASSET_DIR", str(ROOT / "02_media" / "generated" / "brand")))
 SCRIPT_JOB_STORE_PATH = Path(os.environ.get("SCRIPT_JOB_STORE_PATH", str(SQLITE_PATH.with_name("script_generation_jobs.json"))))
+SCRIPT_DIAGNOSTIC_LOG_PATH = Path(os.environ.get(
+    "SCRIPT_DIAGNOSTIC_LOG_PATH", str(SQLITE_PATH.with_name("script_generation_diagnostics.jsonl"))))
 script_job_store = None
 script_job_store_lock = threading.Lock()
 script_job_executor = ThreadPoolExecutor(max_workers=max(1, int(os.environ.get("SCRIPT_JOB_CONCURRENCY", "1"))))
@@ -149,6 +153,25 @@ def release_script_generation(project_id):
         active_script_generation_projects.discard(project_id)
 
 
+def append_script_diagnostic(values):
+    diagnostic = {
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        **dict(values),
+    }
+    encoded = json.dumps(diagnostic, ensure_ascii=False, sort_keys=True, default=str)
+    try:
+        with script_diagnostic_lock:
+            SCRIPT_DIAGNOSTIC_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with SCRIPT_DIAGNOSTIC_LOG_PATH.open("a", encoding="utf-8") as output:
+                output.write(encoded + "\n")
+            os.chmod(SCRIPT_DIAGNOSTIC_LOG_PATH, 0o600)
+    except OSError as log_error:
+        print(json.dumps({
+            "event": "script_diagnostic_write_failed", "message": str(log_error)[:300],
+        }, ensure_ascii=False), file=sys.stderr, flush=True)
+    return diagnostic
+
+
 def log_script_generation_failure(project_id, exc):
     diagnostic = {
         "event": "script_generation_failed",
@@ -157,7 +180,8 @@ def log_script_generation_failure(project_id, exc):
         "message": str(exc)[:800],
         "traceback": "".join(traceback.format_exception(exc))[-1600:],
     }
-    print(json.dumps(diagnostic, ensure_ascii=False), file=sys.stderr, flush=True)
+    persisted = append_script_diagnostic(diagnostic)
+    print(json.dumps(persisted, ensure_ascii=False), file=sys.stderr, flush=True)
 
 
 def init_data_volume():
@@ -1258,7 +1282,7 @@ def validated_script_plan(store, user_id, project_id, selected_labels, resources
 
 
 def openai_unified_storyboard(api_key, selected_labels, resources, previous_documents, script_plan=None,
-                              progress_callback=None):
+                              progress_callback=None, diagnostic_callback=None):
     if not api_key:
         raise ValueError("OpenAI API 키가 연결되지 않았습니다.")
     model = os.environ.get("OPENAI_SCRIPT_MODEL", "gpt-5.6-luna")
@@ -1314,6 +1338,10 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
             if content.get("type") == "output_text"
         )
 
+    def report_progress(values):
+        if progress_callback:
+            progress_callback(values)
+
     generated = run_generation_harness(
         generate, selected_labels, source_material,
         previous_documents=previous_documents,
@@ -1326,13 +1354,23 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
         },
         locked_plan=script_plan,
         canonical_reference_assets=group_reference_asset_catalog(resources),
-        progress_callback=progress_callback,
+        progress_callback=report_progress,
+        diagnostic_callback=diagnostic_callback,
     )
     review_model = os.environ.get("OPENAI_SCENE_REVIEW_MODEL", model)
+    base_document = generated["document"]
+
+    def validate_reviewed_scene(index, reviewed_scene):
+        candidate_document = copy.deepcopy(base_document)
+        candidate_document["production"]["timeline"]["scenes"][index] = reviewed_scene
+        validate_document(candidate_document, selected_labels, True, script_plan)
+
     scene_review = review_storyboard_scenes(
-        generated["document"],
+        base_document,
         lambda prompt: generate(prompt, review_model, RUNTIME_CONFIG["scene_review_max_output_tokens"]),
-        progress_callback,
+        report_progress,
+        diagnostic_callback=diagnostic_callback,
+        validate_reviewed_scene=validate_reviewed_scene,
         concurrency=RUNTIME_CONFIG["scene_review_concurrency"],
         max_attempts=3,
     )
@@ -1340,7 +1378,7 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
     validate_document(generated["document"], selected_labels, True, script_plan)
     generated["scene_review"] = {
         key: scene_review[key]
-        for key in ("completed_scenes", "total_scenes", "failed_scenes", "repaired_scenes")
+        for key in ("written_scenes", "reviewed_scenes", "completed_scenes", "total_scenes", "failed_scenes", "repaired_scenes")
     }
     if progress_callback:
         progress_callback({
@@ -2677,6 +2715,9 @@ def execute_script_generation(user_id: str, project_id: str, progress_callback=N
     generated, openai_response = openai_unified_storyboard(
         provider_values("openai").get("api_key", ""), labels, resources,
         previous_documents, script_plan_data["plan"], progress_callback=progress_callback,
+        diagnostic_callback=lambda values: append_script_diagnostic({
+            "project_id": project_id, **values,
+        }),
     )
     document = generated["document"]
     scene_review = generated.get("scene_review", {})

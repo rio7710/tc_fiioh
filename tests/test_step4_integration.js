@@ -158,7 +158,7 @@ assert.match(html, /src="\/01_app\/assets\/core\/prompt-lab-controller\.js\?v=20
 assert.match(html, /src="\/01_app\/assets\/core\/provider-settings-controller\.js\?v=20261009_v39"/, 'HTML cache-busts provider settings controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/trend-keyword-controller\.js\?v=20261013_v41"/, 'HTML cache-busts trend keyword controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/step02-keyword\.js\?v=20261013_v42"/, 'HTML cache-busts Step 2 keyword controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step02\/script-generation-controller\.js\?v=20261014_v45"/, 'HTML cache-busts script generation controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step02\/script-generation-controller\.js\?v=20261014_v47"/, 'HTML cache-busts script generation controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/production-workflow-controller\.js\?v=20261009_v43"/, 'HTML cache-busts production workflow controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-video-controller\.js\?v=20261009_v44"/, 'HTML cache-busts scene video controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-image-controller\.js\?v=20261013_v46"/, 'HTML cache-busts scene image controller');

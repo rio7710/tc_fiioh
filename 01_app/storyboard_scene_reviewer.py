@@ -7,6 +7,7 @@ This keeps parallel reviews from corrupting the global timeline contract.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -14,8 +15,9 @@ from typing import Any, Callable
 
 
 IMMUTABLE_SCENE_FIELDS = (
-    "id", "start", "end", "media_type", "source_media",
-    "narration_cue_ids", "narration", "caption",
+    "id", "title", "start", "end", "media_type", "source_media",
+    "reference_ids", "characters", "narration_cue_ids", "sequence",
+    "narration", "caption",
 )
 
 
@@ -52,10 +54,36 @@ def build_scene_review_prompt(
         "이미지와 영상 프롬프트의 자연스러움, 자막과 내레이션 불변, 계약 정책 준수.\n"
         "문제가 없으면 {\"status\":\"pass\",\"issues\":[]}만 반환한다. "
         "문제가 있으면 {\"status\":\"repair\",\"issues\":[...],\"scene\":{수정된 전체 scene}}를 반환한다.\n"
-        "repair에서도 id/start/end/media_type/source_media/narration_cue_ids/narration/caption은 입력과 완전히 같아야 한다. "
+        "repair에서는 image_prompt/camera/lighting/motion_prompt/transition만 수정할 수 있다. "
+        "id/title/start/end/media_type/source_media/reference_ids/characters/narration_cue_ids/sequence/narration/caption은 입력과 완전히 같아야 한다. "
+        "reference_ids와 sequence는 확정된 구조이므로 이를 바꾸지 말고, 편집 가능한 프롬프트가 그 구조를 따르도록 고친다. "
         "오류와 직접 관계없는 필드는 바꾸지 않는다. JSON 객체 외 텍스트는 출력하지 않는다."
         f"{retry}\n검수 컨텍스트:\n{json.dumps(context, ensure_ascii=False)}"
     )
+
+
+def _normalize_issues(value: Any) -> list[str]:
+    """Accept common provider variations without weakening scene validation."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        return [text[:500]] if text else []
+    if isinstance(value, list):
+        normalized: list[str] = []
+        for item in value:
+            normalized.extend(_normalize_issues(item))
+        return normalized[:20]
+    if isinstance(value, dict):
+        for key in ("issues", "message", "detail", "reason", "issue", "description"):
+            if key in value:
+                normalized = _normalize_issues(value.get(key))
+                if normalized:
+                    return normalized
+        text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return [text[:500]] if text != "{}" else []
+    text = str(value).strip()
+    return [text[:500]] if text else []
 
 
 def parse_scene_review(candidate: str, original: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
@@ -65,16 +93,14 @@ def parse_scene_review(candidate: str, original: dict[str, Any]) -> tuple[dict[s
         raise ValueError(f"씬 검수 JSON 오류: {exc.msg}") from None
     if not isinstance(value, dict) or value.get("status") not in {"pass", "repair"}:
         raise ValueError("씬 검수 상태가 올바르지 않습니다.")
-    issues = value.get("issues") or []
-    if not isinstance(issues, list) or any(not isinstance(item, str) for item in issues):
-        raise ValueError("씬 검수 이슈 형식이 올바르지 않습니다.")
+    issues = _normalize_issues(value.get("issues"))
     if value["status"] == "pass":
-        if issues:
-            raise ValueError("통과 응답에는 검수 이슈가 없어야 합니다.")
         return copy.deepcopy(original), []
     repaired = value.get("scene")
-    if not isinstance(repaired, dict) or not issues:
-        raise ValueError("보정 응답에는 이슈와 수정된 전체 씬이 필요합니다.")
+    if not isinstance(repaired, dict):
+        raise ValueError("보정 응답에는 수정된 전체 씬이 필요합니다.")
+    if not issues:
+        issues = ["검수 API가 씬 보정을 요청했습니다."]
     if set(repaired) != set(original):
         raise ValueError("씬 보정은 필드를 추가하거나 제거할 수 없습니다.")
     for field in IMMUTABLE_SCENE_FIELDS:
@@ -87,6 +113,8 @@ def review_storyboard_scenes(
     document: dict[str, Any],
     request_review: Callable[[str], str],
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    diagnostic_callback: Callable[[dict[str, Any]], None] | None = None,
+    validate_reviewed_scene: Callable[[int, dict[str, Any]], None] | None = None,
     *,
     concurrency: int = 3,
     max_attempts: int = 3,
@@ -96,6 +124,7 @@ def review_storyboard_scenes(
     worker_count = max(1, min(int(concurrency), total))
     report_lock = threading.Lock()
     completed = 0
+    reviewed_count = 0
     failed = 0
     repaired_count = 0
 
@@ -104,18 +133,35 @@ def review_storyboard_scenes(
             progress_callback({
                 "phase": "scene_review", "percent": 58 + int(30 * completed / total),
                 "detail": detail, "completed_scenes": completed,
-                "total_scenes": total, "failed_scenes": failed,
+                "total_scenes": total, "written_scenes": total,
+                "reviewed_scenes": reviewed_count, "failed_scenes": failed,
             })
 
     def review_one(index: int) -> tuple[int, dict[str, Any], list[str]]:
         error = ""
-        for _attempt in range(1, max_attempts + 1):
+        for attempt in range(1, max_attempts + 1):
+            response = ""
             try:
                 response = request_review(build_scene_review_prompt(document, index, error))
                 reviewed, issues = parse_scene_review(response, scenes[index])
+                if validate_reviewed_scene:
+                    validate_reviewed_scene(index, reviewed)
                 return index, reviewed, issues
             except Exception as exc:
                 error = str(exc)[:500]
+                if diagnostic_callback:
+                    encoded = str(response or "").encode("utf-8", errors="replace")
+                    diagnostic_callback({
+                        "event": "scene_review_attempt_failed",
+                        "scene_id": str(scenes[index].get("id", index + 1)),
+                        "scene_index": index + 1,
+                        "attempt": attempt,
+                        "error_type": type(exc).__name__,
+                        "message": error,
+                        "response_length": len(encoded),
+                        "response_sha256": hashlib.sha256(encoded).hexdigest(),
+                        "response_excerpt": str(response or "")[:2000],
+                    })
         raise RuntimeError(f"{scenes[index].get('id', index + 1)} 씬 검수를 {max_attempts}회 완료하지 못했습니다: {error}")
 
     report(f"씬별 검수를 시작합니다. 완료 0/{total}")
@@ -129,12 +175,14 @@ def review_storyboard_scenes(
                 resolved_index, reviewed, issues = future.result()
                 reviewed_scenes[resolved_index] = reviewed
                 with report_lock:
+                    reviewed_count += 1
                     completed += 1
                     if issues:
                         repaired_count += 1
                     report(f"씬 검수 {completed}/{total} 완료")
             except Exception as exc:
                 with report_lock:
+                    reviewed_count += 1
                     failed += 1
                     failures.append(str(exc))
                     report(f"씬 검수 {completed}/{total} 완료 · 실패 {failed}")
@@ -144,6 +192,8 @@ def review_storyboard_scenes(
         scenes[index] = scene
     return {
         "document": document,
+        "written_scenes": total,
+        "reviewed_scenes": reviewed_count,
         "completed_scenes": completed,
         "total_scenes": total,
         "failed_scenes": failed,

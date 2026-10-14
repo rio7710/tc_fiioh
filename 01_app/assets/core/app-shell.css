@@ -228,6 +228,11 @@ thinkcast-top-nav{display:block}
 .ai-scene-progress[hidden]{display:none}
 .ai-scene-progress strong{font-size:13px;color:#174f43}
 .ai-scene-progress em{margin-left:3px;color:#a33c32;font-style:normal}
+.ai-role.has-scene-progress{grid-template-columns:42px minmax(0,1fr) minmax(275px,auto);align-items:start}
+.ai-role.has-scene-progress .ai-role-no{grid-column:1;grid-row:1/3}
+.ai-role.has-scene-progress .ai-role-copy{grid-column:2;grid-row:1/3}
+.ai-role.has-scene-progress .ai-scene-progress{grid-column:3;grid-row:1;min-width:275px;justify-content:flex-start;text-align:left;font-variant-numeric:tabular-nums}
+.ai-role.has-scene-progress .ai-role-state{grid-column:3;grid-row:2;justify-self:start;text-align:left}
 @keyframes aiPulse{50%{box-shadow:0 0 0 7px rgba(23,79,72,0)}}
 @keyframes aiDots{0%{content:""}25%{content:"."}50%{content:".."}75%,100%{content:"..."}}
 .editor-back{align-self:flex-start;white-space:nowrap}
@@ -767,6 +772,11 @@ body::before{content:"";position:fixed;z-index:-1;inset:-3px;background-image:li
   .ai-dialog-head{padding:16px 16px 11px}
   .ai-role-list{gap:7px;padding:8px 12px}
   .ai-role{grid-template-columns:34px minmax(0,1fr) auto;gap:9px;padding:8px 9px}
+  .ai-role.has-scene-progress{grid-template-columns:34px minmax(0,1fr)}
+  .ai-role.has-scene-progress .ai-role-no{grid-column:1;grid-row:1/4}
+  .ai-role.has-scene-progress .ai-role-copy{grid-column:2;grid-row:1}
+  .ai-role.has-scene-progress .ai-scene-progress{grid-column:2;grid-row:2;width:100%;min-width:0;margin-top:5px}
+  .ai-role.has-scene-progress .ai-role-state{grid-column:2;grid-row:3}
   .ai-role:not(:last-child)::after{left:17px;bottom:-15px}
   .ai-role-no{width:30px;height:30px}
   .ai-dialog-foot{padding:10px 16px max(12px,env(safe-area-inset-bottom));background:#f8f5ee}

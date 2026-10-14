@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from difflib import SequenceMatcher
@@ -1035,11 +1036,20 @@ def maximum_similarity(document: dict[str, Any], previous_documents: list[dict[s
     return max(SequenceMatcher(None, current, narrative_fingerprint(item)).ratio() for item in previous_documents)
 
 
-def build_novelty_repair_prompt(candidate: str, similarity: float) -> str:
+def build_novelty_repair_prompt(candidate: str, similarity: float,
+                                locked_plan: dict[str, Any] | None = None) -> str:
+    locked_contract = ""
+    if locked_plan:
+        locked_contract = (
+            "확정 1차 대본의 title과 narration_beats 원문·순서는 절대 바꾸지 않는다. "
+            "유사성은 사건의 시작 상황, 시각 행동, 인물 관계, 공간 이동, 구도와 결말 이미지로만 낮춘다.\n"
+            f"확정 1차 대본:\n{json.dumps(locked_plan, ensure_ascii=False)}\n"
+        )
     return (
         "JSON 계약은 유효하지만 동일 키워드 과거 결과와 이야기 흐름 또는 내레이션이 너무 유사하다. "
-        "시작 상황, 중심 행동, 인물 관계, 공간 이동 순서, 결말 이미지와 내레이션 비유를 새로 설계하라. "
+        "시작 상황, 중심 행동, 인물 관계, 공간 이동 순서와 결말 이미지를 새로 설계하라. "
         "키워드와 사실, JSON 계약은 유지하고 완전한 JSON 객체 하나만 출력하라.\n"
+        f"{locked_contract}"
         f"최대 유사도: {similarity:.3f}\n이전 후보:\n{candidate}"
     )
 
@@ -1055,10 +1065,25 @@ def run_generation_harness(
     locked_plan: dict[str, Any] | None = None,
     canonical_reference_assets: dict[str, dict[str, Any]] | None = None,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    diagnostic_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     def report(phase: str, **values: Any) -> None:
         if progress_callback:
             progress_callback({"phase": phase, **values})
+
+    def diagnose(event: str, response_text: str, error: Exception, **values: Any) -> None:
+        if not diagnostic_callback:
+            return
+        encoded = str(response_text or "").encode("utf-8", errors="replace")
+        diagnostic_callback({
+            "event": event,
+            "error_type": type(error).__name__,
+            "message": str(error)[:800],
+            "response_length": len(encoded),
+            "response_sha256": hashlib.sha256(encoded).hexdigest(),
+            "response_excerpt": str(response_text or "")[:4000],
+            **values,
+        })
 
     def complete_provenance(document: dict[str, Any]) -> dict[str, Any]:
         document = normalize_document_shape(document)
@@ -1197,6 +1222,10 @@ def run_generation_harness(
             validate_document(document, selected_keywords, strict_schema, locked_plan)
             break
         except (UnifiedContentError, KeyError, TypeError, ValueError) as validation_error:
+            diagnose(
+                "storyboard_candidate_validation_failed", candidate, validation_error,
+                repair_count=repair_count, regeneration_count=regeneration_count,
+            )
             if repairs_in_generation < MAX_VALIDATION_REPAIRS:
                 report(
                     "repair_requested", percent=60 + repairs_in_generation * 5,
@@ -1236,7 +1265,8 @@ def run_generation_harness(
             repairs_in_generation = 0
     similarity = maximum_similarity(document, previous_documents)
     if similarity >= similarity_threshold:
-        revised = generate(build_novelty_repair_prompt(json.dumps(document, ensure_ascii=False), similarity))
+        revised = generate(build_novelty_repair_prompt(
+            json.dumps(document, ensure_ascii=False), similarity, locked_plan))
         try:
             revised_document = complete_provenance(parse_json_document(revised))
             validate_document(revised_document, selected_keywords, strict_schema, locked_plan)
@@ -1244,8 +1274,12 @@ def run_generation_harness(
             if revised_similarity < similarity:
                 document, similarity = revised_document, revised_similarity
             repair_count += 1
-        except (UnifiedContentError, KeyError, TypeError, ValueError):
+        except (UnifiedContentError, KeyError, TypeError, ValueError) as novelty_error:
             # Novelty is a quality preference; never discard an already valid document.
+            diagnose(
+                "storyboard_novelty_candidate_failed", revised, novelty_error,
+                similarity=similarity,
+            )
             pass
     if persist:
         persist(document)

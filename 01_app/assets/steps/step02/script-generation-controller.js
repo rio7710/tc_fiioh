@@ -12,11 +12,11 @@
     engines:Object.freeze([{mark:'GPT',kind:'gpt',name:'OpenAI API',status:'실제 요청'}]),
     roles:Object.freeze([
       {name:'대본 작성',description:'인물·장소 분산, 서사와 나레이션 확정',engine:'OpenAI API'},
-      {name:'콘티 작성',description:'장소 이동·연속성·씬 프롬프트 설계',engine:'OpenAI API'},
+      {name:'콘티 작성',description:'장소 이동·씬 프롬프트 작성 후 씬별 병렬 검수',engine:'OpenAI API'},
       {name:'최종 검증',description:'스키마 검증 · 프로젝트 저장',engine:'Schema Validator'}
     ].map(Object.freeze))
   });
-  const requiredIds = ['aiWorkflowModal','aiProgressBar','aiFootStatus','aiWorkflowSummary','aiNow','aiSceneProgress','aiSceneCompleted','aiSceneTotal','aiSceneFailed'];
+  const requiredIds = ['aiWorkflowModal','aiProgressBar','aiFootStatus','aiWorkflowSummary','aiNow','aiSceneProgress','aiSceneWritten','aiSceneWrittenTotal','aiSceneReviewed','aiSceneReviewedTotal','aiSceneCompleted','aiSceneTotal','aiSceneFailed'];
 
   function create(dependencies) {
     const deps = dependencies || {};
@@ -66,16 +66,29 @@
       const summary = nodes.aiWorkflowSummary;
       const nowNode = nodes.aiNow;
       const sceneProgress = nodes.aiSceneProgress;
+      const sceneWritten = nodes.aiSceneWritten;
+      const sceneWrittenTotal = nodes.aiSceneWrittenTotal;
+      const sceneReviewed = nodes.aiSceneReviewed;
+      const sceneReviewedTotal = nodes.aiSceneReviewedTotal;
       const sceneCompleted = nodes.aiSceneCompleted;
       const sceneTotal = nodes.aiSceneTotal;
       const sceneFailed = nodes.aiSceneFailed;
-      const updateSceneProgress = values => {
+      roles[1].classList.add('has-scene-progress');
+      roles[1].append(sceneProgress);
+      const updateSceneProgress = (values, showPending=false) => {
         const total = Math.max(0, Number(values?.total_scenes) || 0);
         const completed = Math.max(0, Math.min(total, Number(values?.completed_scenes) || 0));
         const failed = Math.max(0, Number(values?.failed_scenes) || 0);
-        sceneProgress.hidden = total < 1;
+        const written = Math.max(0, Math.min(total, Number(values?.written_scenes ?? (total || 0)) || 0));
+        const reviewed = Math.max(0, Math.min(total, Number(values?.reviewed_scenes ?? (completed + failed)) || 0));
+        sceneProgress.hidden = total < 1 && !showPending;
+        sceneWritten.textContent = String(written);
+        sceneReviewed.textContent = String(reviewed);
         sceneCompleted.textContent = String(completed);
-        sceneTotal.textContent = String(total);
+        const totalText = total > 0 ? String(total) : '?';
+        sceneWrittenTotal.textContent = totalText;
+        sceneReviewedTotal.textContent = totalText;
+        sceneTotal.textContent = totalText;
         sceneFailed.hidden = failed < 1;
         sceneFailed.textContent = `실패 ${failed}`;
       };
@@ -86,11 +99,11 @@
         return `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`;
       };
       let activePhase = 0;
+      let latestJobMeta = '';
       const updateWaitingState = () => {
         const elapsed = formatElapsed();
-        nowNode.textContent = `${activePhase === 0 ? '대본' : '콘티'} 작성 중 · ${elapsed}`;
-        foot.textContent = `${activePhase + 1}차 요청 처리 중 · GPT 응답 대기 ${elapsed} · 창을 유지해 주세요.`;
-        roles.forEach((role, index) => { if (index === activePhase) role.querySelector('.ai-role-state').textContent = `응답 대기 ${elapsed}`; });
+        foot.textContent = `${activePhase + 1}차 GPT 응답 대기 ${elapsed}${latestJobMeta ? ` · ${latestJobMeta}` : ''} · 창을 유지해 주세요.`;
+        if (activePhase === 0) roles[0].querySelector('.ai-role-state').textContent = `응답 대기 ${elapsed}`;
       };
       modal.hidden = false;
       modal.classList.remove('complete');
@@ -112,8 +125,10 @@
         if (!resumeJobId) await deps.request('/api/script/plan', {method:'POST',body:JSON.stringify({project_id:projectId})});
         roles[0].classList.remove('active'); roles[0].classList.add('done'); roles[0].querySelector('.ai-role-state').textContent = '저장 완료';
         activePhase = 1; roles[1].classList.add('active'); roles[1].querySelector('.ai-role-state').textContent = '요청 전송';
+        updateSceneProgress(null, true);
         progress.classList.remove('indeterminate'); progress.style.width = '33%';
         summary.textContent = resumeJobId ? '진행 중이던 대본·콘티 작업을 다시 연결했습니다.' : '1차 대본이 저장됐습니다. 장소 이동과 씬 연속성을 설계합니다.';
+        nowNode.textContent = '콘티 작성 API 응답을 기다리고 있습니다.';
         const queued = resumeJobId ? {job_id:resumeJobId} : await deps.request('/api/script/jobs', {method:'POST',body:JSON.stringify({project_id:projectId})});
         deps.setPendingJob({project_id:projectId,job_id:queued.job_id});
         let generated = null;
@@ -126,15 +141,20 @@
           nowNode.textContent = `${jobProgress.detail || '대본·콘티 생성 중'} · ${formatElapsed()}`;
           const repairCount = Number(jobProgress.repair_count || 0);
           const regenerationCount = Number(jobProgress.regeneration_count || 0);
-          updateSceneProgress(jobProgress);
-          foot.textContent = `작업 ${job.job_id.slice(0,8)} · 시도 ${job.attempt} · 보정 ${repairCount}/3 · 신규 재생성 ${regenerationCount}/1`;
-          roles[1].querySelector('.ai-role-state').textContent = `${jobProgress.phase || job.status} · ${percent}%`;
+          updateSceneProgress(jobProgress, true);
+          latestJobMeta = `작업 ${job.job_id.slice(0,8)} · 시도 ${job.attempt} · 보정 ${repairCount}/3 · 신규 재생성 ${regenerationCount}/1`;
+          updateWaitingState();
+          roles[1].querySelector('.ai-role-state').textContent = Number(jobProgress.total_scenes) > 0
+            ? `씬 검수 ${jobProgress.completed_scenes || 0}/${jobProgress.total_scenes} · ${percent}%`
+            : `콘티 작성 0/? · ${percent}%`;
           if (job.status === 'failed') { terminalJob = true; throw new Error(job.error?.message || '대본 생성 작업이 실패했습니다.'); }
           if (job.status === 'cancelled') { terminalJob = true; throw new Error('대본 생성 작업이 취소됐습니다.'); }
           if (job.status === 'succeeded') { terminalJob = true; generated = job.response; }
         }
         deps.clearPendingJob();
         updateSceneProgress(generated.generation?.scene_review || {
+          written_scenes:generated.generation?.scene_count,
+          reviewed_scenes:generated.generation?.scene_count,
           completed_scenes:generated.generation?.scene_count,
           total_scenes:generated.generation?.scene_count,
           failed_scenes:0

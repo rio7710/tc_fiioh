@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from tools.unified_content_prompt_harness import build_prompt, build_repair_prompt, normalize_character_reference_versions, normalize_document_shape, normalize_reference_asset_metadata, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_character_reference_versions, validate_document, validate_scene_reference_media, validate_visual_continuity
+from tools.unified_content_prompt_harness import build_novelty_repair_prompt, build_prompt, build_repair_prompt, normalize_character_reference_versions, normalize_document_shape, normalize_reference_asset_metadata, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_character_reference_versions, validate_document, validate_scene_reference_media, validate_visual_continuity
 from tools.validate_unified_content import UnifiedContentError
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema
 
@@ -29,6 +29,13 @@ def document(keywords):
 
 
 class UnifiedContentPromptHarnessTests(unittest.TestCase):
+    def test_novelty_repair_preserves_locked_script_and_changes_only_visual_story(self):
+        plan = {"title": "확정 제목", "narration_beats": ["확정 자막"]}
+        prompt = build_novelty_repair_prompt("{}", 0.91, plan)
+        self.assertIn("title과 narration_beats 원문·순서는 절대 바꾸지 않는다", prompt)
+        self.assertIn("시각 행동", prompt)
+        self.assertNotIn("내레이션 비유를 새로", prompt)
+
     def test_storyboard_contract_requires_twelve_to_twenty_scenes(self):
         schema = json.loads(__import__('pathlib').Path(
             'contracts/unified-content-production.schema.json'
@@ -551,15 +558,21 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
 
     def test_one_bounded_repair(self):
         calls = []
+        diagnostics = []
         valid = json.dumps(document(["안심"]), ensure_ascii=False)
 
         def generate(prompt):
             calls.append(prompt)
             return "not json" if len(calls) == 1 else valid
 
-        result = run_generation_harness(generate, ["안심"], "자료")
+        result = run_generation_harness(
+            generate, ["안심"], "자료", diagnostic_callback=diagnostics.append)
         self.assertEqual(1, result["repair_count"])
         self.assertEqual(2, len(calls))
+        self.assertEqual(1, len(diagnostics))
+        self.assertEqual("storyboard_candidate_validation_failed", diagnostics[0]["event"])
+        self.assertEqual(64, len(diagnostics[0]["response_sha256"]))
+        self.assertEqual("not json", diagnostics[0]["response_excerpt"])
         self.assertEqual("establish", result["document"]["production"]["timeline"]["scenes"][0]["sequence"]["camera_axis_transition"])
 
     def test_three_failed_repairs_trigger_one_fresh_generation(self):
