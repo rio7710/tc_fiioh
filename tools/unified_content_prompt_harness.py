@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Callable
@@ -1019,6 +1020,11 @@ def run_generation_harness(
         document = normalize_document_shape(document)
         document = normalize_reference_asset_metadata(document, canonical_reference_assets)
         document = normalize_character_reference_versions(document, canonical_reference_assets)
+        raw_document_id = str(document.get("document_id") or "").strip().lower()
+        normalized_document_id = re.sub(r"[^a-z0-9_-]+", "-", raw_document_id).strip("-_")
+        if len(normalized_document_id) < 2 or not normalized_document_id[0].isalnum():
+            normalized_document_id = "thinkcast-content-document"
+        document["document_id"] = normalized_document_id
         project = document.get("project")
         if not isinstance(project, dict):
             project = {}
@@ -1031,6 +1037,9 @@ def run_generation_harness(
                 # exact selected order locally instead of spending another
                 # model call on a deterministic field.
                 concept["keywords"] = list(selected_keywords)
+        concept_ids = [concept.get("id") for concept in concepts if isinstance(concept, dict)]
+        if concept_ids and document.get("selected_variant_id") not in concept_ids:
+            document["selected_variant_id"] = concept_ids[0]
         concept_title = concepts[0].get("title", "") if concepts and isinstance(concepts[0], dict) else ""
         locked_title = (locked_plan or {}).get("title", "")
         if locked_title:
@@ -1047,12 +1056,21 @@ def run_generation_harness(
         production = document.get("production", {})
         cues = production.get("narration_cues", []) if isinstance(production, dict) else []
         scenes = production.get("timeline", {}).get("scenes", []) if isinstance(production, dict) else []
+        cues_incomplete = not isinstance(cues, list) or any(
+            not isinstance(cue, dict)
+            or not isinstance(cue.get("id"), str)
+            or not isinstance(cue.get("start"), (int, float))
+            or not isinstance(cue.get("end"), (int, float))
+            or not isinstance(cue.get("scene_ids"), list)
+            or not isinstance(cue.get("narration"), (dict, str))
+            for cue in (cues if isinstance(cues, list) else [])
+        )
         if (
             isinstance(locked_beats, list)
             and locked_beats
             and isinstance(scenes, list)
             and scenes
-            and len(cues) != len(locked_beats)
+            and (len(cues) != len(locked_beats) or cues_incomplete)
         ):
             rebuilt_cues = []
             scene_cue_ids = {scene.get("id"): [] for scene in scenes if isinstance(scene, dict)}
@@ -1149,7 +1167,12 @@ def run_generation_harness(
                     repaired_root = parse_json_document(repaired_candidate)
                 except (UnifiedContentError, ValueError, TypeError):
                     repaired_root = None
-                if isinstance(repaired_root, dict) and isinstance(repaired_root.get("production"), dict):
+                required_root = ("concept_variants", "selected_variant_id", "production")
+                if (
+                    isinstance(repaired_root, dict)
+                    and isinstance(repaired_root.get("production"), dict)
+                    and all(key in repaired_root for key in required_root)
+                ):
                     candidate = repaired_candidate
                 repair_count += 1
                 repairs_in_generation += 1

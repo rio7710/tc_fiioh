@@ -606,6 +606,38 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         )
         self.assertEqual(0, result["repair_count"])
 
+    def test_document_identity_fields_are_normalized_without_model_repair(self):
+        value = document(["안심"])
+        value["document_id"] = "한글 문서 ID !"
+        value["selected_variant_id"] = "missing-concept"
+
+        result = run_generation_harness(
+            lambda prompt: json.dumps(value, ensure_ascii=False), ["안심"], "시설 자료",
+        )
+
+        self.assertEqual("id", result["document"]["document_id"])
+        self.assertEqual("concept-01", result["document"]["selected_variant_id"])
+        self.assertEqual(0, result["repair_count"])
+
+    def test_incomplete_narration_cues_are_rebuilt_from_locked_plan(self):
+        value = document(["안심"])
+        value["production"]["narration_cues"] = [{
+            "id": "narration-01", "scene_ids": ["scene-01"],
+            "caption": {"text": "함께 걷는 오늘", "source": "provided"},
+        }]
+        plan = {"title": "확정 제목", "synopsis": "확정 요약", "narration_beats": ["함께 걷는 오늘"]}
+
+        result = run_generation_harness(
+            lambda prompt: json.dumps(value, ensure_ascii=False), ["안심"], "시설 자료",
+            locked_plan=plan,
+        )
+
+        cue = result["document"]["production"]["narration_cues"][0]
+        self.assertEqual((0, 1.5), (cue["start"], cue["end"]))
+        self.assertEqual("함께 걷는 오늘", cue["narration"]["text"])
+        self.assertEqual(1.5, cue["estimated_duration_seconds"])
+        self.assertEqual(0, result["repair_count"])
+
     def test_second_bounded_repair_handles_followup_validation_error(self):
         value = document(["안심"])
         base = value["production"]["timeline"]["scenes"][0]
