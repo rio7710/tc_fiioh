@@ -9,9 +9,9 @@ assert.ok(shell.split(/\r?\n/).length <= 400, 'P1 remains a compact root shell o
 assert.equal((shell.match(/<style\b/gi) || []).length, 0, 'P1 has no inline style blocks');
 assert.equal((shell.match(/<script(?![^>]*\bsrc=)[^>]*>/g) || []).length, 0, 'P1 has no inline executable script');
 assert.equal((shell.match(/app-shell\.css\?v=20261012_v79/g) || []).length, 1, 'P1 loads app shell CSS once');
-assert.equal((shell.match(/app-bootstrap\.js\?v=20261012_v79/g) || []).length, 1, 'P1 loads one cache-busted bootstrap asset');
-assert.match(shell, /<script src="\/01_app\/assets\/core\/app-bootstrap\.js\?v=20261012_v79"><\/script>/);
-assert.match(shell, /<script src="\/01_app\/assets\/core\/app-bootstrap\.js\?v=20261012_v79"><\/script>\s*<\/body>/, 'bootstrap is the final shell executable entrypoint');
+assert.equal((shell.match(/app-bootstrap\.js\?v=20261014_v80/g) || []).length, 1, 'P1 loads one cache-busted bootstrap asset');
+assert.match(shell, /<script src="\/01_app\/assets\/core\/app-bootstrap\.js\?v=20261014_v80"><\/script>/);
+assert.match(shell, /<script src="\/01_app\/assets\/core\/app-bootstrap\.js\?v=20261014_v80"><\/script>\s*<\/body>/, 'bootstrap is the final shell executable entrypoint');
 
 const requiredMountPoints = [
   'step01LoginContainer',
@@ -42,7 +42,7 @@ const shellIds = [...shell.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
 assert.equal(new Set(shellIds).size, shellIds.length, 'root shell IDs remain unique');
 
 assert.match(bootstrap, /^\(async\(\)=>\{/);
-assert.match(bootstrap, /async function boot\(\)\{await ensureStepPartialsLoaded\(\);await ensureStep4Loaded\(\);await initDemo\(\);await restoreLoginSession\(\)\}\s*boot\(\);/);
+assert.match(bootstrap, /async function boot\(\)\{await ensureStepPartialsLoaded\(\);await ensureStep4Loaded\(\);await initDemo\(\);await restoreLoginSession\(\);scriptGenerationController\.resume\(\)\.catch/);
 assert.match(bootstrap, /\}\)\(\)\.catch\(error=>\{/);
 assert.match(bootstrap, /const stepPartialDefinitions=\[/);
 assert.match(bootstrap, /const workflowProgressController=ThinkCastWorkflowProgressController\.create/);

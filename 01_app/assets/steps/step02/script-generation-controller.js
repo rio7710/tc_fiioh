@@ -20,7 +20,7 @@
 
   function create(dependencies) {
     const deps = dependencies || {};
-    for (const name of ['getRoot','configureWorkflowModal','request','getActiveProjectId','getSelectedKeywordLabels','now','setInterval','clearInterval','sleep','setGeneratedState','setGeneratedTimeline','setGeneratedDocument','setKeywordLocked','setVoiceProfile','applyTimeline','removeStoredScript','fillScript','applyScript','refreshProjectIndex','showStep']) {
+    for (const name of ['getRoot','configureWorkflowModal','request','getActiveProjectId','getSelectedKeywordLabels','getPendingJob','setPendingJob','clearPendingJob','now','setInterval','clearInterval','sleep','setGeneratedState','setGeneratedTimeline','setGeneratedDocument','setKeywordLocked','setVoiceProfile','applyTimeline','removeStoredScript','fillScript','applyScript','refreshProjectIndex','showStep']) {
       if (typeof deps[name] !== 'function') throw new TypeError(`Step02ScriptGenerationController requires ${name}`);
     }
     let mountedRoot = null;
@@ -54,7 +54,7 @@
       return true;
     }
 
-    async function execute(projectId) {
+    async function execute(projectId, resumeJobId) {
       const root = resolveRoot();
       const nodes = mountedRoot ? elements : collect(root);
       const modal = deps.configureWorkflowModal('storyboard', storyboardConfig);
@@ -92,13 +92,15 @@
       updateWaitingState();
       let waitingTimer = deps.setInterval(updateWaitingState, 1000);
       const stopWaiting = () => { if (waitingTimer !== null) { deps.clearInterval(waitingTimer); waitingTimer = null; } };
+      let terminalJob = false;
       try {
-        await deps.request('/api/script/plan', {method:'POST',body:JSON.stringify({project_id:projectId})});
+        if (!resumeJobId) await deps.request('/api/script/plan', {method:'POST',body:JSON.stringify({project_id:projectId})});
         roles[0].classList.remove('active'); roles[0].classList.add('done'); roles[0].querySelector('.ai-role-state').textContent = '저장 완료';
         activePhase = 1; roles[1].classList.add('active'); roles[1].querySelector('.ai-role-state').textContent = '요청 전송';
         progress.classList.remove('indeterminate'); progress.style.width = '33%';
-        summary.textContent = '1차 대본이 저장됐습니다. 장소 이동과 씬 연속성을 설계합니다.';
-        const queued = await deps.request('/api/script/jobs', {method:'POST',body:JSON.stringify({project_id:projectId})});
+        summary.textContent = resumeJobId ? '진행 중이던 대본·콘티 작업을 다시 연결했습니다.' : '1차 대본이 저장됐습니다. 장소 이동과 씬 연속성을 설계합니다.';
+        const queued = resumeJobId ? {job_id:resumeJobId} : await deps.request('/api/script/jobs', {method:'POST',body:JSON.stringify({project_id:projectId})});
+        deps.setPendingJob({project_id:projectId,job_id:queued.job_id});
         let generated = null;
         while (!generated) {
           await deps.sleep(1000);
@@ -111,10 +113,11 @@
           const regenerationCount = Number(jobProgress.regeneration_count || 0);
           foot.textContent = `작업 ${job.job_id.slice(0,8)} · 시도 ${job.attempt} · 보정 ${repairCount}/3 · 신규 재생성 ${regenerationCount}/1`;
           roles[1].querySelector('.ai-role-state').textContent = `${jobProgress.phase || job.status} · ${percent}%`;
-          if (job.status === 'failed') throw new Error(job.error?.message || '대본 생성 작업이 실패했습니다.');
-          if (job.status === 'cancelled') throw new Error('대본 생성 작업이 취소됐습니다.');
-          if (job.status === 'succeeded') generated = job.response;
+          if (job.status === 'failed') { terminalJob = true; throw new Error(job.error?.message || '대본 생성 작업이 실패했습니다.'); }
+          if (job.status === 'cancelled') { terminalJob = true; throw new Error('대본 생성 작업이 취소됐습니다.'); }
+          if (job.status === 'succeeded') { terminalJob = true; generated = job.response; }
         }
+        deps.clearPendingJob();
         stopWaiting();
         roles[1].classList.remove('active'); roles[1].classList.add('done'); roles[1].querySelector('.ai-role-state').textContent = '완료';
         activePhase = 2; roles[2].classList.add('active'); progress.style.width = '66%';
@@ -143,6 +146,7 @@
         deps.showStep(3);
       } catch (error) {
         stopWaiting();
+        if (terminalJob) deps.clearPendingJob();
         progress.classList.remove('indeterminate'); progress.style.transform = 'none'; progress.style.width = '0%';
         nowNode.classList.remove('processing'); nowNode.textContent = '처리를 완료하지 못했습니다.';
         summary.textContent = '스토리보드 생성 중 문제가 발생했습니다.';
@@ -158,11 +162,22 @@
       if (activeRun) return activeRun;
       const projectId = deps.getActiveProjectId();
       if (!projectId) return Promise.reject(new Error('대본을 생성할 콘텐츠를 먼저 선택해 주세요.'));
-      activeRun = execute(projectId).finally(() => { activeRun = null; });
+      const pending = deps.getPendingJob();
+      const jobId = pending?.project_id === projectId ? pending.job_id : null;
+      activeRun = execute(projectId, jobId).finally(() => { activeRun = null; });
       return activeRun;
     }
 
-    return Object.freeze({mount,unmount,run,isRunning:()=>Boolean(activeRun)});
+    function resume() {
+      if (activeRun) return activeRun;
+      const projectId = deps.getActiveProjectId();
+      const pending = deps.getPendingJob();
+      if (!projectId || pending?.project_id !== projectId || !pending.job_id) return Promise.resolve(false);
+      activeRun = execute(projectId, pending.job_id).finally(() => { activeRun = null; });
+      return activeRun;
+    }
+
+    return Object.freeze({mount,unmount,run,resume,isRunning:()=>Boolean(activeRun)});
   }
   return Object.freeze({create});
 });
