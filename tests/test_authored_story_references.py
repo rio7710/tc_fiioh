@@ -11,6 +11,17 @@ import render_server
 
 
 class AuthoredStoryReferenceTests(unittest.TestCase):
+    @staticmethod
+    def script_plan_with_beat(beat):
+        return {
+            "schema_version": "1.0.0",
+            "title": "오늘의 달력",
+            "synopsis": "달력을 함께 살펴보는 편안한 하루",
+            "narration_beats": [beat] + ["작은 미소가 머뭉니다."] * 14,
+            "cast_choices": ["어르신", "돌봄 직원"],
+            "location_choices": ["생활 공간"],
+        }
+
     def test_script_plan_normalization_removes_formatting_drift(self):
         plan = render_server.normalize_script_plan({
             "schema_version": "1",
@@ -60,6 +71,35 @@ class AuthoredStoryReferenceTests(unittest.TestCase):
         self.assertEqual(1.0, render_server.authored_copy_similarity(exact, context))
         self.assertGreaterEqual(render_server.authored_copy_similarity(similar, context), 0.90)
         self.assertLess(render_server.authored_copy_similarity(fresh, context), 0.90)
+
+    def test_off_season_word_is_rejected_for_october(self):
+        plan = self.script_plan_with_beat("달력 한 칸에 봄을 심고")
+        with self.assertRaisesRegex(ValueError, "한국 계절은 가을"):
+            render_server.validate_script_plan(
+                plan, selected_labels=["어르신의 계절 달력"], local_date="2026-10-14")
+
+    def test_care_word_is_not_mistaken_for_spring(self):
+        plan = self.script_plan_with_beat("세심한 돌봄을 이어갑니다")
+        render_server.validate_script_plan(
+            plan, selected_labels=["전문 돌봄"], local_date="2026-10-14")
+        self.assertEqual([], render_server.script_plan_season_conflicts(
+            {"title": "함께 해봄으로써 배우는 하루", "synopsis": "", "narration_beats": []},
+            ["전문 돌봄"], "2026-10-14"))
+
+    def test_explicit_season_keyword_allows_intentional_off_season_story(self):
+        plan = self.script_plan_with_beat("달력 한 칸에 봄을 심고")
+        render_server.validate_script_plan(
+            plan, selected_labels=["봄맞이 달력"], local_date="2026-10-14")
+
+    def test_initial_and_repair_requests_share_validator_contract(self):
+        contract = render_server.script_plan_request_contract(
+            ["어르신의 계절 달력"], "2026-10-14")
+        for required in (
+            "schema_version은 1.0.0", "15~18개", "13자 이하", "180~210자",
+            "인물 이름·캐릭터 ID", "직접 인용", "현재 계절: 가을",
+            "어르신의 계절 달력",
+        ):
+            self.assertIn(required, contract)
 
 
 if __name__ == "__main__":

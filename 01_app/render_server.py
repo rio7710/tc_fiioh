@@ -1144,7 +1144,56 @@ lines는 반드시 {len(scene_specs)}개이며 각 항목은 비어 있지 않�
     return clean_script, result
 
 
-def validate_script_plan(plan, authored_context=""):
+SCRIPT_SEASON_PATTERNS = {
+    # Hangul-prefixed nominalizations such as ``돌봄`` and ``해봄`` are not
+    # spring references. Seasonal compounds begin with ``봄`` or ``새봄``.
+    "봄": re.compile(r"(?:새봄|(?<![가-힣])봄)"),
+    "여름": re.compile(r"여름"),
+    "가을": re.compile(r"가을"),
+    "겨울": re.compile(r"겨울"),
+}
+
+
+def script_season_context(local_date=None):
+    local_date = local_date or datetime.now(timezone(timedelta(hours=9))).date().isoformat()
+    return korea_keyword_context(local_date)
+
+
+def script_plan_season_conflicts(plan, selected_labels, local_date=None):
+    """Return off-season words that were not explicitly requested as keywords."""
+    context = script_season_context(local_date)
+    selected_text = " ".join(str(label) for label in (selected_labels or []))
+    explicitly_requested = {
+        season for season, pattern in SCRIPT_SEASON_PATTERNS.items()
+        if pattern.search(selected_text)
+    }
+    content = " ".join([
+        str(plan.get("title", "")), str(plan.get("synopsis", "")),
+        *[str(beat) for beat in plan.get("narration_beats", [])],
+    ])
+    return [
+        season for season, pattern in SCRIPT_SEASON_PATTERNS.items()
+        if season != context["season"]
+        and season not in explicitly_requested
+        and pattern.search(content)
+    ]
+
+
+def script_plan_request_contract(selected_labels, local_date=None):
+    """Rules shared by the first generation request and every repair request."""
+    context = script_season_context(local_date)
+    return f"""[공통 1차 대본 작성·검증 계약]
+- JSON 객체 하나만 출력하고 설명, Markdown, 코드펜스를 덧붙이지 않는다.
+- 허용 필드는 schema_version, title, synopsis, narration_beats, cast_choices, location_choices뿐이며 schema_version은 1.0.0이다.
+- narration_beats는 15~18개, 각 항목은 앞뒤 공백을 제외하고 내부 공백·문장부호를 포함해 13자 이하, 전체는 180~210자로 작성한다.
+- cast_choices의 인물 이름·캐릭터 ID를 title, synopsis, narration_beats에 쓰지 않는다.
+- 사람 작성 원고의 제목·내레이션을 직접 인용하거나 단어만 바꿔 재사용하지 않는다.
+- 선택 키워드: {json.dumps(selected_labels, ensure_ascii=False)}
+- 제작 기준일: {context['local_date']} (Asia/Seoul), 현재 계절: {context['season']}, 이번 달 참고 주제: {context['themes']}.
+- 제목·서사·내레이션·화면 소품을 현재 계절와 맞춘다. '계절'·'달력' 같은 범용 키워드를 임의의 다른 계절로 바꾸지 않는다. 현재와 다른 계절은 선택 키워드에 그 계절이 명시된 경우에만 허용한다."""
+
+
+def validate_script_plan(plan, authored_context="", selected_labels=None, local_date=None):
     validate_json_schema_file(plan, ROOT / "contracts" / "script-plan.schema.json")
     beats = plan["narration_beats"]
     narration_length = sum(len(beat.strip()) for beat in beats)
@@ -1159,6 +1208,13 @@ def validate_script_plan(plan, authored_context=""):
         raise ValueError("인물 이름은 나레이션이 아닌 캐스팅·콘티에만 넣어 주세요.")
     if authored_context and authored_copy_similarity(plan, authored_context) >= 0.90:
         raise ValueError("사람 작성 샘플의 제목·내레이션 문장을 그대로 복제하지 말고 새 사건과 문장으로 작성해 주세요.")
+    conflicts = script_plan_season_conflicts(plan, selected_labels, local_date)
+    if conflicts:
+        context = script_season_context(local_date)
+        raise ValueError(
+            f"제작일 {context['local_date']}의 한국 계절은 {context['season']}입니다. "
+            f"선택 키워드에 없는 다른 계절 표현({', '.join(conflicts)})을 사용하지 마세요."
+        )
 
 
 def normalize_script_plan(plan):
@@ -1182,16 +1238,18 @@ def normalize_script_plan(plan):
     return normalized
 
 
-def openai_script_plan(api_key, selected_labels, resources, recent_usage):
+def openai_script_plan(api_key, selected_labels, resources, recent_usage, local_date=None):
     if not api_key:
         raise ValueError("OpenAI API 키가 연결되지 않았습니다.")
     model = os.environ.get("OPENAI_SCRIPT_MODEL", "gpt-5.6-luna")
     context = group_story_reference_context(resources, 45_000,
         {"default_asset_manifest", "reference_library", "prompt_contract"})
     authored_context = human_storyboard_reference_context(resources)
+    season_context = script_season_context(local_date)
+    request_contract = script_plan_request_contract(
+        selected_labels, season_context["local_date"])
     prompt = f"""생각담 | ThinkCast 한국어 콘텐츠의 1차 대본만 작성한다. JSON 객체 하나만 출력한다.
-형식: {{"schema_version":"1.0.0","title":"제목","synopsis":"서사 요약","narration_beats":["실제 낭독 문장",...],"cast_choices":["자료 속 인물/역할"],"location_choices":["자료 속 장소"]}}
-키워드: {json.dumps(selected_labels, ensure_ascii=False)}
+{request_contract}
 그룹 자료: {context}
 사람 작성 원고 전체: {authored_context or '등록된 사람 작성 원고 없음'}
 최근 같은 그룹의 실제 사용 인물/장소: {json.dumps(recent_usage, ensure_ascii=False)}
@@ -1227,7 +1285,8 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage):
     for attempt in range(4):
         plan = normalize_script_plan(plan)
         try:
-            validate_script_plan(plan, authored_context)
+            validate_script_plan(
+                plan, authored_context, selected_labels, season_context["local_date"])
             break
         except (JsonSchemaError, TypeError, ValueError) as exc:
             validation_errors.append(str(exc))
@@ -1237,9 +1296,9 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage):
             beats = plan.get("narration_beats", []) if isinstance(plan, dict) else []
             current_length = sum(len(str(beat).strip()) for beat in beats) if isinstance(beats, list) else 0
             plan = generate(
+                request_contract + "\n"
                 "아래 1차 대본 JSON을 형식에 맞게 고쳐 완전한 JSON 객체 하나만 출력하라. "
                 "인물 이름 없는 짧은 시적 나레이션으로 바꾸되 제목·캐스팅·장소·서사 취지는 유지하라. "
-                "narration_beats는 15~18개, 각 항목은 공백과 문장부호를 포함해 13자 이하, 전체는 반드시 180~210자로 맞춘다. 각 항목은 줄바꿈 없는 한 줄 자막이다. "
                 "사람 작성 원고의 문장을 인용하거나 단어만 바꿔 재사용하지 말고 전부 새 문장으로 쓴다. "
                 f"현재 나레이션 글자 수: {current_length}. 검증 오류: {exc}\n"
                 f"이전 검증 오류들: {json.dumps(validation_errors, ensure_ascii=False)}\n"
@@ -1263,7 +1322,8 @@ def validated_script_plan(store, user_id, project_id, selected_labels, resources
     if not saved:
         return None, False
     try:
-        validate_script_plan(saved["plan"], human_storyboard_reference_context(resources))
+        validate_script_plan(
+            saved["plan"], human_storyboard_reference_context(resources), selected_labels)
         return saved, False
     except (JsonSchemaError, TypeError, ValueError):
         plan, response = openai_script_plan(
@@ -1290,6 +1350,7 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
         resources, 55_000,
         {"default_asset_manifest", "reference_library", "prompt_contract"},
     )
+    season_context = script_season_context()
     source_material += """
 
 [필수 화면 연출 잠금]
@@ -1301,6 +1362,12 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
 - 마지막 씬은 가능하면 주인공 한 명의 정면 구도와 자연스러운 카메라 렌즈 응시로 마무리한다. 안전·존엄·서사상 부적절한 경우에만 사유를 명시해 예외로 한다.
 - 요양원의 좋은 인상은 어르신의 선택과 존엄을 지키는 눈높이 소통, 편안하고 정돈된 공간, 실제 장면에 근거한 세심한 돌봄과 가족 교류로 절제해 표현한다. 제공되지 않은 설비·서비스 실적·치료 효과를 꾸며 홍보하지 않는다.
 """
+    source_material += (
+        "\n[제작 시점 계절 잠금]\n"
+        f"- 제작 기준일: {season_context['local_date']} (Asia/Seoul), 현재 계절: {season_context['season']}.\n"
+        "- 제목, 내레이션, 장면명, 이미지·모션 프롬프트의 계절·조명·식물·소품을 현재 계절과 맞춘다. "
+        "선택 키워드에 명시되지 않은 다른 계절을 임의로 추가하지 않는다.\n"
+    )
     if script_plan:
         source_material += "\n확정된 1차 대본(2차에서 제목과 나레이션 문장을 그대로 유지): " + json.dumps(script_plan, ensure_ascii=False)
         source_material += "\n2차 콘티에서는 확정 대본을 씬으로 확장한다. 제목과 나레이션 원문을 새 시어로 바꾸거나 어색한 비유를 덧붙이지 않는다. 모든 씬은 나레이션 큐에 속해야 한다. 인물/장소 선택은 1차와 일치시킨다. 각 씬의 현재 구역, 문턱 통과, 이동 방향, 다음 도착 구역을 sequence에 명시한다. 문을 열고 들어갔다면 다음 씬은 내부 장소이며 문 앞 재등장과 왕복을 금지한다."
