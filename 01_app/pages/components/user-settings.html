@@ -1,19 +1,6 @@
 <dialog class="user-settings-dialog" id="userSettingsDialog" aria-labelledby="userSettingsTitle">
   <header class="user-settings-head"><div><small>YOUR WORKFLOW · USER SETTINGS</small><h2 id="userSettingsTitle">사용자 설정</h2></div><button class="user-settings-close" id="userSettingsClose" type="button" aria-label="사용자 설정 닫기" autofocus>×</button></header>
   <div class="user-settings-body">
-    <div class="user-settings-workspace">
-      <aside class="user-automation-control" aria-labelledby="userAutomationControlTitle">
-        <div class="user-automation-control-head"><div><small>AUTOMATION</small><h3 id="userAutomationControlTitle">자동 제작</h3></div><span class="user-automation-state" id="userAutomationStateBadge" data-state="idle">꺼짐</span></div>
-        <label class="user-automation-switch"><span><strong>자동 제작 시작</strong><small id="userAutomationSwitchText">꺼짐</small></span><input id="userAutomationToggle" type="checkbox" role="switch" aria-label="자동 제작 시작 또는 중지"><i aria-hidden="true"></i></label>
-        <section class="user-automation-progress" aria-label="자동 제작 진행 상황">
-          <header><span id="userAutomationCurrentStage">대기</span><strong id="userAutomationPercent">0%</strong></header>
-          <div class="user-automation-progress-track" role="progressbar" aria-label="자동 제작 전체 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="userAutomationProgressBar"></i></div>
-          <p id="userAutomationCurrentDetail">자동 제작 스위치를 켜면 저장된 설정으로 시작합니다.</p>
-          <ol class="user-automation-progress-steps" id="userAutomationProgressSteps"></ol>
-        </section>
-        <p class="user-automation-server-status" id="userAutomationServerStatus" role="status" aria-live="polite">서버 상태를 불러오는 중입니다.</p>
-        <details class="user-automation-history"><summary>최근 실행</summary><div class="user-automation-runs" id="userAutomationRuns" aria-label="최근 자동화 실행"></div></details>
-      </aside>
       <section class="user-settings-section user-automation-layout" aria-label="단계별 자동화 설정">
       <label class="user-settings-value" for="userAutomationRange" id="userAutomationValue">수동 진행</label>
       <input class="user-settings-range" id="userAutomationRange" type="range" min="0" max="0" step="1" value="0" aria-label="자동화 종료 단계" aria-describedby="userAutomationSummary">
@@ -56,9 +43,8 @@
         </section>
         <section class="user-stage-options" data-user-stage="5" hidden><h4>제작 캘린더</h4><p>기존처럼 제작 콘텐츠를 캘린더에 표시합니다. 배포·예약 게시 기능은 자동화 범위에 포함되지 않으며 추후 구현 예정입니다.</p></section>
       </form>
-      <p>시작 확인 시 첫 콘텐츠를 제작하고, 한국 시간 기준 설정 간격으로 반복합니다. 오류 시 반복을 중지합니다. 월말에 해당 날짜가 없으면 말일에 실행합니다.</p>
+      <p>설정을 저장한 뒤 제작 인덱스의 자동 제작 스위치를 켜면 첫 콘텐츠를 제작하고, 한국 시간 기준 설정 간격으로 반복합니다. 오류 시 반복을 중지합니다. 월말에 해당 날짜가 없으면 말일에 실행합니다.</p>
       </section>
-    </div>
   </div>
   <footer class="user-settings-footer"><span id="userSettingsSaveStatus" role="status" aria-live="polite">서버에 저장합니다. 저장만으로는 실행되지 않습니다.</span><fieldset class="user-repeat" id="userAutomationRepeat" disabled hidden><legend>반복 간격</legend><div class="user-repeat-controls"><input id="userRepeatInterval" form="userStageOptionsForm" type="number" min="1" max="365" step="1" value="1" required aria-label="반복 간격 숫자"><div class="user-repeat-units"><label class="user-repeat-unit"><input form="userStageOptionsForm" type="radio" name="userRepeatUnit" value="day" checked><span>일</span></label><label class="user-repeat-unit"><input form="userStageOptionsForm" type="radio" name="userRepeatUnit" value="week"><span>주</span></label><label class="user-repeat-unit"><input form="userStageOptionsForm" type="radio" name="userRepeatUnit" value="month"><span>월</span></label><label class="user-repeat-unit"><input form="userStageOptionsForm" type="radio" name="userRepeatUnit" value="count"><span>회</span></label></div><span id="userRepeatSuffix">마다</span></div></fieldset><div class="user-settings-actions"><button class="flow-btn primary" id="userSettingsSave" type="button">설정 저장</button></div></footer>
 </dialog>

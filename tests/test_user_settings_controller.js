@@ -84,9 +84,10 @@ assert.equal(fixture.controller.mount(), true);
 assert.equal(fixture.get('#userSettingsOpen').listeners.get('click').length, 1, 'mount is idempotent');
 
 (async () => {
+  await fixture.controller.refreshAutomation();
+  const beforeOpen = fixture.requests.length;
   await fixture.get('#userSettingsOpen').emit('click');
-  assert.equal(fixture.requests[0][0], '/api/automation');
-  assert.equal(fixture.requests[1][0], '/api/brand-assets');
+  assert.deepEqual(fixture.requests.slice(beforeOpen).map(([path]) => path), ['/api/automation','/api/brand-assets']);
   assert.equal(fixture.get('#userSettingsDialog').open, true);
   assert.equal(fixture.intervals[0].delay, 5000);
   const stageButton = fixture.get('#userAutomationStages').children[0];
@@ -141,5 +142,18 @@ assert.equal(fixture.get('#userSettingsOpen').listeners.get('click').length, 1, 
   await closeOnly.get('#userAutomationStages').children[1].emit('click');
   await closeOnly.get('#userSettingsClose').emit('click');
   assert.equal(closeOnly.requests.some(([, options]) => options?.method === 'POST' && JSON.parse(options.body).action === 'start'), false, 'closing settings never starts automation implicitly');
+
+  const indexControl = harness({automationData: {settings: {version: 3, enabled: false, config: {
+    endpoint: '2', repeat: {interval: 1, unit: 'day'}, keywords: {count: 3, ai: true, month: ''},
+    video: {scene_count: 0, crop: 'default'}, voice: {profile_id: 'warm_female'},
+    brand: {intro: false, outro: false, watermark: false}, channels: []
+  }}, runs: []}});
+  indexControl.controller.mount();
+  await indexControl.controller.refreshAutomation();
+  indexControl.get('#userAutomationToggle').checked = true;
+  await indexControl.get('#userAutomationToggle').emit('change');
+  const indexStart = indexControl.requests.find(([, options]) => options?.method === 'POST' && JSON.parse(options.body).action === 'start');
+  assert.equal(JSON.parse(indexStart[1].body).config.endpoint, '2', 'index switch starts with the server-saved configuration');
+  assert.equal(indexControl.get('#userSettingsDialog').open, false, 'index switch does not need to open settings');
   console.log('User settings controller tests passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

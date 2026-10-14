@@ -24,6 +24,11 @@
       mounted=true;return true;
     }
     function setBusy(value){busy=Boolean(value);if(nodes)nodes.switch.disabled=busy;}
+    function setNotice(message,state='idle'){
+      if(!nodes)return false;
+      nodes.detail.textContent=String(message||'');nodes.badge.textContent=state==='failed'?'확인 필요':current?.state||'꺼짐';nodes.badge.dataset.state=state;
+      return true;
+    }
     function runRow(run){
       const row=nodes.document.createElement('article');row.className=`user-automation-run ${run.status||''}`;
       const head=nodes.document.createElement('strong');head.textContent=`${deps.model({runs:[run]}).state} · ${deps.model({runs:[run]}).stage}`;
@@ -49,7 +54,7 @@
       return current;
     }
     function unmount(){if(!mounted)return false;listeners.splice(0).reverse().forEach(dispose=>dispose());nodes=null;current=null;mounted=false;return true;}
-    return Object.freeze({mount,unmount,render,setBusy});
+    return Object.freeze({mount,unmount,render,setBusy,setNotice});
   }
   return Object.freeze({create});
 });

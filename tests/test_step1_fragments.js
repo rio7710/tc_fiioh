@@ -18,13 +18,14 @@ assert.match(fragments.login, /id="step1"/);
 
 assert.match(fragments.index, /id="stepIndex"/);
 assert.match(fragments.index, /<h1 class="flow-title content-index-heading">내 콘텐츠 제작 인덱스<\/h1>/);
-['contentIndex', 'contentIndexPagination', 'contentIndexMessage', 'createProjectButton', 'brandLibraryPanel'].forEach(id => {
+['contentIndex', 'contentIndexPagination', 'contentIndexMessage', 'createProjectButton', 'brandLibraryPanel', 'userAutomationToggle', 'userAutomationProgressBar', 'userSettingsOpen'].forEach(id => {
   assert.match(fragments.index, new RegExp(`id="${id}"`), `index contract keeps #${id}`);
 });
 assert.match(fragments.index, /data-index-filter="all"/);
 assert.match(fragments.index, /data-index-filter="progress"/);
 assert.match(fragments.index, /data-index-filter="completed"/);
 assert.equal((fragments.index.match(/data-create-project/g) || []).length, 2, 'index keeps top and bottom create buttons');
+assert.ok(fragments.index.indexOf('id="userAutomationToggle"') < fragments.index.indexOf('id="userSettingsOpen"'), 'automation control sits left of settings button');
 
 assert.match(fragments.project, /id="stepProject"/);
 ['projectDetailTitle', 'projectDetailSteps', 'projectDeleteButton', 'projectDetailContinue'].forEach(id => {

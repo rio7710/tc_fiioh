@@ -16,6 +16,7 @@
     let disposeRuntime = () => {};
     let listenerDisposers = [];
     let automationControlPanel = null;
+    let refreshAutomation = async () => false;
 
     function mount() {
       if (mounted) return true;
@@ -92,7 +93,7 @@
             syncKeywordButton();
           }catch(error){saveStatus.textContent='저장된 설정을 불러오지 못했습니다. 기본값으로 표시합니다.';}
         }
-        let serverVersion=0,automationBusy=false,automationLoaded=false,automationPoll=null,openGeneration=0;
+        let serverVersion=0,automationBusy=false,automationLoaded=false,automationPoll=null,openGeneration=0,latestAutomation=null;
         let availableBrandRoles=new Set();
         function syncAvailableBrandOptions(){
           const inputs={intro:'#userUseIntro',outro:'#userUseOutro',watermark:'#userUseWatermark'};
@@ -105,13 +106,16 @@
           });
         }
         function collectAutomationConfig(){return {schema_version:'1.0.0',endpoint:stages[Number(slider.value)-1]?.key||'manual',repeat:repeatSettings(),keywords:{count:Number(document.querySelector('#userKeywordCount').value),ai:document.querySelector('#userAiKeywords').checked,month:document.querySelector('#userKeywordMonth').value},video:{scene_count:Number(document.querySelector('#userVideoSceneCount').value),crop:document.querySelector('#userCropMode').value},voice:{profile_id:document.querySelector('#userVoiceProfile').value},brand:{intro:document.querySelector('#userUseIntro').checked,outro:document.querySelector('#userUseOutro').checked,watermark:document.querySelector('#userUseWatermark').checked},channels:[...optionsForm.querySelectorAll('[data-output-channel]:checked')].map(input=>input.dataset.outputChannel)};}
-        function applyServerSettings(data){
+        function applyServerSettings(data,applyForm=dialog.open){
+          latestAutomation=data;
           serverVersion=data.settings?.version||0;
-          const c=data.settings?.config;
-          if(c)restoreAutomationSettings({version:1,endpoint:c.endpoint,repeat:c.repeat,channels:c.channels,options:{userKeywordCount:String(c.keywords.count),userAiKeywords:c.keywords.ai,userKeywordMonth:c.keywords.month,userVideoSceneCount:String(c.video.scene_count),userCropMode:c.video.crop,userVoiceProfile:c.voice?.profile_id||'warm_female',userUseIntro:c.brand.intro,userUseOutro:c.brand.outro,userUseWatermark:c.brand.watermark}});
-          else restoreAutomationSettings();
-          syncAvailableBrandOptions();
-          renderAutomationStatus(data);render();
+          if(applyForm){
+            const c=data.settings?.config;
+            if(c)restoreAutomationSettings({version:1,endpoint:c.endpoint,repeat:c.repeat,channels:c.channels,options:{userKeywordCount:String(c.keywords.count),userAiKeywords:c.keywords.ai,userKeywordMonth:c.keywords.month,userVideoSceneCount:String(c.video.scene_count),userCropMode:c.video.crop,userVoiceProfile:c.voice?.profile_id||'warm_female',userUseIntro:c.brand.intro,userUseOutro:c.brand.outro,userUseWatermark:c.brand.watermark}});
+            else restoreAutomationSettings();
+            syncAvailableBrandOptions();render();
+          }
+          renderAutomationStatus(data);
         }
         function renderAutomationStatus(data){
           automationControlPanel.render(data);
@@ -122,28 +126,34 @@
           ['userSettingsSave','userVoicePreview'].forEach(id=>document.getElementById(id).disabled=value||!automationLoaded);
           automationControlPanel?.setBusy(value||!automationLoaded);
         }
-        async function mutateAutomation(action,runId){
+        async function mutateAutomation(action,runId,configOverride){
           if(automationBusy||!automationLoaded)return false;
-          if(['save','start'].includes(action)&&!optionsForm.reportValidity()){saveStatus.textContent='입력값을 확인해 주세요.';return false;}
-          const generation=openGeneration;setAutomationBusy(true);saveStatus.textContent='서버에 반영 중…';
+          if(['save','start'].includes(action)&&!configOverride&&!optionsForm.reportValidity()){saveStatus.textContent='입력값을 확인해 주세요.';return false;}
+          setAutomationBusy(true);saveStatus.textContent='서버에 반영 중…';
           try{
             const payload={action,request_id:crypto.randomUUID(),version:serverVersion};
-            if(['save','start'].includes(action))payload.config=collectAutomationConfig();
+            if(['save','start'].includes(action))payload.config=configOverride||collectAutomationConfig();
             if(runId)payload.run_id=runId;
             const data=await api('/api/automation',{method:'POST',body:JSON.stringify(payload)});
-            if(generation!==openGeneration)return false;
-            applyServerSettings(data);saveStatus.textContent=action==='save'?'서버에 저장했습니다. 자동화는 중지 상태입니다.':action==='start'?'자동화를 시작했습니다. 첫 콘텐츠가 곧 생성됩니다.':'반영했습니다. 이미 시작한 외부 요청은 완료될 수 있습니다.';
+            applyServerSettings(data,dialog.open);saveStatus.textContent=action==='save'?'서버에 저장했습니다. 자동화는 중지 상태입니다.':action==='start'?'자동화를 시작했습니다. 첫 콘텐츠가 곧 생성됩니다.':'반영했습니다. 이미 시작한 외부 요청은 완료될 수 있습니다.';
             deps.refreshProjectIndex().catch(error=>deps.onError('refresh-project-index',error));return true;
-          }catch(error){if(generation===openGeneration)saveStatus.textContent=error.message;return false;}
-          finally{if(generation===openGeneration)setAutomationBusy(false);}
+          }catch(error){saveStatus.textContent=error.message;automationControlPanel.setNotice(error.message,'failed');return false;}
+          finally{setAutomationBusy(false);}
         }
         async function startAutomation(closeAfter=false){
           if(automationBusy||!automationLoaded)return false;
-          const c=collectAutomationConfig();if(c.endpoint==='manual'){saveStatus.textContent='자동화할 단계를 선택해 주세요.';return false;}
+          if(dialog.open&&!optionsForm.reportValidity()){saveStatus.textContent='입력값을 확인해 주세요.';return false;}
+          const c=dialog.open?collectAutomationConfig():latestAutomation?.settings?.config;
+          if(!c||c.endpoint==='manual'){
+            saveStatus.textContent='설정에서 자동화할 단계를 선택하고 먼저 저장해 주세요.';
+            automationControlPanel.setNotice('설정 버튼에서 자동화 범위를 먼저 저장해 주세요.','failed');
+            return false;
+          }
           const unit={day:'일',week:'주',month:'개월',count:'회 연속'}[c.repeat.unit];
           const cadence=c.repeat.unit==='count'?`${c.repeat.interval}${unit}`:`${c.repeat.interval}${unit} 간격`;
-          if(!confirm(`키워드부터 ${stages[Number(slider.value)-1]?.label}까지 ${cadence}으로 자동화를 시작합니다.\n지금 첫 콘텐츠를 만들며, AI·이미지·음성 API 비용이 발생할 수 있습니다.\n진행할까요?`))return false;
-          const started=await mutateAutomation('start');if(started&&closeAfter)dialog.close();return started;
+          const endpointLabel=stages.find(stage=>stage.key===c.endpoint)?.label||{'2':'키워드','3':'대본·타임라인','3-1':'콘티','4':'영상 디자인','5':'제작 캘린더'}[c.endpoint]||c.endpoint;
+          if(!confirm(`키워드부터 ${endpointLabel}까지 ${cadence}으로 자동화를 시작합니다.\n지금 첫 콘텐츠를 만들며, AI·이미지·음성 API 비용이 발생할 수 있습니다.\n진행할까요?`))return false;
+          const started=await mutateAutomation('start',null,c);if(started&&closeAfter)dialog.close();return started;
         }
         function requestSettingsClose(){
           if(automationBusy)return;
@@ -163,6 +173,16 @@
           }
         });
         automationControlPanel.mount();
+        automationControlPanel.render({settings:null,runs:[]});
+        automationControlPanel.setBusy(true);
+        refreshAutomation=async({applyForm=false}={})=>{
+          if(!authUIController.isLoggedIn())return false;
+          try{
+            const data=await api('/api/automation');automationLoaded=true;applyServerSettings(data,applyForm);setAutomationBusy(false);return true;
+          }catch(error){deps.onError('automation-status',error);automationControlPanel.setNotice('자동 제작 상태를 불러오지 못했습니다.','failed');return false;}
+        };
+        automationPoll=setInterval(()=>{if(!automationBusy)refreshAutomation().catch(error=>deps.onError('poll',error))},5000);
+        refreshAutomation().catch(error=>deps.onError('initial-status',error));
         const recommendButton=document.querySelector('#userKeywordRecommend');
         const refreshButton=document.querySelector('#userKeywordRefresh');
         const keywordCount=document.querySelector('#userKeywordCount');
@@ -220,7 +240,7 @@
           document.querySelector('#userAutomationSummary').textContent=!stages.length?'단계 목록을 불러오지 못했습니다. 콘텐츠 목록을 다시 불러온 뒤 열어 주세요.':end?`자동 진행: ${stages.slice(0,end).map(stage=>stage.label).join(' → ')} · ${stages[end]?`${stages[end].label} 전 대기`:'제작물 캘린더 표시까지 (배포 제외)'}`:'모든 단계에서 사용자가 직접 진행합니다.';
         }
         listen(document.querySelector('#userSettingsOpen'),'click',async()=>{
-          const generation=++openGeneration;automationLoaded=false;
+          const generation=++openGeneration;
           stages=(Object.values(indexProjects)[0]?.steps||[]).filter(stage=>stage.key!=='1').map(stage=>stage.key==='5'?{...stage,label:'제작 캘린더'}:stage);
           selectedStage='manual';optionsForm.reset();clearKeywordPreview();
           slider.closest('.user-automation-layout').style.setProperty('--stage-count',String(stages.length+1));
@@ -270,8 +290,7 @@
           try{
             const [data,brandData]=await Promise.all([api('/api/automation'),api('/api/brand-assets')]);if(generation!==openGeneration||!dialog.open)return;
             availableBrandRoles=new Set((brandData.assets||[]).filter(asset=>asset&&asset.active).map(asset=>asset.role));
-            automationLoaded=true;applyServerSettings(data);
-            clearInterval(automationPoll);automationPoll=setInterval(async()=>{if(!dialog.open||automationBusy)return;try{const current=await api('/api/automation');if(dialog.open&&generation===openGeneration)renderAutomationStatus(current)}catch(error){deps.onError('poll',error)}},5000);
+            automationLoaded=true;applyServerSettings(data,true);
           }catch(error){saveStatus.textContent='서버 설정을 불러오지 못했습니다. 닫은 뒤 다시 열어 주세요.';}
           finally{if(generation===openGeneration)setAutomationBusy(false);}
         });
@@ -295,7 +314,7 @@
         });
         listen(dialog,'cancel',event=>{event.preventDefault();requestSettingsClose();});
         listen(dialog,'click',event=>{if(event.target!==dialog)return;const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)requestSettingsClose()});
-        listen(dialog,'close',()=>{openGeneration++;clearInterval(automationPoll);document.body.style.overflow=previousOverflow;slider.value='0';selectedStage='manual';optionsForm.reset();clearKeywordPreview();render();document.querySelector('#userSettingsOpen').focus()});
+        listen(dialog,'close',()=>{openGeneration++;document.body.style.overflow=previousOverflow;slider.value='0';selectedStage='manual';optionsForm.reset();clearKeywordPreview();render();document.querySelector('#userSettingsOpen').focus()});
       disposeRuntime = () => {
         openGeneration++;
         clearInterval(automationPoll);
@@ -307,6 +326,7 @@
         if (keyInput) keyInput.value = '';
         automationControlPanel?.unmount();
         automationControlPanel = null;
+        refreshAutomation = async () => false;
       };
       mounted = true;
       return true;
@@ -321,7 +341,7 @@
       return true;
     }
 
-    return Object.freeze({mount, unmount});
+    return Object.freeze({mount, unmount, refreshAutomation:(...args)=>refreshAutomation(...args)});
   }
 
   return Object.freeze({create});

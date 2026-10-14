@@ -22,6 +22,9 @@ const panel=Panel.create({getRoot:()=>root,model:Model.view,onToggle:async value
   assert.equal(nodes.userAutomationPercent.textContent,'62%');
   assert.equal(nodes.userAutomationProgressBar.style.width,'62%');
   assert.equal(nodes.userAutomationCurrentStage.textContent,'장면 이미지 생성');
+  assert.equal(panel.setNotice('설정을 확인해 주세요.','failed'),true);
+  assert.equal(nodes.userAutomationCurrentDetail.textContent,'설정을 확인해 주세요.');
+  assert.equal(nodes.userAutomationStateBadge.dataset.state,'failed');
   nodes.userAutomationToggle.checked=false;await nodes.userAutomationToggle.emit('change');assert.deepEqual(toggles,[false]);
   assert.equal(panel.unmount(),true);assert.equal(panel.unmount(),false);
   console.log('Automation control panel tests passed');
