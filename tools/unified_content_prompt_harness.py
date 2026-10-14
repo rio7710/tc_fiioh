@@ -693,6 +693,50 @@ def normalize_unknown_table_reference_locks(document: dict[str, Any]) -> dict[st
     return document
 
 
+def normalize_location_return_routes(document: dict[str, Any]) -> dict[str, Any]:
+    """Complete a missing visible route when a storyboard revisits a location.
+
+    A provider can preserve the intended A -> B -> A scene order while repeatedly
+    omitting the route tokens required by the continuity contract. The omission
+    is mechanical, so fill only the current scene's entry action instead of
+    spending more provider calls or changing any scene content/reference.
+    """
+    production = document.get("production") or {}
+    scenes = (production.get("timeline") or {}).get("scenes") or []
+    assets = production.get("reference_assets") or []
+    location_ids = {
+        str(asset.get("id")) for asset in assets if isinstance(asset, dict)
+        and (str(asset.get("kind", "")).lower() in {"location", "facility"}
+             or str(asset.get("id", "")).startswith(("ref-location-", "ref-facility-")))
+    }
+    seen_locations: set[str] = set()
+    previous_locations: set[str] = set()
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        current_locations = {
+            str(item) for item in (scene.get("reference_ids") or []) if str(item) in location_ids
+        }
+        returned = current_locations & (seen_locations - previous_locations)
+        if returned:
+            sequence = scene.get("sequence")
+            if not isinstance(sequence, dict):
+                sequence = {}
+                scene["sequence"] = sequence
+            route = " ".join(_text(sequence.get(key)) for key in
+                             ("entry_action", "continuity_anchor", "camera_bridge"))
+            return_terms = ("돌아오", "돌아가", "복귀", "귀환", "재방문", "되돌아")
+            travel_terms = ("이동", "걸어", "통과", "문턱", "복도", "계단", "엘리베이터", "도착", "향해")
+            if not any(term in route for term in return_terms) or not any(term in route for term in travel_terms):
+                title = str(scene.get("title") or "현재 활동").strip()
+                existing = _text(sequence.get("entry_action")).strip()
+                completed = f"{title}을 이어가기 위해 복도와 문턱을 통과해 이전 장소로 돌아오는 이동을 화면에 보여준다."
+                sequence["entry_action"] = f"{completed} {existing}".strip()
+        seen_locations.update(current_locations)
+        previous_locations = current_locations
+    return document
+
+
 def validate_visual_continuity(document: dict[str, Any]) -> None:
     """Reject storyboard plans that encode an unmotivated location return or lose known furniture geometry."""
     production = document.get("production") or {}
@@ -1133,6 +1177,7 @@ def run_generation_harness(
                     scene["narration"] = dict(sourced)
                     scene["caption"] = dict(sourced)
         normalize_unmotivated_axis_crossings(document)
+        normalize_location_return_routes(document)
         normalize_unknown_table_reference_locks(document)
         if provenance and not isinstance(document.get("provenance"), dict):
             document["provenance"] = json.loads(json.dumps(provenance, ensure_ascii=False))

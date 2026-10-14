@@ -674,8 +674,10 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
             return json.dumps(repaired, ensure_ascii=False)
 
         result = run_generation_harness(generate, ["안심"], "시설 자료")
-        self.assertEqual(3, len(calls))
-        self.assertEqual(2, result["repair_count"])
+        self.assertEqual(2, len(calls))
+        self.assertEqual(1, result["repair_count"])
+        normalized_route = result["document"]["production"]["timeline"]["scenes"][2]["sequence"]["entry_action"]
+        self.assertIn("돌아오는 이동", normalized_route)
 
     def test_location_return_requires_explicit_return_route(self):
         value = document(["안심"])
@@ -693,6 +695,27 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
             validate_visual_continuity(value)
         third["sequence"]["entry_action"] = "복도를 지나 옥상정원으로 돌아오는 이동을 화면에 보여준 뒤 활동을 이어간다."
         validate_visual_continuity(value)
+
+    def test_generation_normalizes_missing_location_return_route_without_provider_repair(self):
+        value = document(["안심"])
+        scenes = value["production"]["timeline"]["scenes"]
+        first = json.loads(json.dumps(scenes[0])); second = json.loads(json.dumps(scenes[0])); third = json.loads(json.dumps(scenes[0]))
+        first.update(id="scene-a1", reference_ids=["ref-location-roof"], sequence={"continuity_from":None,"exit_action":"정원에서 실내로 이동한다."})
+        second.update(id="scene-b", reference_ids=["ref-location-room"], sequence={"continuity_from":"scene-a1","exit_action":"실내에서 머문다."})
+        third.update(id="scene-a2", title="정원 산책", reference_ids=["ref-location-roof"], sequence={"continuity_from":"scene-b","entry_action":"활동을 이어간다."})
+        value["production"]["reference_assets"] = [
+            {"id":"ref-location-roof","kind":"location"},
+            {"id":"ref-location-room","kind":"location"},
+        ]
+        value["production"]["timeline"]["scenes"] = [first, second, third]
+        cue = value["production"]["narration_cues"][0]
+        cue.update(end=90, scene_ids=["scene-a1", "scene-b", "scene-a2"])
+
+        result = run_generation_harness(lambda prompt: json.dumps(value, ensure_ascii=False), ["안심"], "시설 자료")
+
+        route = result["document"]["production"]["timeline"]["scenes"][2]["sequence"]["entry_action"]
+        self.assertIn("돌아오는 이동", route)
+        self.assertEqual(0, result["repair_count"])
 
     def test_table_geometry_is_declared_and_consistent_with_scene_prompts(self):
         value = document(["안심"])
