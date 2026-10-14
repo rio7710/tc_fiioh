@@ -18,6 +18,12 @@
       <li class="ai-role" data-role="director"><span class="ai-role-no">03</span><div class="ai-role-copy"><strong>비주얼 디렉터</strong><small>구도 · 쇼트 · 장면 전환 설계</small><span class="ai-role-engine">ChatGPT 담당</span><p class="ai-role-result"></p></div><span class="ai-role-state">대기</span></li>
       <li class="ai-role" data-role="editor"><span class="ai-role-no">04</span><div class="ai-role-copy"><strong>콘티 에디터</strong><small>씬 · 대사 · 타이밍 최종 통합</small><span class="ai-role-engine">Claude 담당</span><p class="ai-role-result"></p></div><span class="ai-role-state">대기</span></li>
     </ol>
-    <div class="ai-dialog-foot"><span class="ai-foot-status" id="aiFootStatus">AI 팀을 호출하고 있습니다.</span></div>
+    <div class="ai-dialog-foot">
+      <span class="ai-foot-status" id="aiFootStatus">AI 팀을 호출하고 있습니다.</span>
+      <span class="ai-scene-progress" id="aiSceneProgress" hidden>
+        씬 검수 <strong id="aiSceneCompleted">0</strong>/<span id="aiSceneTotal">0</span>
+        <em id="aiSceneFailed" hidden>실패 0</em>
+      </span>
+    </div>
   </div>
 </div>

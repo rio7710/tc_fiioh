@@ -224,6 +224,10 @@ thinkcast-top-nav{display:block}
 .ai-role.done .ai-role-state{color:#54826f}
 .ai-dialog-foot{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 24px 14px;border-top:1px solid var(--line)}
 .ai-foot-status{color:var(--muted);font-size:12px}
+.ai-scene-progress{display:inline-flex;align-items:center;gap:4px;flex:none;padding:5px 9px;border:1px solid #9cb7ad;border-radius:999px;background:#edf6f2;color:#265b4d;font-size:11px;font-weight:800;white-space:nowrap}
+.ai-scene-progress[hidden]{display:none}
+.ai-scene-progress strong{font-size:13px;color:#174f43}
+.ai-scene-progress em{margin-left:3px;color:#a33c32;font-style:normal}
 @keyframes aiPulse{50%{box-shadow:0 0 0 7px rgba(23,79,72,0)}}
 @keyframes aiDots{0%{content:""}25%{content:"."}50%{content:".."}75%,100%{content:"..."}}
 .editor-back{align-self:flex-start;white-space:nowrap}

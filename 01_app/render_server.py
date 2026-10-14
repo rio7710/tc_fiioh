@@ -40,8 +40,9 @@ from final_export_queue import FinalExportConflict, FinalExportNotFound, FinalEx
 from worker_core import JobConflict, JobNotFound, JobStore
 kling_submission_lock = threading.Lock()
 from keyword_pool import load_month_pool, normalize_keyword_label
-from tools.unified_content_prompt_harness import normalize_reference_asset_metadata, run_generation_harness
+from tools.unified_content_prompt_harness import normalize_reference_asset_metadata, run_generation_harness, validate_document
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema_file
+from storyboard_scene_reviewer import review_storyboard_scenes
 
 APP_DIR = Path(__file__).resolve().parent
 ROOT = APP_DIR.parent
@@ -1281,12 +1282,13 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
         source_material += "\n2차 콘티에서는 확정 대본을 씬으로 확장한다. 제목과 나레이션 원문을 새 시어로 바꾸거나 어색한 비유를 덧붙이지 않는다. 모든 씬은 나레이션 큐에 속해야 한다. 인물/장소 선택은 1차와 일치시킨다. 각 씬의 현재 구역, 문턱 통과, 이동 방향, 다음 도착 구역을 sequence에 명시한다. 문을 열고 들어갔다면 다음 씬은 내부 장소이며 문 앞 재등장과 왕복을 금지한다."
     reference_material = human_storyboard_reference_context(resources, 70_000)
     responses = []
+    responses_lock = threading.Lock()
 
-    def generate(prompt):
+    def generate(prompt, request_model=None, max_output_tokens=24_000):
         body = {
-            "model": model,
+            "model": request_model or model,
             "input": prompt,
-            "max_output_tokens": 24_000,
+            "max_output_tokens": max_output_tokens,
             "text": {"format": {"type": "json_object"}},
         }
         request = Request(
@@ -1303,7 +1305,8 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
             raise RuntimeError(safe.get(exc.code, f"OpenAI API 응답 오류 (HTTP {exc.code})")) from None
         except (URLError, TimeoutError):
             raise RuntimeError("OpenAI 최종대본 생성 연결 시간이 초과되었습니다.") from None
-        responses.append(result)
+        with responses_lock:
+            responses.append(result)
         return "".join(
             str(content.get("text", ""))
             for item in result.get("output", [])
@@ -1325,6 +1328,26 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
         canonical_reference_assets=group_reference_asset_catalog(resources),
         progress_callback=progress_callback,
     )
+    review_model = os.environ.get("OPENAI_SCENE_REVIEW_MODEL", model)
+    scene_review = review_storyboard_scenes(
+        generated["document"],
+        lambda prompt: generate(prompt, review_model, RUNTIME_CONFIG["scene_review_max_output_tokens"]),
+        progress_callback,
+        concurrency=RUNTIME_CONFIG["scene_review_concurrency"],
+        max_attempts=3,
+    )
+    generated["document"] = scene_review["document"]
+    validate_document(generated["document"], selected_labels, True, script_plan)
+    generated["scene_review"] = {
+        key: scene_review[key]
+        for key in ("completed_scenes", "total_scenes", "failed_scenes", "repaired_scenes")
+    }
+    if progress_callback:
+        progress_callback({
+            "phase": "scene_review_complete", "percent": 90,
+            "detail": f"씬별 검수 {scene_review['completed_scenes']}/{scene_review['total_scenes']} 완료",
+            **generated["scene_review"],
+        })
     usage = {
         key: sum(int(item.get("usage", {}).get(key, 0)) for item in responses)
         for key in ("input_tokens", "output_tokens", "total_tokens")
@@ -1735,6 +1758,8 @@ RUNTIME_CONFIG = {
     "openai_tts_timeout": safe_env_int("OPENAI_TTS_TIMEOUT", 120, 1, 600),
     "openai_image_timeout": safe_env_int("OPENAI_IMAGE_TIMEOUT", 300, 1, 900),
     "openai_script_timeout": safe_env_int("OPENAI_SCRIPT_TIMEOUT", 300, 1, 900),
+    "scene_review_concurrency": safe_env_int("SCRIPT_SCENE_REVIEW_CONCURRENCY", 3, 1, 4),
+    "scene_review_max_output_tokens": safe_env_int("OPENAI_SCENE_REVIEW_MAX_OUTPUT_TOKENS", 8000, 2000, 24000),
     "qwen_submit_timeout": safe_env_int("QWEN_SUBMIT_TIMEOUT", 15, 1, 120),
     "qwen_poll_timeout": safe_env_int("QWEN_POLL_TIMEOUT", 10, 1, 120),
     "qwen_audio_timeout": safe_env_int("QWEN_AUDIO_TIMEOUT", 30, 1, 300),
@@ -2654,12 +2679,14 @@ def execute_script_generation(user_id: str, project_id: str, progress_callback=N
         previous_documents, script_plan_data["plan"], progress_callback=progress_callback,
     )
     document = generated["document"]
+    scene_review = generated.get("scene_review", {})
     script, timeline = unified_document_view(document)
     if progress_callback:
         progress_callback({"phase": "persisting", "percent": 95,
                            "detail": "검증된 대본과 콘티를 프로젝트에 저장하고 있습니다.",
                            "repair_count": generated["repair_count"],
-                           "regeneration_count": generated.get("regeneration_count", 0)})
+                           "regeneration_count": generated.get("regeneration_count", 0),
+                           **scene_review})
     candidate = store.save_stage_candidate(user_id, project_id, 3, {
         "document": document, "script": script, "selected_keywords": labels,
         "group_id": project["group_id"], "resource_ids": [item["resource_id"] for item in resources],
@@ -2681,7 +2708,8 @@ def execute_script_generation(user_id: str, project_id: str, progress_callback=N
         "resource_count": len(resources), "resource_types": sorted({item["resource_type"] for item in resources}),
         "document_id": document["document_id"], "schema_version": document["schema_version"],
         "scene_count": len(document["production"]["timeline"]["scenes"]),
-        "repair_count": generated["repair_count"], "usage": store.usage_summary(user_id, project_id),
+        "repair_count": generated["repair_count"], "scene_review": scene_review,
+        "usage": store.usage_summary(user_id, project_id),
     }
     return {"ok": True, "state": {"selected_keywords": selected_ids, "script": script},
             "document": document, "timeline": timeline, "generation": generation}
@@ -2709,8 +2737,10 @@ def _run_script_job(job_id: str) -> None:
         def progress(values):
             queue.update_progress(job_id, worker_id, values)
         result = execute_script_generation(job["input"]["user_id"], job["project_id"], progress)
+        scene_review = (result.get("generation") or {}).get("scene_review") or {}
         queue.update_progress(job_id, worker_id, {
-            "phase": "completed", "percent": 100, "detail": "대본과 콘티 저장이 완료됐습니다."
+            "phase": "completed", "percent": 100, "detail": "대본과 콘티 저장이 완료됐습니다.",
+            **scene_review,
         })
         queue.transition(job_id, "succeeded", result=result)
     except Exception as exc:

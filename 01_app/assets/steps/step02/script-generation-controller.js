@@ -16,7 +16,7 @@
       {name:'최종 검증',description:'스키마 검증 · 프로젝트 저장',engine:'Schema Validator'}
     ].map(Object.freeze))
   });
-  const requiredIds = ['aiWorkflowModal','aiProgressBar','aiFootStatus','aiWorkflowSummary','aiNow'];
+  const requiredIds = ['aiWorkflowModal','aiProgressBar','aiFootStatus','aiWorkflowSummary','aiNow','aiSceneProgress','aiSceneCompleted','aiSceneTotal','aiSceneFailed'];
 
   function create(dependencies) {
     const deps = dependencies || {};
@@ -65,6 +65,20 @@
       const foot = nodes.aiFootStatus;
       const summary = nodes.aiWorkflowSummary;
       const nowNode = nodes.aiNow;
+      const sceneProgress = nodes.aiSceneProgress;
+      const sceneCompleted = nodes.aiSceneCompleted;
+      const sceneTotal = nodes.aiSceneTotal;
+      const sceneFailed = nodes.aiSceneFailed;
+      const updateSceneProgress = values => {
+        const total = Math.max(0, Number(values?.total_scenes) || 0);
+        const completed = Math.max(0, Math.min(total, Number(values?.completed_scenes) || 0));
+        const failed = Math.max(0, Number(values?.failed_scenes) || 0);
+        sceneProgress.hidden = total < 1;
+        sceneCompleted.textContent = String(completed);
+        sceneTotal.textContent = String(total);
+        sceneFailed.hidden = failed < 1;
+        sceneFailed.textContent = `실패 ${failed}`;
+      };
       const labels = deps.getSelectedKeywordLabels();
       const requestStartedAt = deps.now();
       const formatElapsed = () => {
@@ -88,6 +102,7 @@
       nowNode.classList.add('processing');
       nowNode.textContent = 'GPT에 최종대본 생성 요청을 전송하고 있습니다';
       foot.textContent = '요청 1건 전송 중 · 중복 요청은 차단됩니다.';
+      updateSceneProgress(null);
       roles.forEach((role, index) => { role.className = `ai-role ${index === 0 ? 'active' : ''}`; role.querySelector('.ai-role-state').textContent = index === 0 ? '요청 전송' : '대기'; role.querySelector('.ai-role-result').textContent = ''; });
       updateWaitingState();
       let waitingTimer = deps.setInterval(updateWaitingState, 1000);
@@ -111,6 +126,7 @@
           nowNode.textContent = `${jobProgress.detail || '대본·콘티 생성 중'} · ${formatElapsed()}`;
           const repairCount = Number(jobProgress.repair_count || 0);
           const regenerationCount = Number(jobProgress.regeneration_count || 0);
+          updateSceneProgress(jobProgress);
           foot.textContent = `작업 ${job.job_id.slice(0,8)} · 시도 ${job.attempt} · 보정 ${repairCount}/3 · 신규 재생성 ${regenerationCount}/1`;
           roles[1].querySelector('.ai-role-state').textContent = `${jobProgress.phase || job.status} · ${percent}%`;
           if (job.status === 'failed') { terminalJob = true; throw new Error(job.error?.message || '대본 생성 작업이 실패했습니다.'); }
@@ -118,6 +134,11 @@
           if (job.status === 'succeeded') { terminalJob = true; generated = job.response; }
         }
         deps.clearPendingJob();
+        updateSceneProgress(generated.generation?.scene_review || {
+          completed_scenes:generated.generation?.scene_count,
+          total_scenes:generated.generation?.scene_count,
+          failed_scenes:0
+        });
         stopWaiting();
         roles[1].classList.remove('active'); roles[1].classList.add('done'); roles[1].querySelector('.ai-role-state').textContent = '완료';
         activePhase = 2; roles[2].classList.add('active'); progress.style.width = '66%';
