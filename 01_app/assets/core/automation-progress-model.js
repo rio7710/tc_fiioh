@@ -15,6 +15,7 @@
     Object.freeze({key:'export', label:'최종 출력', percent:96, matches:['final_export_calendar']})
   ]);
   const statusLabels = Object.freeze({queued:'대기 중',running:'진행 중',succeeded:'완료',failed:'오류',cancelled:'중지'});
+  const configuredEndIndex = Object.freeze({'2':0,'3':1,'3-1':4,'4':5,'5':6});
 
   function phaseFor(stage) {
     const value=String(stage||'create_project');
@@ -41,6 +42,19 @@
     return value.replaceAll('_',' ');
   }
 
+  function phaseState(index,configuredIndex,activeIndex,latest,active){
+    if(latest?.status==='succeeded')return index<=configuredIndex?'done':'pending';
+    if(latest&&['running','queued','failed','cancelled'].includes(latest.status)){
+      if(index<activeIndex)return 'done';
+      if(index===activeIndex){
+        if(active)return 'active';
+        if(latest.status==='failed')return 'failed';
+        if(latest.status==='cancelled')return 'stopped';
+      }
+    }
+    return index<=configuredIndex?'configured':'pending';
+  }
+
   function view(snapshot) {
     const data=snapshot||{},runs=Array.isArray(data.runs)?data.runs:[];
     const active=runs.find(run=>run&&['queued','running'].includes(run.status))||null;
@@ -62,10 +76,11 @@
       percent=phase.percent;state='중지';detail=`${stageLabel(latest.stage)} 단계에서 중지됐습니다.`;
     }
     const activeIndex=phases.findIndex(item=>item.key===phase.key);
+    const configuredIndex=configuredEndIndex[String(data.settings?.config?.endpoint||'manual')]??-1;
     return Object.freeze({
       enabled,active:Boolean(active),state,detail,percent,stage:latest?stageLabel(latest.stage):'대기',
       nextRunAt:data.settings?.next_run_at||null,latest,
-      phases:phases.map((item,index)=>Object.freeze({...item,state:percent===100?'done':index<activeIndex?'done':index===activeIndex&&active?'active':'pending'})),
+      phases:phases.map((item,index)=>Object.freeze({...item,state:phaseState(index,configuredIndex,activeIndex,latest,active)})),
       runs
     });
   }

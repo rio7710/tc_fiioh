@@ -13,13 +13,16 @@ assert.equal(value.stage,'대본·콘티 생성');
 assert.equal(value.percent,30);
 assert.equal(value.phases.find(item=>item.key==='script').state,'active');
 
+value=Model.view({settings:{enabled:0,config:{endpoint:'4'}},runs:[]});
+assert.deepEqual(value.phases.map(item=>item.state),['configured','configured','configured','configured','configured','configured','pending']);
+
 value=Model.view({settings:{enabled:0},runs:[{status:'failed',stage:'video_complete_scene-02',error_message:'Kling 오류'}]});
 assert.equal(value.state,'오류');
 assert.equal(value.stage,'Kling 영상 변환');
 assert.equal(value.detail,'Kling 오류');
 assert.equal(value.percent,78);
 
-value=Model.view({settings:{enabled:0},runs:[{status:'succeeded',stage:'final_export_calendar'}]});
+value=Model.view({settings:{enabled:0,config:{endpoint:'3'}},runs:[{status:'succeeded',stage:'script_confirm'}]});
 assert.equal(value.percent,100);
-assert.ok(value.phases.every(item=>item.state==='done'));
+assert.deepEqual(value.phases.map(item=>item.state),['done','done','pending','pending','pending','pending','pending']);
 console.log('Automation progress model tests passed');

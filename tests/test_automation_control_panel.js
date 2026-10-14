@@ -17,6 +17,8 @@ const toggles=[],actions=[];
 const panel=Panel.create({getRoot:()=>root,model:Model.view,onToggle:async value=>{toggles.push(value);return true},onRunAction:(action,run)=>actions.push([action,run])});
 (async()=>{
   assert.equal(panel.mount(),true);assert.equal(panel.mount(),true);
+  panel.render({settings:{enabled:0,config:{endpoint:'4'}},runs:[]});
+  assert.deepEqual(nodes.userAutomationProgressSteps.children.map(item=>item.className),['configured','configured','configured','configured','configured','configured','pending']);
   panel.render({settings:{enabled:1,next_run_at:'2030-01-01T00:00:00Z'},runs:[{status:'running',stage:'image_scene-01',attempt:1,created_at:'2030-01-01T00:00:00Z'}]});
   assert.equal(nodes.userAutomationToggle.checked,true);
   assert.equal(nodes.userAutomationPercent.textContent,'62%');
