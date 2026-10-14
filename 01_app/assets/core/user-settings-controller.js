@@ -7,7 +7,7 @@
 
   function create(dependencies) {
     const deps = dependencies || {};
-    const required = ['getRoot','request','getIndexProjects','refreshProjectIndex','confirm','alert','fetch','createObjectURL','revokeObjectURL','createRequestId','setInterval','clearInterval','onError'];
+    const required = ['getRoot','request','getIndexProjects','refreshProjectIndex','setManualProjectActionsLocked','confirm','alert','fetch','createObjectURL','revokeObjectURL','createRequestId','setInterval','clearInterval','onError'];
     required.forEach(name => { if (typeof deps[name] !== 'function') throw new TypeError(`ThinkCastUserSettingsController requires ${name}`); });
     if (!deps.automationPanel || typeof deps.automationPanel.create !== 'function') throw new TypeError('ThinkCastUserSettingsController requires automationPanel');
     if (!deps.authUI || typeof deps.authUI.isLoggedIn !== 'function' || typeof deps.authUI.getActiveAccount !== 'function') throw new TypeError('ThinkCastUserSettingsController requires authUI');
@@ -118,7 +118,9 @@
           renderAutomationStatus(data);
         }
         function renderAutomationStatus(data){
-          automationControlPanel.render(data);
+          const state=automationControlPanel.render(data);
+          deps.setManualProjectActionsLocked(state.enabled);
+          return state;
         }
         function setAutomationBusy(value){
           automationBusy=value;slider.disabled=value||!stages.length;

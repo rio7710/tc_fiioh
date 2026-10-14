@@ -55,6 +55,7 @@ function harness(options = {}) {
   const cleared = [];
   const errors = [];
   const alerts = [];
+  const manualLocks = [];
   const controller = UserSettings.create({
     getRoot: () => root,
     request: async (path, requestOptions) => {
@@ -64,6 +65,7 @@ function harness(options = {}) {
     },
     getIndexProjects: () => ({project: {steps: [{key: '1', label: '기본'}, {key: '2', label: '키워드'}]}}),
     refreshProjectIndex: async () => {},
+    setManualProjectActionsLocked: locked => manualLocks.push(locked),
     confirm: () => true,
     alert: message => alerts.push(message),
     fetch: async () => ({ok: true, blob: async () => ({})}),
@@ -75,7 +77,7 @@ function harness(options = {}) {
     storage: {getItem: () => null},
     automationPanel: {create: panelOptions => AutomationPanel.create({...panelOptions, model: snapshot => AutomationProgress.view(snapshot)})}
   });
-  return {controller, root, get, requests, intervals, cleared, errors, alerts};
+  return {controller, root, get, requests, intervals, cleared, errors, alerts, manualLocks};
 }
 
 assert.throws(() => UserSettings.create({}), /requires getRoot/);
@@ -87,6 +89,7 @@ assert.equal(fixture.get('#userSettingsOpen').listeners.get('click').length, 1, 
 
 (async () => {
   await fixture.controller.refreshAutomation();
+  assert.equal(fixture.manualLocks.at(-1), false, 'manual project actions remain available while automation is off');
   fixture.get('#userAutomationToggle').checked = true;
   await fixture.get('#userAutomationToggle').emit('change');
   assert.deepEqual(fixture.alerts, ['자동 제작 설정을 완료해 주세요.']);
@@ -161,5 +164,13 @@ assert.equal(fixture.get('#userSettingsOpen').listeners.get('click').length, 1, 
   const indexStart = indexControl.requests.find(([, options]) => options?.method === 'POST' && JSON.parse(options.body).action === 'start');
   assert.equal(JSON.parse(indexStart[1].body).config.endpoint, '2', 'index switch starts with the server-saved configuration');
   assert.equal(indexControl.get('#userSettingsDialog').open, false, 'index switch does not need to open settings');
+  const activeControl = harness({automationData: {settings: {version: 4, enabled: true, config: {
+    endpoint: '2', repeat: {interval: 1, unit: 'day'}, keywords: {count: 3, ai: true, month: ''},
+    video: {scene_count: 0, crop: 'default'}, voice: {profile_id: 'warm_female'},
+    brand: {intro: false, outro: false, watermark: false}, channels: []
+  }}, runs: [{status: 'running', stage: 'script_generate'}]}});
+  activeControl.controller.mount();
+  await activeControl.controller.refreshAutomation();
+  assert.equal(activeControl.manualLocks.at(-1), true, 'active automation locks manual create and continue actions');
   console.log('User settings controller tests passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

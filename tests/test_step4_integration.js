@@ -303,7 +303,7 @@ assert.match(html,/function connectStoryboardAssetsToEditor\(\)\{\s*return story
 assert.match(html,/function resetProjectScopedState\(\)\{\s*return storyboardProjectStateController\.reset\(\);\s*\}/,'P1 keeps thin project reset wrapper');
 assert.match(html,/resetProjectStore:\(\)=>\{if\(projectStore\)projectStore\.resetProjectState\(\)\}/,'P1 keeps project store reset optional while controller invokes its adapter once');
 assert.doesNotMatch(html,/storedStoryboardImageCandidates=new Map\(\);\s*\(items\|\|\[\]\)\.forEach|scenes=timelineBridge\.connectStoryboardAssetsToEditor\(scenes\)\.scenes/,'P1 removes inline storyboard project state bodies');
-assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-view\.js\?v=20261012_v58"/, 'HTML cache-busts content index view');
+assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-view\.js\?v=20261014_v59"/, 'HTML cache-busts content index view');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-content-index-controller\.js\?v=20261009_v56"/, 'HTML cache-busts content index controller');
 assert.ok(html.indexOf('step01-content-index-view.js') < html.indexOf('step01-content-index-controller.js'), 'content index view loads before controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step01\/step01-project-index-view\.js\?v=20261012_v57"/, 'HTML cache-busts project index view');

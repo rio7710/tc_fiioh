@@ -107,7 +107,7 @@ thinkcast-top-nav{display:block}
 .flow-btn.primary{border-color:#0d3e38;background:var(--green);color:#fff;box-shadow:3px 3px 0 #b7aa90}
 .flow-btn.primary:hover{background:#103f39;box-shadow:4px 4px 0 #b7aa90}
 .btn-next-icon{display:inline-block;width:27px;height:18px;margin-left:7px;background:var(--gold);vertical-align:-4px;transform:rotate(-3deg);-webkit-mask:url('/01_app/assets/icons/sketchy/arrow-right.svg') center/contain no-repeat;mask:url('/01_app/assets/icons/sketchy/arrow-right.svg') center/contain no-repeat}
-.flow-btn:disabled{cursor:wait;opacity:.55}
+.flow-btn:disabled{cursor:wait;opacity:.55}.flow-btn[data-automation-locked="true"]{cursor:not-allowed;filter:grayscale(.35)}
 .form-message{min-height:20px;margin:12px 0 0;color:#a34336;font-size:12px}
 .keyword-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .keyword-card{position:relative;isolation:isolate;display:flex;min-height:126px;padding:18px;flex-direction:column;justify-content:flex-end;overflow:hidden;border:1px solid rgba(255,255,255,.5);border-radius:14px;background-image:linear-gradient(180deg,rgba(6,25,22,.05) 10%,rgba(6,25,22,.82) 100%),var(--keyword-bg);background-position:center;background-size:cover;box-shadow:0 7px 18px rgba(20,39,33,.1);filter:grayscale(1) saturate(0) contrast(.92);cursor:pointer;transition:.2s}
