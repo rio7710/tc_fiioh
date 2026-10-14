@@ -167,12 +167,16 @@
           onToggle:async enabled=>{
             if(enabled)return startAutomation(false);
             if(!confirm('반복 예약과 진행 중인 자동화를 중지할까요? 이미 시작한 API 요청의 비용은 발생할 수 있습니다.'))return false;
-            return mutateAutomation('stop');
+            const stopped=await mutateAutomation('stop');
+            if(stopped)deps.alert('자동 제작 중지를 요청했습니다. 대기 중인 작업은 즉시 중지되며, 진행 중인 작업은 현재 단계 완료 후 중지됩니다.');
+            return stopped;
           },
           onRunAction:async(action,run)=>{
             const message=action==='retry'?'완료된 단계는 재사용합니다. 응답이 끊긴 단계는 재호출 비용이 발생할 수 있습니다. 다시 시도할까요?':'진행 중인 외부 요청은 완료될 수 있습니다. 다음 단계부터 중지할까요?';
             if(!confirm(message))return false;
-            return mutateAutomation(action,run.run_id);
+            const changed=await mutateAutomation(action,run.run_id);
+            if(changed&&action==='cancel')deps.alert('이번 실행의 중지를 요청했습니다. 대기 중인 작업은 즉시 중지되며, 진행 중인 작업은 현재 단계 완료 후 중지됩니다.');
+            return changed;
           }
         });
         automationControlPanel.mount();

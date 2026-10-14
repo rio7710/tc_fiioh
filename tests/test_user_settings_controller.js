@@ -172,5 +172,10 @@ assert.equal(fixture.get('#userSettingsOpen').listeners.get('click').length, 1, 
   activeControl.controller.mount();
   await activeControl.controller.refreshAutomation();
   assert.equal(activeControl.manualLocks.at(-1), true, 'active automation locks manual create and continue actions');
+  activeControl.get('#userAutomationToggle').checked = false;
+  await activeControl.get('#userAutomationToggle').emit('change');
+  const stopPost = activeControl.requests.find(([, options]) => options?.method === 'POST' && JSON.parse(options.body).action === 'stop');
+  assert.ok(stopPost, 'automation switch sends a stop request');
+  assert.match(activeControl.alerts.at(-1), /현재 단계 완료 후 중지됩니다/, 'successful stop explains the safe checkpoint behavior');
   console.log('User settings controller tests passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
