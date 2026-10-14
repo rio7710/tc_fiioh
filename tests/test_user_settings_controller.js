@@ -54,6 +54,7 @@ function harness(options = {}) {
   const intervals = [];
   const cleared = [];
   const errors = [];
+  const alerts = [];
   const controller = UserSettings.create({
     getRoot: () => root,
     request: async (path, requestOptions) => {
@@ -64,6 +65,7 @@ function harness(options = {}) {
     getIndexProjects: () => ({project: {steps: [{key: '1', label: '기본'}, {key: '2', label: '키워드'}]}}),
     refreshProjectIndex: async () => {},
     confirm: () => true,
+    alert: message => alerts.push(message),
     fetch: async () => ({ok: true, blob: async () => ({})}),
     createObjectURL: () => 'blob:voice', revokeObjectURL() {}, createRequestId: () => 'request-id',
     setInterval(callback, delay) { const timer = {callback, delay}; intervals.push(timer); return timer; },
@@ -73,7 +75,7 @@ function harness(options = {}) {
     storage: {getItem: () => null},
     automationPanel: {create: panelOptions => AutomationPanel.create({...panelOptions, model: snapshot => AutomationProgress.view(snapshot)})}
   });
-  return {controller, root, get, requests, intervals, cleared, errors};
+  return {controller, root, get, requests, intervals, cleared, errors, alerts};
 }
 
 assert.throws(() => UserSettings.create({}), /requires getRoot/);
@@ -85,6 +87,10 @@ assert.equal(fixture.get('#userSettingsOpen').listeners.get('click').length, 1, 
 
 (async () => {
   await fixture.controller.refreshAutomation();
+  fixture.get('#userAutomationToggle').checked = true;
+  await fixture.get('#userAutomationToggle').emit('change');
+  assert.deepEqual(fixture.alerts, ['자동 제작 설정을 완료해 주세요.']);
+  assert.equal(fixture.get('#userAutomationToggle').checked, false, 'manual mode rolls the index switch back off');
   const beforeOpen = fixture.requests.length;
   await fixture.get('#userSettingsOpen').emit('click');
   assert.deepEqual(fixture.requests.slice(beforeOpen).map(([path]) => path), ['/api/automation','/api/brand-assets']);

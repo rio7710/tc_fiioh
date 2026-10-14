@@ -7,7 +7,7 @@
 
   function create(dependencies) {
     const deps = dependencies || {};
-    const required = ['getRoot','request','getIndexProjects','refreshProjectIndex','confirm','fetch','createObjectURL','revokeObjectURL','createRequestId','setInterval','clearInterval','onError'];
+    const required = ['getRoot','request','getIndexProjects','refreshProjectIndex','confirm','alert','fetch','createObjectURL','revokeObjectURL','createRequestId','setInterval','clearInterval','onError'];
     required.forEach(name => { if (typeof deps[name] !== 'function') throw new TypeError(`ThinkCastUserSettingsController requires ${name}`); });
     if (!deps.automationPanel || typeof deps.automationPanel.create !== 'function') throw new TypeError('ThinkCastUserSettingsController requires automationPanel');
     if (!deps.authUI || typeof deps.authUI.isLoggedIn !== 'function' || typeof deps.authUI.getActiveAccount !== 'function') throw new TypeError('ThinkCastUserSettingsController requires authUI');
@@ -147,6 +147,7 @@
           if(!c||c.endpoint==='manual'){
             saveStatus.textContent='설정에서 자동화할 단계를 선택하고 먼저 저장해 주세요.';
             automationControlPanel.setNotice('설정 버튼에서 자동화 범위를 먼저 저장해 주세요.','failed');
+            deps.alert('자동 제작 설정을 완료해 주세요.');
             return false;
           }
           const unit={day:'일',week:'주',month:'개월',count:'회 연속'}[c.repeat.unit];
