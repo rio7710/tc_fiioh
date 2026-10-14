@@ -32,7 +32,7 @@ const Navigation = require('../01_app/assets/core/shell-navigation-controller.js
     isLoggedIn: () => loggedIn, getActiveProjectId: () => active, setActiveProjectId: id => { active = id; calls.push(['active', id]); }, getProjects: () => projects,
     refreshProjectIndex: () => refresh(), loadProjectState: (...args) => stateLoader(...args), loadProjectContent: (...args) => contentLoader(...args),
     openIndexProject: (...args) => calls.push(['open', ...args]), updateContentUuidLabels: () => calls.push(['uuid']), getPreviewVideo: () => video,
-    scrollTo: value => calls.push(['scroll', value]), renderStoryboardGrid: () => { calls.push(['storyboard']); if (storyboardError) throw storyboardError; },
+    scrollTo: value => calls.push(['scroll', value]), renderStoryboardGrid: () => { calls.push(['storyboard']); if (storyboardError) throw storyboardError; }, startStoryboardMedia: () => calls.push(['autostart']),
     connectStoryboardAssetsToEditor: () => calls.push(['connect']), setContentIndexError: (...args) => calls.push(['error', ...args]), onError: (...args) => errors.push(args)
   };
   const controller = Navigation.create(deps);
@@ -56,7 +56,7 @@ const Navigation = require('../01_app/assets/core/shell-navigation-controller.js
   loggedIn = false; controller.showStep('5'); assert.equal(views.find(view => !view.hidden).id, 'step1'); loggedIn = true;
 
   active = 'A'; calls.length = 0; await controller.navigate('3-1');
-  assert.deepEqual(calls.filter(item => ['storyboard', 'connect'].includes(item[0])), [['storyboard']]);
+  assert.deepEqual(calls.filter(item => ['storyboard', 'autostart', 'connect'].includes(item[0])), [['storyboard'], ['autostart']]);
   active = 'A'; stateLoader = async () => ({content: false}); calls.length = 0;
   assert.equal(await controller.navigate('4'), '2'); assert.equal(messages['#keywordMessage'].textContent, '저장된 키워드를 확인한 뒤 대본 구성을 시작해 주세요.');
   assert.equal(views.find(view => !view.hidden).id, 'step2');

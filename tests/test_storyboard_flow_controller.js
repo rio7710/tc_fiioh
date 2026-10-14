@@ -16,6 +16,7 @@ function harness(overrides = {}) {
   const calls = [];
   const deps = {
     getRoot: () => root, renderStoryboardGrid: overrides.render || (() => calls.push('render')),
+    startStoryboardMedia: overrides.autostart || (() => calls.push('autostart')),
     showStep: overrides.show || (step => calls.push(['show', step])), updateScriptDiff: overrides.diff || (() => 0),
     saveScriptChanges: overrides.save || (async () => calls.push('save')), connectStoryboardAssetsToEditor: overrides.connect || (() => calls.push('connect')),
     applyStoryboardLook: overrides.look || (look => calls.push(['look', look]))
@@ -26,7 +27,7 @@ function harness(overrides = {}) {
 (async () => {
   let h = harness();
   assert.equal(Object.isFrozen(Controller), true); assert.equal(Object.isFrozen(h.controller), true);
-  for (const name of ['getRoot', 'renderStoryboardGrid', 'showStep', 'updateScriptDiff', 'saveScriptChanges', 'connectStoryboardAssetsToEditor', 'applyStoryboardLook']) {
+  for (const name of ['getRoot', 'renderStoryboardGrid', 'startStoryboardMedia', 'showStep', 'updateScriptDiff', 'saveScriptChanges', 'connectStoryboardAssetsToEditor', 'applyStoryboardLook']) {
     const copy = {...h.deps}; delete copy[name]; assert.throws(() => Controller.create(copy), new RegExp(`requires ${name}`));
   }
   const incomplete = {querySelector: selector => selector === '#storyboardLookToolbar' ? null : node(selector)};
@@ -35,7 +36,7 @@ function harness(overrides = {}) {
   assert.equal(h.controller.mount(h.root), true); assert.equal(h.controller.mount(h.root), true);
   assert.equal(h.nodes.scriptNext.listeners.get('click').length, 1); assert.equal(h.nodes.storyboardNext.listeners.get('click').length, 1); assert.equal(h.nodes.storyboardLookToolbar.listeners.get('click').length, 1);
 
-  h.nodes.scriptNext.click(); assert.deepEqual(h.calls, ['render', ['show', '3-1']]); assert.equal(h.nodes.scriptMessage.textContent, '');
+  h.nodes.scriptNext.click(); assert.deepEqual(h.calls, ['render', ['show', '3-1'], 'autostart']); assert.equal(h.nodes.scriptMessage.textContent, '');
   h = harness({render: () => { throw new Error('render failed'); }}); h.controller.mount(); h.nodes.scriptNext.click();
   assert.equal(h.nodes.scriptMessage.textContent, 'render failed'); assert.deepEqual(h.calls, []);
 
@@ -62,7 +63,7 @@ function harness(overrides = {}) {
   assert.deepEqual(h.calls, [['look', 'cool']]);
 
   const oldRoot = h.root, oldNodes = h.nodes; h.controller.unmount(); assert.equal(oldNodes.scriptNext.listeners.get('click').length, 0);
-  const replacement = harness(); h.controller.mount(replacement.root); replacement.nodes.scriptNext.click(); assert.deepEqual(h.calls, [['look', 'cool'], 'render', ['show', '3-1']]);
+  const replacement = harness(); h.controller.mount(replacement.root); replacement.nodes.scriptNext.click(); assert.deepEqual(h.calls, [['look', 'cool'], 'render', ['show', '3-1'], 'autostart']);
   h.controller.unmount(); h.controller.unmount(); h.controller.mount(oldRoot); oldNodes.scriptNext.click(); assert.equal(h.calls.filter(item => item === 'render').length, 2);
   console.log('Storyboard flow controller tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

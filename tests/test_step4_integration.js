@@ -61,6 +61,7 @@ const workflowProgressControllerPath = '01_app/assets/core/workflow-progress-con
 const storyboardGridRendererPath = '01_app/assets/steps/step03/storyboard-grid-renderer.js';
 const storyboardLookControllerPath = '01_app/assets/steps/step03/storyboard-look-controller.js';
 const storyboardFlowControllerPath = '01_app/assets/steps/step03/storyboard-flow-controller.js';
+const storyboardMediaAutostartControllerPath = '01_app/assets/steps/step03/storyboard-media-autostart-controller.js';
 const storyboardProjectStateControllerPath = '01_app/assets/steps/step03/storyboard-project-state-controller.js';
 const imageRegenerationControllerPath = '01_app/assets/steps/step04/step04-image-regeneration-controller.js';
 
@@ -73,6 +74,7 @@ assert.ok(fs.existsSync(projectIndexControllerPath), 'step01-project-index-contr
 assert.ok(fs.existsSync(projectIndexViewPath), 'step01-project-index-view.js must exist');
 assert.ok(fs.existsSync(brandStatePath), 'step04-brand-state.js must exist');
 assert.ok(fs.existsSync(brandSelectionControllerPath), 'step04-brand-selection-controller.js must exist');
+assert.ok(fs.existsSync(storyboardMediaAutostartControllerPath), 'storyboard-media-autostart-controller.js must exist');
 assert.ok(fs.existsSync(brandLibraryControllerPath), 'step04-brand-library-controller.js must exist');
 assert.ok(fs.existsSync(outroRatioAssetsPath), 'step04-outro-ratio-assets.js must exist');
 assert.ok(fs.existsSync(brandStagePreviewPath), 'step04-brand-stage-preview.js must exist');
@@ -138,7 +140,7 @@ console.log('✓ File integrity checks passed');
 const shellHtml = fs.readFileSync('01_app/P1_title_design_preview.html', 'utf8');
 const appBootstrapSource = fs.readFileSync('01_app/assets/core/app-bootstrap.js', 'utf8');
 const html = `${shellHtml}\n${appBootstrapSource}`;
-assert.match(html, /src="\/01_app\/assets\/core\/shell-navigation-controller\.js\?v=20261009_v32"/, 'HTML cache-busts shell navigation controller');
+assert.match(html, /src="\/01_app\/assets\/core\/shell-navigation-controller\.js\?v=20261014_v33"/, 'HTML cache-busts shell navigation controller');
 assert.match(html, /src="\/01_app\/assets\/core\/session-bootstrap-controller\.js\?v=20261009_v33"/, 'HTML cache-busts session bootstrap controller');
 assert.match(html, /src="\/01_app\/assets\/core\/auth-ui-controller\.js\?v=20261014_v35"/, 'HTML cache-busts auth UI controller');
 assert.match(html, /src="\/01_app\/assets\/core\/project-keyword-hydrator\.js\?v=20261009_v58"/, 'HTML cache-busts project keyword hydrator');
@@ -161,20 +163,22 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step02\/step02-keyword\.js\?v=
 assert.match(html, /src="\/01_app\/assets\/steps\/step02\/script-generation-controller\.js\?v=20261014_v49"/, 'HTML cache-busts script generation controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/production-workflow-controller\.js\?v=20261009_v43"/, 'HTML cache-busts production workflow controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-video-controller\.js\?v=20261009_v44"/, 'HTML cache-busts scene video controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-image-controller\.js\?v=20261013_v46"/, 'HTML cache-busts scene image controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-image-controller\.js\?v=20261014_v47"/, 'HTML cache-busts scene image controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-media-autostart-controller\.js\?v=20261014_v1"/, 'HTML cache-busts storyboard media autostart controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/candidate-selection-controller\.js\?v=20261009_v46"/, 'HTML cache-busts candidate selection controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-voice-playback-controller\.js\?v=20261009_v54"/, 'HTML cache-busts scene voice playback controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/scene-voice-controller\.js\?v=20261009_v54"/, 'HTML cache-busts scene voice controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/voice-profile-controller\.js\?v=20261009_v48"/, 'HTML cache-busts voice profile controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-look-controller\.js\?v=20261009_v52"/, 'HTML cache-busts storyboard look controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-grid-renderer\.js\?v=20261009_v52"/, 'HTML cache-busts storyboard grid renderer');
-assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-flow-controller\.js\?v=20261009_v53"/, 'HTML cache-busts storyboard flow controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-flow-controller\.js\?v=20261014_v54"/, 'HTML cache-busts storyboard flow controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step03\/storyboard-project-state-controller\.js\?v=20261009_v51"/, 'HTML cache-busts storyboard project state controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('trend-keyword-controller.js'), 'base Step 2 module loads before trend keyword controller');
 assert.ok(html.indexOf('step02-keyword.js') < html.indexOf('script-generation-controller.js') && html.indexOf('script-generation-controller.js') < html.indexOf('trend-keyword-controller.js'), 'script generation loads between Step 2 keyword controllers');
 assert.ok(html.indexOf('step03-script-editor-controller.js') < html.indexOf('production-workflow-controller.js'), 'production workflow loads after Step 3 script editor');
 assert.ok(html.indexOf('scene-video-controller.js') < html.indexOf('production-workflow-controller.js'), 'scene video controller loads before production workflow');
 assert.ok(html.indexOf('scene-image-controller.js') < html.indexOf('scene-video-controller.js'), 'scene image controller loads before scene video controller');
+assert.ok(html.indexOf('scene-image-controller.js') < html.indexOf('storyboard-media-autostart-controller.js'), 'scene image controller loads before storyboard media autostart controller');
 assert.ok(html.indexOf('candidate-selection-controller.js') < html.indexOf('scene-image-controller.js'), 'candidate selection controller loads before scene image controller');
 assert.ok(html.indexOf('scene-voice-controller.js') < html.indexOf('candidate-selection-controller.js'), 'scene voice controller loads before candidate selection controller');
 assert.ok(html.indexOf('scene-voice-playback-controller.js') < html.indexOf('scene-voice-controller.js'), 'scene voice playback loads before scene voice orchestration');
@@ -262,6 +266,8 @@ for(const contract of [/async function pollSceneVideo\(card,taskId\)\{\s*return 
 assert.doesNotMatch(html,/resumedKlingTaskIds|pendingVideoResumeBusy|\/api\/storyboard\/video-status\?task_id=|document\.querySelector\('#storyboardVideoBulkGenerate'\)\.addEventListener/, 'P1 removes scene video state, API body, and listeners');
 assert.match(html,/const sceneImageController=Step03SceneImageController\.create\(/,'P1 wires scene image controller');
 assert.match(html,/sceneImageController\.mount\(document\)/,'P1 mounts scene image interactions');
+assert.match(html,/storyboardMediaAutostartController=Step03StoryboardMediaAutostartController\.create\(/,'P1 wires storyboard media autostart orchestration');
+assert.match(html,/generateMissingVoices:generateMissingSceneVoices,generateMissingImages:generateMissingStoryboardImages/,'P1 reuses existing missing voice and image generation APIs');
 assert.match(html,/async function generateStoryboardImage\(button,force=true\)\{\s*return sceneImageController\.generate\(button,force\);\s*\}/,'P1 keeps thin scene image wrapper');
 assert.match(html,/async function generateMissingStoryboardImages\(\)\{\s*return sceneImageController\.generateMissing\(\);\s*\}/,'P1 keeps thin bulk image wrapper');
 assert.doesNotMatch(html,/\/api\/storyboard\/image-generate|document\.querySelector\('#storyboardBulkGenerate'\)\.addEventListener/,'P1 removes scene image API body and listeners');
@@ -579,6 +585,7 @@ function createPrePartialContext() {
     Step03StoryboardGridRenderer: require('../01_app/assets/steps/step03/storyboard-grid-renderer.js'),
     Step03StoryboardLookController: require('../01_app/assets/steps/step03/storyboard-look-controller.js'),
     Step03StoryboardFlowController: require('../01_app/assets/steps/step03/storyboard-flow-controller.js'),
+    Step03StoryboardMediaAutostartController: require('../01_app/assets/steps/step03/storyboard-media-autostart-controller.js'),
     Step03StoryboardProjectStateController: require('../01_app/assets/steps/step03/storyboard-project-state-controller.js'),
     Step05Calendar: require('../01_app/assets/steps/step05/step05-calendar.js'),
     Step05CalendarStore: require('../01_app/assets/steps/step05/step05-calendar-store.js'),

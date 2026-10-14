@@ -5,7 +5,7 @@
 }(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const required = ['getRoot', 'renderStoryboardGrid', 'showStep', 'updateScriptDiff', 'saveScriptChanges', 'connectStoryboardAssetsToEditor', 'applyStoryboardLook'];
+  const required = ['getRoot', 'renderStoryboardGrid', 'startStoryboardMedia', 'showStep', 'updateScriptDiff', 'saveScriptChanges', 'connectStoryboardAssetsToEditor', 'applyStoryboardLook'];
 
   function create(dependencies) {
     const deps = dependencies || {};
@@ -35,6 +35,7 @@
       try {
         deps.renderStoryboardGrid();
         deps.showStep('3-1');
+        Promise.resolve(deps.startStoryboardMedia()).catch(error => { current.scriptMessage.textContent = error.message; });
       } catch (error) {
         current.scriptMessage.textContent = error.message;
       }

@@ -11,7 +11,7 @@
       'getLocation', 'getHistory', 'getWindow', 'isLoggedIn', 'getActiveProjectId',
       'setActiveProjectId', 'getProjects', 'refreshProjectIndex', 'loadProjectState',
       'loadProjectContent', 'openIndexProject', 'updateContentUuidLabels', 'getPreviewVideo',
-      'scrollTo', 'renderStoryboardGrid', 'connectStoryboardAssetsToEditor', 'setContentIndexError', 'onError'
+      'scrollTo', 'renderStoryboardGrid', 'startStoryboardMedia', 'connectStoryboardAssetsToEditor', 'setContentIndexError', 'onError'
     ]) if (typeof deps[name] !== 'function') throw new TypeError(`ThinkCastShellNavigationController requires ${name}`);
     if (!deps.contentRoute || !['readContentRoute', 'writeContentRoute', 'listenContentRoutes'].every(name => typeof deps.contentRoute[name] === 'function')) {
       throw new TypeError('ThinkCastShellNavigationController requires contentRoute');
@@ -61,7 +61,10 @@
 
     function prepareStep(target) {
       const step = String(target);
-      if (step === '3-1') deps.renderStoryboardGrid();
+      if (step === '3-1') {
+        deps.renderStoryboardGrid();
+        Promise.resolve(deps.startStoryboardMedia()).catch(error => deps.onError('storyboard-media-autostart', error));
+      }
       if (step === '4') deps.connectStoryboardAssetsToEditor();
     }
 

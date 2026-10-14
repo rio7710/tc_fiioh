@@ -139,7 +139,7 @@ function lifecycle(seed) {
     getProjects:()=>vm.runInContext('indexProjects',context),refreshProjectIndex:context.refreshProjectIndex,
     loadProjectState:(...args)=>context.loadProjectState(...args),loadProjectContent:(...args)=>context.loadProjectContent(...args),openIndexProject:(...args)=>context.openIndexProject(...args),
     updateContentUuidLabels:context.updateContentUuidLabels,getPreviewVideo:()=>context.video,scrollTo:options=>context.window.scrollTo(options),
-    renderStoryboardGrid:context.renderStoryboardGrid,connectStoryboardAssetsToEditor:context.connectStoryboardAssetsToEditor,
+    renderStoryboardGrid:context.renderStoryboardGrid,startStoryboardMedia:()=>Promise.resolve(),connectStoryboardAssetsToEditor:context.connectStoryboardAssetsToEditor,
     setContentIndexError:(_key,message)=>{context.document.querySelector('#contentIndexMessage').textContent=message},onError(){}
   });
   context.shellNavigationController.mount(context.document);

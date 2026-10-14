@@ -7,8 +7,9 @@ const cssPath = '01_app/assets/steps/step03/step03-flow.css';
 const jsPath = '01_app/assets/steps/step03/step03-flow.js';
 const editorPath = '01_app/assets/steps/step03/step03-script-editor-controller.js';
 const flowControllerPath = '01_app/assets/steps/step03/storyboard-flow-controller.js';
+const mediaAutostartControllerPath = '01_app/assets/steps/step03/storyboard-media-autostart-controller.js';
 
-[scriptPath, storyboardPath, cssPath, jsPath, editorPath, flowControllerPath].forEach(file => {
+[scriptPath, storyboardPath, cssPath, jsPath, editorPath, flowControllerPath, mediaAutostartControllerPath].forEach(file => {
   assert.ok(fs.existsSync(file), `${file} must exist`);
 });
 
@@ -35,13 +36,16 @@ assert.doesNotMatch(shellHtml, /id="step3"|id="step31"/, 'step 3 markup is not d
 assert.doesNotMatch(scriptHtml + storyboardHtml, /<script\b|onclick=/i, 'fragments are safe to inject and do not duplicate script execution');
 assert.match(shellHtml, /step03-flow\.js\?v=20261009_v52/, 'shell cache-busts the Step 3 flow helper');
 assert.match(shellHtml, /step03-script-editor-controller\.js\?v=20261009_v38/, 'shell cache-busts the Step 3 script editor controller');
-assert.match(shellHtml, /storyboard-flow-controller\.js\?v=20261009_v53/, 'shell cache-busts the storyboard flow controller');
+assert.match(shellHtml, /storyboard-flow-controller\.js\?v=20261014_v54/, 'shell cache-busts the storyboard flow controller');
+assert.match(shellHtml, /storyboard-media-autostart-controller\.js\?v=20261014_v1/, 'shell cache-busts storyboard media autostart');
 assert.match(shellHtml, /const scriptEditorController=Step03ScriptEditorController\.create\(/, 'shell wires the Step 3 script editor controller');
 assert.match(shellHtml, /scriptEditorController\.mount\(document\)/, 'shell mounts Step 3 script editor interactions');
 for(const [name,method] of [['fillScript','fill'],['currentScriptPayload','payload'],['updateScriptDiff','updateDiff'],['loadSavedScript','loadSaved'],['saveScriptLocally','saveLocal'],['saveScriptChanges','save']]) assert.match(shellHtml,new RegExp(`function ${name}\\([^)]*\\)\\{\\s*return scriptEditorController\\.${method}\\(`),`${name} remains a thin wrapper`);
 assert.doesNotMatch(shellHtml, /let scriptBaselineLines=|document\.querySelector\('#scriptLines'\)\.addEventListener|document\.querySelector\('#scriptSaveBtn'\)\.addEventListener|\/api\/script\/save/, 'shell removes duplicate script editor state and handlers');
 assert.match(shellHtml, /const storyboardFlowController=Step03StoryboardFlowController\.create\(/, 'shell wires storyboard flow transitions');
 assert.match(shellHtml, /storyboardFlowController\.mount\(document\)/, 'shell mounts storyboard flow transitions');
+assert.match(shellHtml, /storyboardMediaAutostartController=Step03StoryboardMediaAutostartController\.create\(/, 'shell wires automatic missing voice and image generation');
+assert.match(storyboardHtml, /진입하면 미생성 이미지와 음성을 자동으로 생성/, 'storyboard explains automatic media generation');
 assert.doesNotMatch(shellHtml, /document\.querySelector\('#scriptNext'\)\.addEventListener|document\.querySelector\('#storyboardNext'\)\.addEventListener|document\.querySelector\('#storyboardLookToolbar'\)\.addEventListener/, 'shell removes inline Step 3 transition listeners');
 
 const Step03Flow = require('../01_app/assets/steps/step03/step03-flow.js');
