@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from tools.unified_content_prompt_harness import build_prompt, build_repair_prompt, normalize_document_shape, normalize_reference_asset_metadata, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_character_reference_versions, validate_document, validate_scene_reference_media, validate_visual_continuity
+from tools.unified_content_prompt_harness import build_prompt, build_repair_prompt, normalize_character_reference_versions, normalize_document_shape, normalize_reference_asset_metadata, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_character_reference_versions, validate_document, validate_scene_reference_media, validate_visual_continuity
 from tools.validate_unified_content import UnifiedContentError
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema
 
@@ -97,6 +97,59 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         value["production"]["timeline"]["scenes"][0]["reference_ids"] = ["ref-character-old"]
         with self.assertRaisesRegex(UnifiedContentError, "must use V2"):
             validate_character_reference_versions(value)
+
+    def test_character_reference_normalizer_upgrades_v1_and_locks_one_v2(self):
+        value = document(["안심"])
+        value["production"]["reference_assets"] = [{
+            "id": "ref-character-old", "kind": "character",
+            "character_id": "character-nurse-m01", "reference_version": "v1",
+            "wardrobe_variant": "cardigan",
+        }]
+        first = value["production"]["timeline"]["scenes"][0]
+        first["reference_ids"] = ["ref-character-old"]
+        first["image_prompt"] = {"text": "ref-character-old 인물을 유지", "source": "ai_inferred"}
+        second = json.loads(json.dumps(first))
+        second.update(id="scene-02", start=30, end=60)
+        second["sequence"]["continuity_from"] = "scene-01"
+        value["production"]["timeline"]["scenes"].append(second)
+        catalog = {
+            "ref-character-asset-st-nm01-uniform-v2-scrub": {
+                "id": "ref-character-asset-st-nm01-uniform-v2-scrub", "kind": "character",
+                "character_id": "character-nurse-m01", "reference_version": "v2",
+                "wardrobe_variant": "scrub", "status": "ready", "uri": "scrub.png",
+            },
+            "ref-character-asset-st-nm01-uniform-v2-cardigan": {
+                "id": "ref-character-asset-st-nm01-uniform-v2-cardigan", "kind": "character",
+                "character_id": "character-nurse-m01", "reference_version": "v2",
+                "wardrobe_variant": "cardigan", "status": "ready", "uri": "cardigan.png",
+            },
+        }
+
+        normalize_character_reference_versions(value, catalog)
+
+        selected = "ref-character-asset-st-nm01-uniform-v2-cardigan"
+        self.assertEqual([[selected], [selected]], [scene["reference_ids"] for scene in value["production"]["timeline"]["scenes"]])
+        self.assertIn(selected, first["image_prompt"]["text"])
+        self.assertTrue(any(asset.get("id") == selected for asset in value["production"]["reference_assets"]))
+        validate_character_reference_versions(value)
+
+    def test_error_envelope_does_not_replace_repairable_storyboard(self):
+        value = document(["안심"])
+        calls = []
+
+        def generate(prompt):
+            calls.append(prompt)
+            if len(calls) == 1:
+                return "not json"
+            if len(calls) in {2, 3}:
+                return '{"error":"temporary provider failure"}'
+            return json.dumps(value, ensure_ascii=False)
+
+        result = run_generation_harness(generate, ["안심"], "자료")
+
+        self.assertEqual(3, result["repair_count"])
+        self.assertEqual(4, len(calls))
+        self.assertIn("production", result["document"])
 
     def test_character_reference_rejects_mid_storyboard_wardrobe_change(self):
         value = document(["안심"])

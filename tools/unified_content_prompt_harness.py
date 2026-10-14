@@ -449,6 +449,88 @@ def normalize_reference_asset_metadata(
     return document
 
 
+def normalize_character_reference_versions(
+    document: dict[str, Any], canonical_assets: dict[str, dict[str, Any]] | None,
+) -> dict[str, Any]:
+    """Upgrade covered character identities to one canonical V2 asset."""
+    if not canonical_assets:
+        return document
+    production = document.get("production") or {}
+    assets = production.get("reference_assets")
+    scenes = (production.get("timeline") or {}).get("scenes")
+    if not isinstance(assets, list) or not isinstance(scenes, list):
+        return document
+
+    policy = json.loads(CHARACTER_POLICY_PATH.read_text(encoding="utf-8"))
+    policy_characters = policy.get("characters") or {}
+    asset_by_id = {
+        str(asset.get("id")): asset for asset in assets
+        if isinstance(asset, dict) and asset.get("id")
+    }
+    catalog_by_id = {
+        str(reference_id): asset for reference_id, asset in canonical_assets.items()
+        if isinstance(asset, dict)
+    }
+    referenced_ids = [
+        str(reference_id)
+        for scene in scenes if isinstance(scene, dict)
+        for reference_id in (scene.get("reference_ids") or [])
+    ]
+    identities: dict[str, list[str]] = {}
+    for reference_id in referenced_ids:
+        asset = asset_by_id.get(reference_id) or catalog_by_id.get(reference_id)
+        if not isinstance(asset, dict) or asset.get("kind") != "character":
+            continue
+        character_id = str(asset.get("character_id") or asset.get("identity_group") or "").strip()
+        if character_id:
+            identities.setdefault(character_id, []).append(reference_id)
+
+    replacements: dict[str, str] = {}
+    for character_id, current_ids in identities.items():
+        preferred_ids = list((policy_characters.get(character_id) or {}).get("v2_reference_ids") or [])
+        available = [reference_id for reference_id in preferred_ids if reference_id in catalog_by_id]
+        if not available:
+            continue
+        selected = next((reference_id for reference_id in current_ids if reference_id in available), None)
+        if selected is None:
+            wardrobe = next((
+                str((asset_by_id.get(reference_id) or catalog_by_id.get(reference_id) or {}).get("wardrobe_variant") or "").strip()
+                for reference_id in current_ids
+                if str((asset_by_id.get(reference_id) or catalog_by_id.get(reference_id) or {}).get("wardrobe_variant") or "").strip()
+            ), "")
+            selected = next((
+                reference_id for reference_id in available
+                if str(catalog_by_id[reference_id].get("wardrobe_variant") or "").strip() == wardrobe
+            ), available[0])
+        for reference_id in current_ids:
+            replacements[reference_id] = selected
+        if selected not in asset_by_id:
+            canonical = catalog_by_id[selected]
+            inserted = {"id": selected, **{
+                key: json.loads(json.dumps(value, ensure_ascii=False))
+                for key, value in canonical.items() if key in CANONICAL_REFERENCE_FIELDS
+            }}
+            assets.append(inserted)
+            asset_by_id[selected] = inserted
+
+    if not replacements:
+        return document
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        old_ids = [str(item) for item in (scene.get("reference_ids") or [])]
+        scene["reference_ids"] = list(dict.fromkeys(replacements.get(item, item) for item in old_ids))
+        for field in ("image_prompt", "motion_prompt"):
+            value = scene.get(field)
+            if not isinstance(value, dict) or not isinstance(value.get("text"), str):
+                continue
+            text = value["text"]
+            for old_id, new_id in replacements.items():
+                text = text.replace(old_id, new_id)
+            value["text"] = text
+    return document
+
+
 def reference_context(limit: int = 4) -> str:
     summaries = []
     for path in sorted(REFERENCE_DIR.glob("*_STANDARD_v1.md"))[:limit]:
@@ -936,6 +1018,7 @@ def run_generation_harness(
     def complete_provenance(document: dict[str, Any]) -> dict[str, Any]:
         document = normalize_document_shape(document)
         document = normalize_reference_asset_metadata(document, canonical_reference_assets)
+        document = normalize_character_reference_versions(document, canonical_reference_assets)
         project = document.get("project")
         if not isinstance(project, dict):
             project = {}
@@ -1051,7 +1134,16 @@ def run_generation_harness(
                     repair_count=repair_count + 1, regeneration_count=regeneration_count,
                     validation_error=str(validation_error)[:300],
                 )
-                candidate = generate(build_repair_prompt(candidate, validation_error, locked_plan))
+                repaired_candidate = generate(build_repair_prompt(candidate, validation_error, locked_plan))
+                # A provider can return a valid JSON error envelope for a
+                # transient failure. Keep the last content document in that
+                # case instead of replacing it with {"error": ...}.
+                try:
+                    repaired_root = parse_json_document(repaired_candidate)
+                except (UnifiedContentError, ValueError, TypeError):
+                    repaired_root = None
+                if isinstance(repaired_root, dict) and isinstance(repaired_root.get("production"), dict):
+                    candidate = repaired_candidate
                 repair_count += 1
                 repairs_in_generation += 1
                 continue
