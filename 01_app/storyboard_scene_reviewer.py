@@ -19,6 +19,9 @@ IMMUTABLE_SCENE_FIELDS = (
     "reference_ids", "characters", "narration_cue_ids", "sequence",
     "narration", "caption",
 )
+MUTABLE_PROMPT_FIELDS = (
+    "image_prompt", "camera", "lighting", "motion_prompt", "transition",
+)
 
 
 def _scene_list(document: dict[str, Any]) -> list[dict[str, Any]]:
@@ -52,10 +55,13 @@ def build_scene_review_prompt(
         "검수 기준: 실제로 가능한 인물·사물 움직임, 인접 씬과 장소/동선/시선/카메라축 연속성, "
         "인물 수와 정체성 및 V2 우선 캐릭터 참조 일관성, 시설 참조 이미지 준수, 인접 구도 중복 방지, "
         "이미지와 영상 프롬프트의 자연스러움, 자막과 내레이션 불변, 계약 정책 준수.\n"
+        "물리적으로 불가능한 동작, 정체성·장소·소품·카메라축 연속성 위반, 제작 실패를 유발할 명백한 계약 위반만 repair한다. "
+        "취향 차이, 더 나은 표현 제안, 경미한 문체 개선은 pass로 처리해 불필요한 재작성을 만들지 않는다.\n"
         "문제가 없으면 {\"status\":\"pass\",\"issues\":[]}만 반환한다. "
-        "문제가 있으면 {\"status\":\"repair\",\"issues\":[...],\"scene\":{수정된 전체 scene}}를 반환한다.\n"
-        "repair에서는 image_prompt/camera/lighting/motion_prompt/transition만 수정할 수 있다. "
-        "id/title/start/end/media_type/source_media/reference_ids/characters/narration_cue_ids/sequence/narration/caption은 입력과 완전히 같아야 한다. "
+        "문제가 있으면 {\"status\":\"repair\",\"issues\":[...],\"patch\":{\"image_prompt\":{\"text\":\"...\"}}}처럼 "
+        "수정할 필드만 반환한다. 전체 scene을 다시 출력하지 않는다.\n"
+        "patch에서는 image_prompt/camera/lighting/motion_prompt/transition의 text만 수정할 수 있다. "
+        "id/title/start/end/media_type/source_media/reference_ids/characters/narration_cue_ids/sequence/narration/caption은 반환하거나 변경하지 않는다. "
         "reference_ids와 sequence는 확정된 구조이므로 이를 바꾸지 말고, 편집 가능한 프롬프트가 그 구조를 따르도록 고친다. "
         "오류와 직접 관계없는 필드는 바꾸지 않는다. JSON 객체 외 텍스트는 출력하지 않는다."
         f"{retry}\n검수 컨텍스트:\n{json.dumps(context, ensure_ascii=False)}"
@@ -96,17 +102,46 @@ def parse_scene_review(candidate: str, original: dict[str, Any]) -> tuple[dict[s
     issues = _normalize_issues(value.get("issues"))
     if value["status"] == "pass":
         return copy.deepcopy(original), []
-    repaired = value.get("scene")
-    if not isinstance(repaired, dict):
-        raise ValueError("보정 응답에는 수정된 전체 씬이 필요합니다.")
+    patch = value.get("patch")
+    legacy_scene = value.get("scene")
+    if patch is None and isinstance(legacy_scene, dict):
+        # Backward compatibility for an in-flight response from the old
+        # prompt: extract only editable prompt fields and ignore structural
+        # rewrites instead of retrying the same useful review three times.
+        if set(legacy_scene) - set(original):
+            raise ValueError("씬 보정은 필드를 추가할 수 없습니다.")
+        patch = {
+            field: legacy_scene[field]
+            for field in MUTABLE_PROMPT_FIELDS
+            if field in legacy_scene and legacy_scene.get(field) != original.get(field)
+        }
+    if not isinstance(patch, dict) or not patch:
+        raise ValueError("보정 응답에는 수정할 prompt patch가 필요합니다.")
     if not issues:
         issues = ["검수 API가 씬 보정을 요청했습니다."]
-    if set(repaired) != set(original):
-        raise ValueError("씬 보정은 필드를 추가하거나 제거할 수 없습니다.")
-    for field in IMMUTABLE_SCENE_FIELDS:
-        if repaired.get(field) != original.get(field):
-            raise ValueError(f"씬 보정이 불변 필드 {field}를 변경했습니다.")
-    return copy.deepcopy(repaired), list(issues)
+    invalid_fields = set(patch) - set(MUTABLE_PROMPT_FIELDS)
+    if invalid_fields:
+        raise ValueError(f"씬 보정 patch가 허용되지 않은 필드를 포함합니다: {sorted(invalid_fields)}")
+    repaired = copy.deepcopy(original)
+    for field, proposed in patch.items():
+        current = repaired.get(field)
+        if isinstance(proposed, str):
+            proposed_text = proposed.strip()
+        elif isinstance(proposed, dict) and set(proposed) == {"text"}:
+            proposed_text = str(proposed.get("text") or "").strip()
+        elif isinstance(proposed, dict) and set(proposed).issubset({"text", "source"}):
+            proposed_text = str(proposed.get("text") or "").strip()
+        else:
+            raise ValueError(f"씬 보정 patch.{field}는 text만 수정할 수 있습니다.")
+        if not proposed_text:
+            raise ValueError(f"씬 보정 patch.{field}.text는 비어 있을 수 없습니다.")
+        if isinstance(current, dict):
+            updated = copy.deepcopy(current)
+            updated["text"] = proposed_text
+            repaired[field] = updated
+        else:
+            repaired[field] = proposed_text
+    return repaired, list(issues)
 
 
 def review_storyboard_scenes(

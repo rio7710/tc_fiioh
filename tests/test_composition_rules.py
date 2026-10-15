@@ -13,11 +13,13 @@ class CompositionRuleTests(unittest.TestCase):
         server=load_render_server()
         resources=[{'payload':{'document':{'assets':[{
             'id':'ref-character-v2','kind':'character','uri':'캐릭터/v2.png',
-            'status':'ready','usage':'canonical','wardrobe_variant':'cardigan','sha256':'ignored',
+            'status':'ready','usage':'canonical','wardrobe_variant':'cardigan',
+            'aliases':['caregiver-main'],'sha256':'ignored',
         }]}}}]
         asset=server.group_reference_asset_catalog(resources)['ref-character-v2']
         self.assertEqual(asset['uri'],'캐릭터/v2.png')
         self.assertEqual(asset['wardrobe_variant'],'cardigan')
+        self.assertEqual(asset['aliases'],['caregiver-main'])
         self.assertNotIn('sha256',asset)
 
     def test_scene_reference_paths_ignores_style_and_requires_character_media(self):

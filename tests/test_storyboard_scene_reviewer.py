@@ -130,9 +130,11 @@ class StoryboardSceneReviewerTests(unittest.TestCase):
         self.assertEqual("scene-02", context["scene"]["id"])
         self.assertEqual("scene-03", context["next_scene"]["id"])
         self.assertIn("reference_ids/characters/narration_cue_ids/sequence", build_scene_review_prompt(source, 1))
+        self.assertIn("경미한 문체 개선은 pass", build_scene_review_prompt(source, 1))
+        self.assertIn('"patch"', build_scene_review_prompt(source, 1))
         changed = copy.deepcopy(context["scene"])
         changed["unexpected"] = True
-        with self.assertRaisesRegex(ValueError, "추가하거나 제거"):
+        with self.assertRaisesRegex(ValueError, "필드를 추가"):
             parse_scene_review(json.dumps({"status": "repair", "issues": ["x"], "scene": changed}), context["scene"])
 
     def test_normalizes_provider_issue_variations_without_weakening_scene_rules(self):
@@ -158,9 +160,27 @@ class StoryboardSceneReviewerTests(unittest.TestCase):
         self.assertEqual([], issues)
         changed_reference = copy.deepcopy(repaired)
         changed_reference["reference_ids"] = ["ref-other"]
-        with self.assertRaisesRegex(ValueError, "reference_ids"):
+        resolved, issues = parse_scene_review(json.dumps({
+            "status": "repair", "issues": "참조 변경", "scene": changed_reference,
+        }, ensure_ascii=False), original)
+        self.assertEqual(["ref-v2"], resolved["reference_ids"])
+        self.assertEqual("보정된 프롬프트", resolved["image_prompt"])
+        self.assertEqual(["참조 변경"], issues)
+
+    def test_patch_response_updates_text_only_and_preserves_prompt_metadata(self):
+        original = copy.deepcopy(document()["production"]["timeline"]["scenes"][0])
+        original["image_prompt"] = {"text": "원본", "source": "ai_inferred"}
+        resolved, issues = parse_scene_review(json.dumps({
+            "status": "repair",
+            "issues": ["동작 보정"],
+            "patch": {"image_prompt": {"text": "자연스러운 동작"}},
+        }, ensure_ascii=False), original)
+        self.assertEqual({"text": "자연스러운 동작", "source": "ai_inferred"}, resolved["image_prompt"])
+        self.assertEqual(original["id"], resolved["id"])
+        self.assertEqual(["동작 보정"], issues)
+        with self.assertRaisesRegex(ValueError, "허용되지 않은 필드"):
             parse_scene_review(json.dumps({
-                "status": "repair", "issues": "참조 변경", "scene": changed_reference,
+                "status": "repair", "issues": ["x"], "patch": {"sequence": {"text": "변경"}},
             }, ensure_ascii=False), original)
 
     def test_revalidates_each_repaired_scene_against_the_full_contract(self):

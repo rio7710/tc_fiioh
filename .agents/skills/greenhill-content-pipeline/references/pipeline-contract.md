@@ -77,6 +77,9 @@ Required result fields:
 
 ## Reliability
 
+- The canonical reference-asset index is derived at request time from all authorized registered group resources. Index entries retain server-owned metadata; aliases are accepted only when they resolve uniquely, so adding an asset does not require prompt or validator code changes.
+- Storyboard review is a field-patch operation. Review providers may update only prompt text fields; the server merges the patch onto immutable scene identity, timing, narration, reference, and sequence data.
+- A repair response cannot replace an already valid 12–20 scene topology with a missing or out-of-range scene list. Keep the last structurally complete candidate and retry the specific validation correction.
 - Persist state transitions before emitting progress events.
 - Retry transient provider/network failures with bounded exponential backoff.
 - Do not retry validation, policy, or unsupported-format errors without changed input.

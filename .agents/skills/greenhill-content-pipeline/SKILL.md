@@ -50,6 +50,9 @@ Avoid inventing a second stage list or timing table. If temporary duplication is
 
 ## Implementation rules
 
+- Rebuild the canonical reference-asset index from the group's registered resources on every storyboard request. New assets and explicit aliases must become available without a hardcoded ID list or a manually synchronized cache.
+- Resolve a model-authored reference ID only when its normalized alias maps to exactly one canonical asset. Never fuzzy-match an ambiguous alias; keep it as a validation error for diagnosis.
+- Scene review returns text-only patches for `image_prompt`, `camera`, `lighting`, `motion_prompt`, or `transition`. Merge those patches onto the server-owned scene and never allow a reviewer to rewrite timing, narration, `reference_ids`, or `sequence`.
 - Keep each worker focused on one durable output.
 - Pass immutable input references and return explicit artifacts plus metrics.
 - Keep providers swappable through adapter names in the manifest.

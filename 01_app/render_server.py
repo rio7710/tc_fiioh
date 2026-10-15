@@ -1009,7 +1009,7 @@ def group_reference_asset_catalog(resources):
     """Index canonical reference metadata from authorized group resources."""
     fields = {
         "id", "kind", "uri", "status", "usage", "character_id", "display_name",
-        "identity_group", "appearance_lock", "reference_version", "wardrobe_variant",
+        "identity_group", "appearance_lock", "reference_version", "wardrobe_variant", "aliases",
     }
     catalog = {}
 

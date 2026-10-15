@@ -9,6 +9,11 @@ from typing import Any, Callable
 
 from tools.validate_unified_content import UnifiedContentError, validate_timeline
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema_file
+from tools.reference_asset_index import (
+    build_reference_asset_index,
+    normalize_scene_reference_ids,
+    reference_asset_index_context,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -569,6 +574,7 @@ def build_prompt(
     selected_keywords: list[str], source_material: str,
     previous_documents: list[dict[str, Any]] | None = None,
     reference_material: str | None = None,
+    reference_asset_index: str | None = None,
 ) -> str:
     if not 1 <= len(selected_keywords) <= 5 or len(set(selected_keywords)) != len(selected_keywords):
         raise UnifiedContentError("selected_keywords must contain 1 to 5 unique values")
@@ -576,9 +582,16 @@ def build_prompt(
         raise UnifiedContentError("selected_keywords cannot contain blanks")
     template = PROMPT_PATH.read_text(encoding="utf-8")
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    indexed_source = str(source_material).strip()
+    if reference_asset_index:
+        indexed_source += (
+            "\n\n[정식 레퍼런스 자산 인덱스]\n"
+            "아래 assets의 정식 ID만 reference_ids에 사용한다. aliases는 입력 오류 교정용이며 "
+            "새 ID를 만들거나 종류 접두사를 바꾸지 않는다.\n" + reference_asset_index
+        )
     return (template
         .replace("{{SELECTED_KEYWORDS_JSON}}", json.dumps(selected_keywords, ensure_ascii=False))
-        .replace("{{SOURCE_MATERIAL}}", str(source_material).strip())
+        .replace("{{SOURCE_MATERIAL}}", indexed_source)
         .replace("{{REFERENCE_CONTEXT}}", reference_material if reference_material is not None else reference_context())
         .replace("{{PRIOR_OUTPUT_CONTEXT}}", prior_output_context(previous_documents or []))
         .replace("{{JSON_SCHEMA}}", json.dumps(schema, ensure_ascii=False)))
@@ -990,7 +1003,8 @@ def validate_document(document: dict[str, Any], selected_keywords: list[str], st
 
 
 def build_repair_prompt(candidate: str, error: Exception,
-                        locked_plan: dict[str, Any] | None = None) -> str:
+                        locked_plan: dict[str, Any] | None = None,
+                        reference_asset_index: str | None = None) -> str:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     sequence = schema.get("$defs", {}).get("sequenceContinuity", {}).get("properties", {})
     enum_hints = []
@@ -1000,6 +1014,11 @@ def build_repair_prompt(candidate: str, error: Exception,
             enum_hints.append(f"sequence.{key}는 다음 값 중 하나만 사용한다: {json.dumps(allowed, ensure_ascii=False)}")
     enum_contract = "\n".join(enum_hints)
     error_text = str(error)
+    asset_contract = (
+        "정식 레퍼런스 자산 인덱스(assets의 ID만 사용):\n"
+        f"{reference_asset_index}\n"
+        if reference_asset_index else ""
+    )
     empty_scene_recovery = ""
     if "timeline.scenes" in error_text and "too few items" in error_text:
         empty_scene_recovery = (
@@ -1015,6 +1034,7 @@ def build_repair_prompt(candidate: str, error: Exception,
         "이전 JSON 후보가 스키마 또는 장면 연속성 계약 검증에 실패했다. 오류 메시지에 표시된 필드만 최소 변경하고, 그 밖의 모든 값은 이전 JSON에서 정확히 유지하라. 특히 카메라 축, 씬 동선, 장소, 인물, 구도와 프롬프트는 해당 오류가 직접 지적하지 않는 한 절대 바꾸지 않는다.\n"
         "장소 복귀는 이유와 이동 경로를 sequence에 기록하고, 가구 형태는 기준 레퍼런스 및 continuity.props와 모든 씬 프롬프트에서 일치시킨다. 아래 오류를 모두 수정하고 완전한 JSON 객체 하나만 다시 출력하라.\n"
         f"열거형 계약:\n{enum_contract}\n"
+        f"{asset_contract}"
         f"{empty_scene_recovery}"
         "화면축 검증 오류라면 camera_bridge·entry_action·exit_action에 실제로 보이는 카메라/인물의 축 횡단 이동이 명시된 경우에만 motivated_cross를 유지한다. 이동 근거가 없으면 해당 씬을 same_side로 고치며, 단순한 샷 크기·각도 변화는 축 횡단으로 취급하지 않는다.\n"
         "테이블 형태 누락 오류라면 오류에 표시된 한국어 형태명을 해당 scene의 image_prompt.text에 직접 넣고, continuity.props 및 기준 레퍼런스와 일치시킨다.\n"
@@ -1087,6 +1107,7 @@ def run_generation_harness(
 
     def complete_provenance(document: dict[str, Any]) -> dict[str, Any]:
         document = normalize_document_shape(document)
+        document = normalize_scene_reference_ids(document, canonical_reference_assets)
         document = normalize_reference_asset_metadata(document, canonical_reference_assets)
         document = normalize_character_reference_versions(document, canonical_reference_assets)
         raw_document_id = str(document.get("document_id") or "").strip().lower()
@@ -1209,7 +1230,13 @@ def run_generation_harness(
         return document
 
     previous_documents = previous_documents or []
-    prompt = build_prompt(selected_keywords, source_material, previous_documents, reference_material)
+    asset_index = reference_asset_index_context(
+        build_reference_asset_index(canonical_reference_assets)
+    ) if canonical_reference_assets else None
+    prompt = build_prompt(
+        selected_keywords, source_material, previous_documents, reference_material,
+        asset_index,
+    )
     report("generation_requested", percent=30, detail="GPT에 콘티 생성을 요청했습니다.", repair_count=0, regeneration_count=0)
     candidate = generate(prompt)
     report("response_received", percent=55, detail="GPT 응답을 수신해 검증하고 있습니다.", repair_count=0, regeneration_count=0)
@@ -1233,7 +1260,9 @@ def run_generation_harness(
                     repair_count=repair_count + 1, regeneration_count=regeneration_count,
                     validation_error=str(validation_error)[:300],
                 )
-                repaired_candidate = generate(build_repair_prompt(candidate, validation_error, locked_plan))
+                repaired_candidate = generate(build_repair_prompt(
+                    candidate, validation_error, locked_plan, asset_index,
+                ))
                 # A provider can return a valid JSON error envelope for a
                 # transient failure. Keep the last content document in that
                 # case instead of replacing it with {"error": ...}.
@@ -1241,11 +1270,23 @@ def run_generation_harness(
                     repaired_root = parse_json_document(repaired_candidate)
                 except (UnifiedContentError, ValueError, TypeError):
                     repaired_root = None
+                try:
+                    current_root = parse_json_document(candidate)
+                except (UnifiedContentError, ValueError, TypeError):
+                    current_root = None
+                current_scenes = (((current_root or {}).get("production") or {}).get("timeline") or {}).get("scenes")
+                repaired_scenes = (((repaired_root or {}).get("production") or {}).get("timeline") or {}).get("scenes")
+                loses_valid_scene_range = (
+                    isinstance(current_scenes, list)
+                    and 12 <= len(current_scenes) <= 20
+                    and (not isinstance(repaired_scenes, list) or not 12 <= len(repaired_scenes) <= 20)
+                )
                 required_root = ("concept_variants", "selected_variant_id", "production")
                 if (
                     isinstance(repaired_root, dict)
                     and isinstance(repaired_root.get("production"), dict)
                     and all(key in repaired_root for key in required_root)
+                    and not loses_valid_scene_range
                 ):
                     candidate = repaired_candidate
                 repair_count += 1

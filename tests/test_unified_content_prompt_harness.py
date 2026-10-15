@@ -1,6 +1,7 @@
 import json
 import unittest
 
+from tools.reference_asset_index import build_reference_asset_index, normalize_scene_reference_ids
 from tools.unified_content_prompt_harness import build_novelty_repair_prompt, build_prompt, build_repair_prompt, normalize_character_reference_versions, normalize_document_shape, normalize_reference_asset_metadata, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_character_reference_versions, validate_document, validate_scene_reference_media, validate_visual_continuity
 from tools.validate_unified_content import UnifiedContentError
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema
@@ -64,6 +65,43 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertEqual(asset["uri"], "캐릭터/v2.png")
         self.assertEqual(asset["usage"], "canonical")
         self.assertEqual(asset["wardrobe_variant"], "cardigan")
+
+    def test_dynamic_asset_index_repairs_unique_wrong_kind_prefix(self):
+        value = document(["안심"])
+        scene = value["production"]["timeline"]["scenes"][0]
+        scene["reference_ids"] = ["ref-character-asset-entrance-2632b2ec4f792"]
+        scene["image_prompt"] = {
+            "text": "ref-character-asset-entrance-2632b2ec4f792 출입구",
+            "source": "ai_inferred",
+        }
+        value["production"]["reference_assets"] = [{
+            "id": "ref-character-asset-entrance-2632b2ec4f792", "kind": "character",
+        }]
+        canonical_id = "ref-location-asset-entrance-2632b2ec4f792"
+        catalog = {canonical_id: {
+            "id": canonical_id, "kind": "location", "uri": "시설/entrance.png",
+            "status": "ready", "usage": "시설 출입구 기준",
+        }}
+
+        normalize_scene_reference_ids(value, catalog)
+
+        self.assertEqual([canonical_id], scene["reference_ids"])
+        self.assertIn(canonical_id, scene["image_prompt"]["text"])
+        self.assertEqual(canonical_id, value["production"]["reference_assets"][0]["id"])
+
+    def test_asset_index_applies_new_assets_and_refuses_ambiguous_aliases(self):
+        first = "ref-location-asset-lounge-main"
+        second = "ref-character-asset-lounge-main"
+        index = build_reference_asset_index({
+            first: {"id": first, "kind": "location", "uri": "location/lounge.png"},
+            second: {"id": second, "kind": "character", "uri": "character/lounge.png"},
+        })
+        self.assertNotIn("lounge-main", index["aliases"])
+        added = "ref-location-asset-new-library-1234"
+        refreshed = build_reference_asset_index({
+            added: {"id": added, "kind": "location", "uri": "location/library.png"},
+        })
+        self.assertEqual(added, refreshed["aliases"]["new-library-1234"])
 
     def test_scene_reference_media_requires_uri_but_ignores_style_media(self):
         value = document(["안심"])
@@ -157,6 +195,37 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertEqual(3, result["repair_count"])
         self.assertEqual(4, len(calls))
         self.assertIn("production", result["document"])
+
+    def test_repair_cannot_replace_valid_scene_range_with_short_document(self):
+        invalid = document(["안심"])
+        base = invalid["production"]["timeline"]["scenes"][0]
+        invalid["production"]["timeline"]["scenes"] = []
+        for index in range(12):
+            scene = json.loads(json.dumps(base, ensure_ascii=False))
+            scene.update(id=f"scene-{index + 1:02d}", start=index * 3, end=(index + 1) * 3)
+            scene["sequence"]["continuity_from"] = f"scene-{index:02d}" if index else None
+            invalid["production"]["timeline"]["scenes"].append(scene)
+        invalid["production"]["reference_assets"] = [{
+            "id": "ref-character-old", "kind": "character",
+            "character_id": "character-caregiver-m02", "reference_version": "v1",
+        }]
+        for scene in invalid["production"]["timeline"]["scenes"]:
+            scene["reference_ids"] = ["ref-character-old"]
+        short = json.loads(json.dumps(invalid, ensure_ascii=False))
+        short["production"]["timeline"]["scenes"] = short["production"]["timeline"]["scenes"][:1]
+        valid = json.loads(json.dumps(invalid, ensure_ascii=False))
+        valid["production"]["reference_assets"][0].update(
+            character_id="character-uncovered", reference_version="v1",
+        )
+        responses = iter((invalid, short, valid))
+
+        result = run_generation_harness(
+            lambda _prompt: json.dumps(next(responses), ensure_ascii=False),
+            ["안심"], "자료",
+        )
+
+        self.assertEqual(12, len(result["document"]["production"]["timeline"]["scenes"]))
+        self.assertEqual(2, result["repair_count"])
 
     def test_character_reference_rejects_mid_storyboard_wardrobe_change(self):
         value = document(["안심"])
