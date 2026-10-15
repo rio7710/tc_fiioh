@@ -44,6 +44,12 @@ from keyword_pool import load_month_pool, normalize_keyword_label
 from tools.unified_content_prompt_harness import normalize_reference_asset_metadata, run_generation_harness, validate_document
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema_file
 from storyboard_scene_reviewer import review_storyboard_scenes
+from script_copy_quality import (
+    korean_subject_form,
+    registered_client_name,
+    script_plan_copy_quality_conflicts,
+    script_plan_editorial_review_prompt,
+)
 
 APP_DIR = Path(__file__).resolve().parent
 ROOT = APP_DIR.parent
@@ -1180,21 +1186,35 @@ def script_plan_season_conflicts(plan, selected_labels, local_date=None):
     ]
 
 
-def script_plan_request_contract(selected_labels, local_date=None):
+def script_plan_request_contract(selected_labels, local_date=None, client_name=""):
     """Rules shared by the first generation request and every repair request."""
     context = script_season_context(local_date)
+    client_subject = korean_subject_form(client_name)
+    client_contract = (
+        f"- 등록된 정식 고객사명은 '{client_name}'이다. 마지막 1~3개 beat 안에 "
+        f"'{client_subject}'를 정확히 한 번 넣어 고객사를 문장의 주체로 삼고, 마지막 beat는 "
+        "자연스러운 종결 문장으로 마무리한다. 고객사명 뒤에 '와/과'를 붙여 화자를 모호하게 만들지 않는다. 명칭이 길면 "
+        "13자 제한을 지키도록 명칭과 종결 문장을 인접 beat로 나눈다.\n"
+        if client_name else
+        "- 등록된 정식 고객사명이 없으므로 시설명을 임의로 만들지 않는다.\n"
+    )
     return f"""[공통 1차 대본 작성·검증 계약]
 - JSON 객체 하나만 출력하고 설명, Markdown, 코드펜스를 덧붙이지 않는다.
 - 허용 필드는 schema_version, title, synopsis, narration_beats, cast_choices, location_choices뿐이며 schema_version은 1.0.0이다.
 - narration_beats는 15~18개, 각 항목은 앞뒤 공백을 제외하고 내부 공백·문장부호를 포함해 13자 이하, 전체는 180~210자로 작성한다.
 - cast_choices의 인물 이름·캐릭터 ID를 title, synopsis, narration_beats에 쓰지 않는다.
 - 사람 작성 원고의 제목·내레이션을 직접 인용하거나 단어만 바꿔 재사용하지 않는다.
+- 모든 narration beat를 실제 한국어로 소리 내어 읽어 조사 생략, 주어·서술어 불일치, 뜻이 통하지 않는 추상어 결합이 없는지 확인한다. 짧은 시적 호흡은 허용하지만 문법 오류를 시적 표현으로 포장하지 않는다.
+- '하루가 깊어져요', '방향이 놓여요', '곁의 눈빛이 먼저 살펴요'처럼 행위 주체나 의미 관계가 어색한 표현은 쓰지 않는다. 화면에서 확인되는 일상 언어로 바꾼다.
+- 마지막 1~3개 beat는 앞 장면의 의미를 받아 하나의 자연스러운 마무리가 되게 한다. 마지막 beat는 조사와 서술어를 갖춘 종결 문장으로 쓴다. 추상적인 '잇습니다'로 끝내지 않는다. '편안한 일상을 / 함께 이어 나갑니다', '따뜻한 오늘을 / 함께 만들어 갑니다', '오늘도 곁에서 / 함께하겠습니다'처럼 자막을 나눌 수 있으며, 이야기 문맥에 맞춰 다양하게 쓴다. 같은 문구를 매번 복제하지 않는다.
+{client_contract.rstrip()}
 - 선택 키워드: {json.dumps(selected_labels, ensure_ascii=False)}
 - 제작 기준일: {context['local_date']} (Asia/Seoul), 현재 계절: {context['season']}, 이번 달 참고 주제: {context['themes']}.
 - 제목·서사·내레이션·화면 소품을 현재 계절와 맞춘다. '계절'·'달력' 같은 범용 키워드를 임의의 다른 계절로 바꾸지 않는다. 현재와 다른 계절은 선택 키워드에 그 계절이 명시된 경우에만 허용한다."""
 
 
-def validate_script_plan(plan, authored_context="", selected_labels=None, local_date=None):
+def validate_script_plan(plan, authored_context="", selected_labels=None, local_date=None,
+                         client_name=""):
     validate_json_schema_file(plan, ROOT / "contracts" / "script-plan.schema.json")
     beats = plan["narration_beats"]
     narration_length = sum(len(beat.strip()) for beat in beats)
@@ -1207,6 +1227,22 @@ def validate_script_plan(plan, authored_context="", selected_labels=None, local_
     names = {name for name in names if 2 <= len(name) <= 12 and " " not in name}
     if any(name in beat for name in names for beat in beats):
         raise ValueError("인물 이름은 나레이션이 아닌 캐스팅·콘티에만 넣어 주세요.")
+    copy_issues = script_plan_copy_quality_conflicts(plan)
+    if copy_issues:
+        raise ValueError("나레이션 문장 자연스러움 검증 실패: " + " ".join(copy_issues))
+    if client_name:
+        closing = _copy_normalized("".join(beats[-3:]))
+        client_subject = korean_subject_form(client_name)
+        if _copy_normalized(client_subject) not in closing:
+            raise ValueError(
+                f"마지막 1~3개 나레이션에 '{client_subject}'를 넣어 고객사를 "
+                "명확한 문장 주체로 써 주세요."
+            )
+        if not re.search(r"니다[.!?…]?$", beats[-1]):
+            raise ValueError(
+                "고객사 마무리의 마지막 문장은 '이어 나갑니다', '함께 만들어 갑니다', "
+                "'함께하겠습니다'처럼 정중한 합니다체로 끝내 주세요."
+            )
     if authored_context and authored_copy_similarity(plan, authored_context) >= 0.90:
         raise ValueError("사람 작성 샘플의 제목·내레이션 문장을 그대로 복제하지 말고 새 사건과 문장으로 작성해 주세요.")
     conflicts = script_plan_season_conflicts(plan, selected_labels, local_date)
@@ -1246,9 +1282,10 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage, local_
     context = group_story_reference_context(resources, 45_000,
         {"default_asset_manifest", "reference_library", "prompt_contract"})
     authored_context = human_storyboard_reference_context(resources)
+    client_name = registered_client_name(resources)
     season_context = script_season_context(local_date)
     request_contract = script_plan_request_contract(
-        selected_labels, season_context["local_date"])
+        selected_labels, season_context["local_date"], client_name)
     prompt = f"""생각담 | ThinkCast 한국어 콘텐츠의 1차 대본만 작성한다. JSON 객체 하나만 출력한다.
 {request_contract}
 그룹 자료: {context}
@@ -1287,7 +1324,7 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage, local_
         plan = normalize_script_plan(plan)
         try:
             validate_script_plan(
-                plan, authored_context, selected_labels, season_context["local_date"])
+                plan, authored_context, selected_labels, season_context["local_date"], client_name)
             break
         except (JsonSchemaError, TypeError, ValueError) as exc:
             validation_errors.append(str(exc))
@@ -1305,6 +1342,31 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage, local_
                 f"이전 검증 오류들: {json.dumps(validation_errors, ensure_ascii=False)}\n"
                 f"이전 결과: {json.dumps(plan, ensure_ascii=False)}"
             )
+    # A separate editorial pass reviews every Korean beat after schema and
+    # factual constraints are valid. Only narration is accepted back from the
+    # reviewer; story metadata remains server-owned and immutable here.
+    reviewed = generate(script_plan_editorial_review_prompt(plan, request_contract))
+    editorial_errors = []
+    for attempt in range(3):
+        reviewed = normalize_script_plan(reviewed)
+        reviewed_plan = dict(plan)
+        reviewed_plan["narration_beats"] = reviewed.get("narration_beats", [])
+        try:
+            validate_script_plan(
+                reviewed_plan, authored_context, selected_labels, season_context["local_date"], client_name)
+            plan = reviewed_plan
+            break
+        except (JsonSchemaError, TypeError, ValueError) as exc:
+            editorial_errors.append(str(exc))
+            if attempt == 2:
+                detail = str(exc).strip() or type(exc).__name__
+                raise RuntimeError(f"1차 대본 문장 검수에 실패했습니다: {detail}") from None
+            reviewed = generate(
+                script_plan_editorial_review_prompt(plan, request_contract) + "\n"
+                "직전 검수 결과가 계약을 위반했다. 원본의 사실과 메타데이터는 유지하고 "
+                "narration_beats만 다시 교정하라. "
+                f"검증 오류: {exc}\n직전 검수 결과: {json.dumps(reviewed, ensure_ascii=False)}"
+            )
     usage = {key: sum(int(item.get("usage", {}).get(key, 0)) for item in responses)
              for key in ("input_tokens", "output_tokens", "total_tokens")}
     result = responses[-1]
@@ -1313,6 +1375,8 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage, local_
                   "recovery": {
                       "attempts": len(validation_errors),
                       "validation_errors": validation_errors,
+                      "editorial_review_requests": 1 + len(editorial_errors),
+                      "editorial_validation_errors": editorial_errors,
                       "normalized_before_validation": True,
                   }}
 
@@ -1324,7 +1388,8 @@ def validated_script_plan(store, user_id, project_id, selected_labels, resources
         return None, False
     try:
         validate_script_plan(
-            saved["plan"], human_storyboard_reference_context(resources), selected_labels)
+            saved["plan"], human_storyboard_reference_context(resources), selected_labels,
+            client_name=registered_client_name(resources))
         return saved, False
     except (JsonSchemaError, TypeError, ValueError):
         plan, response = openai_script_plan(

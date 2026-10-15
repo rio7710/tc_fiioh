@@ -63,6 +63,22 @@ class AuthoredStoryReferenceTests(unittest.TestCase):
         self.assertIn("사람 원고 B", context)
         self.assertNotIn("생성 결과", context)
 
+    def test_registered_client_name_prefers_metadata_and_reads_explicit_heading(self):
+        self.assertEqual("등록 메타 시설", render_server.registered_client_name([{
+            "resource_type": "client_profile", "payload": {"facility_name": "등록 메타 시설"},
+        }]))
+        self.assertEqual("그린힐 재활실버케어", render_server.registered_client_name([{
+            "resource_type": "test_content_sample",
+            "payload": {"content": "# 그린힐 재활실버케어 30초 홍보영상\n본문"},
+        }]))
+        self.assertEqual("", render_server.registered_client_name([{
+            "resource_type": "test_content_sample",
+            "payload": {"content": "요양원 분위기의 일반적인 참고 문장"},
+        }]))
+        self.assertEqual("그린힐 재활실버케어가", render_server.korean_subject_form(
+            "그린힐 재활실버케어"))
+        self.assertEqual("푸른마을이", render_server.korean_subject_form("푸른마을"))
+
     def test_verbatim_or_near_verbatim_narration_is_rejected(self):
         context = "| 화면 | 내레이션 |\n| 창가 | 따뜻한 빛이 오늘의 마음을 천천히 엽니다. |"
         exact = {"narration_beats": ["따뜻한 빛이 오늘의 마음을 천천히 엽니다."]}
@@ -97,9 +113,75 @@ class AuthoredStoryReferenceTests(unittest.TestCase):
         for required in (
             "schema_version은 1.0.0", "15~18개", "13자 이하", "180~210자",
             "인물 이름·캐릭터 ID", "직접 인용", "현재 계절: 가을",
-            "어르신의 계절 달력",
+            "어르신의 계절 달력", "소리 내어 읽어", "마지막 1~3개 beat",
+            "등록된 정식 고객사명", "임의로 만들지 않는다",
         ):
             self.assertIn(required, contract)
+
+    def test_editorial_review_is_limited_to_narration_copy(self):
+        plan = self.script_plan_with_beat("따뜻한 빛이 머뭅니다.")
+        prompt = render_server.script_plan_editorial_review_prompt(
+            plan, render_server.script_plan_request_contract(["안심"], "2026-10-14"))
+        self.assertIn("narration_beats 전체", prompt)
+        self.assertIn("앞뒤 문장이 이어질 때", prompt)
+        self.assertIn("수정할 필요가 없는 문장은 그대로", prompt)
+        self.assertIn("title, synopsis, cast_choices, location_choices", prompt)
+        self.assertIn("새 사실", prompt)
+
+    def test_rejects_known_unnatural_narration_anywhere_in_plan(self):
+        plan = self.script_plan_with_beat("함께 읽은 하루 깊어져요")
+        with self.assertRaisesRegex(ValueError, "자연스러움 검증 실패"):
+            render_server.validate_script_plan(plan)
+
+    def test_rejects_unfinished_final_beat(self):
+        plan = self.script_plan_with_beat("따뜻한 빛이 머뭅니다.")
+        plan["narration_beats"].insert(-1, "작은 미소가 머뭉니다.")
+        plan["narration_beats"][-1] = "오늘도 편안한 하루"
+        with self.assertRaisesRegex(ValueError, "자연스럽게 종결"):
+            render_server.validate_script_plan(plan)
+
+    def test_accepts_natural_complete_closing(self):
+        plan = self.script_plan_with_beat("따뜻한 빛이 머뭅니다.")
+        plan["narration_beats"].insert(-1, "작은 미소가 머뭉니다.")
+        plan["narration_beats"][-1] = "오늘도 함께합니다."
+        render_server.validate_script_plan(plan)
+
+    def test_rejects_abstract_itseumnida_closing_and_common_misspelling(self):
+        plan = self.script_plan_with_beat("따뜻한 빛이 머뭅니다.")
+        plan["narration_beats"].insert(-1, "작은 미소가 머뭉니다.")
+        plan["narration_beats"][-1] = "오늘의 걸음을 잇습니다."
+        with self.assertRaisesRegex(ValueError, "추상적인 '잇습니다'"):
+            render_server.validate_script_plan(plan)
+        plan["narration_beats"][-1] = "함께 이어 나감니다."
+        with self.assertRaisesRegex(ValueError, "맞춤법 오류"):
+            render_server.validate_script_plan(plan)
+
+    def test_registered_client_name_is_required_only_near_closing(self):
+        plan = self.script_plan_with_beat("따뜻한 빛이 머뭅니다.")
+        plan["narration_beats"].insert(-1, "작은 미소가 머뭉니다.")
+        plan["narration_beats"][-2:] = ["그린힐 재활실버케어가", "오늘도 함께합니다."]
+        render_server.validate_script_plan(
+            plan, client_name="그린힐 재활실버케어")
+        plan["narration_beats"][-2] = "편안한 하루를 이어"
+        with self.assertRaisesRegex(ValueError, "명확한 문장 주체"):
+            render_server.validate_script_plan(
+                plan, client_name="그린힐 재활실버케어")
+
+    def test_rejects_client_name_with_ambiguous_conjunction_particle(self):
+        plan = self.script_plan_with_beat("따뜻한 빛이 머뭅니다.")
+        plan["narration_beats"].insert(-1, "작은 미소가 머뭉니다.")
+        plan["narration_beats"][-2:] = ["그린힐 재활실버케어와", "오늘도 함께하겠습니다"]
+        with self.assertRaisesRegex(ValueError, "명확한 문장 주체"):
+            render_server.validate_script_plan(
+                plan, client_name="그린힐 재활실버케어")
+
+    def test_registered_client_closing_requires_formal_style(self):
+        plan = self.script_plan_with_beat("따뜻한 빛이 머뭅니다.")
+        plan["narration_beats"].insert(-1, "작은 미소가 머뭉니다.")
+        plan["narration_beats"][-2:] = ["그린힐 재활실버케어가", "편안한 하루를 함께해요."]
+        with self.assertRaisesRegex(ValueError, "정중한 합니다체"):
+            render_server.validate_script_plan(
+                plan, client_name="그린힐 재활실버케어")
 
 
 if __name__ == "__main__":
