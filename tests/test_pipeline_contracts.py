@@ -112,6 +112,7 @@ class PipelineContractTests(unittest.TestCase):
             self.assertTrue((scene_dir / f"scene_{index:02d}.webp").is_file())
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
         self.assertIn("COPY 02_media/images/scenes/scene_*.webp", dockerfile)
+        self.assertIn("COPY tools/reference_asset_index.py /app/tools/reference_asset_index.py", dockerfile)
         for path in self.server.MUSIC.values():
             if path is not None:
                 self.assertTrue(path.is_file(), path)
