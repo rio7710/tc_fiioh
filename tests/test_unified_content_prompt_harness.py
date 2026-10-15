@@ -2,7 +2,7 @@ import json
 import unittest
 
 from tools.reference_asset_index import build_reference_asset_index, normalize_scene_reference_ids
-from tools.unified_content_prompt_harness import build_novelty_repair_prompt, build_prompt, build_repair_prompt, normalize_character_reference_versions, normalize_document_shape, normalize_reference_asset_metadata, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_character_reference_versions, validate_document, validate_scene_reference_media, validate_visual_continuity
+from tools.unified_content_prompt_harness import build_novelty_repair_prompt, build_prompt, build_repair_prompt, normalize_character_reference_versions, normalize_document_shape, normalize_reference_asset_metadata, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_character_reference_versions, validate_document, validate_scene_reference_media, validate_transition_bridge_routes, validate_visual_continuity
 from tools.validate_unified_content import UnifiedContentError
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema
 
@@ -823,6 +823,100 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertIn("등록된 연결 복도 레퍼런스", route)
         self.assertIn("문·문손잡이·문턱은 생성하지 않는다", route)
         self.assertEqual(0, result["repair_count"])
+
+    def test_transition_bridge_requires_one_corridor_scene_between_locations(self):
+        value = document(["안심"])
+        base = value["production"]["timeline"]["scenes"][0]
+        scenes = []
+        for index, location in enumerate(("ref-location-a", "ref-location-bridge", "ref-location-b"), 1):
+            scene = json.loads(json.dumps(base))
+            scene.update(id=f"scene-{index:02d}", reference_ids=[location])
+            scene["sequence"] = {"continuity_from": None if index == 1 else f"scene-{index - 1:02d}"}
+            scenes.append(scene)
+        value["production"]["timeline"]["scenes"] = scenes
+        value["production"]["reference_assets"] = [
+            {"id":"ref-location-a","kind":"location"},
+            {"id":"ref-location-bridge","kind":"location"},
+            {"id":"ref-location-b","kind":"location"},
+        ]
+        catalog = {
+            "ref-location-a":{"id":"ref-location-a","kind":"location","status":"ready"},
+            "ref-location-bridge":{"id":"ref-location-bridge","kind":"location","status":"ready","usage_role":"transition_bridge"},
+            "ref-location-b":{"id":"ref-location-b","kind":"location","status":"ready"},
+        }
+
+        validate_transition_bridge_routes(value, catalog)
+
+    def test_transition_bridge_rejects_direct_location_jump_using_server_catalog(self):
+        value = document(["안심"])
+        first = value["production"]["timeline"]["scenes"][0]
+        second = json.loads(json.dumps(first))
+        first.update(id="scene-01", reference_ids=["ref-location-a"])
+        second.update(id="scene-02", reference_ids=["ref-location-b"],
+                      sequence={"continuity_from":"scene-01"})
+        value["production"]["timeline"]["scenes"] = [first, second]
+        value["production"]["reference_assets"] = [
+            {"id":"ref-location-a","kind":"location"},
+            {"id":"ref-location-b","kind":"location"},
+        ]
+        catalog = {
+            "ref-location-a":{"id":"ref-location-a","kind":"location","status":"ready"},
+            "ref-location-bridge":{"id":"ref-location-bridge","kind":"location","status":"ready","usage_role":"transition_bridge"},
+            "ref-location-b":{"id":"ref-location-b","kind":"location","status":"ready"},
+        }
+
+        with self.assertRaisesRegex(UnifiedContentError, "장소가 직접 바뀌었습니다"):
+            validate_transition_bridge_routes(value, catalog)
+
+    def test_transition_bridge_rejects_first_last_repeated_and_same_destination(self):
+        catalog = {
+            "ref-location-a":{"id":"ref-location-a","kind":"location","status":"ready"},
+            "ref-location-bridge":{"id":"ref-location-bridge","kind":"location","status":"ready","assignment":"connector_corridor"},
+            "ref-location-b":{"id":"ref-location-b","kind":"location","status":"ready"},
+        }
+
+        def value_for(*locations):
+            value = document(["안심"])
+            base = value["production"]["timeline"]["scenes"][0]
+            scenes = []
+            for index, location in enumerate(locations, 1):
+                scene = json.loads(json.dumps(base))
+                scene.update(id=f"scene-{index:02d}", reference_ids=[location])
+                scene["sequence"] = {"continuity_from": None if index == 1 else f"scene-{index - 1:02d}"}
+                scenes.append(scene)
+            value["production"]["timeline"]["scenes"] = scenes
+            value["production"]["reference_assets"] = [
+                {"id":reference_id,"kind":"location"} for reference_id in set(locations)
+            ]
+            return value
+
+        with self.assertRaisesRegex(UnifiedContentError, "첫 씬"):
+            validate_transition_bridge_routes(value_for("ref-location-bridge", "ref-location-b"), catalog)
+        with self.assertRaisesRegex(UnifiedContentError, "끝낼 수 없습니다"):
+            validate_transition_bridge_routes(value_for("ref-location-a", "ref-location-bridge"), catalog)
+        with self.assertRaisesRegex(UnifiedContentError, "연속 사용"):
+            validate_transition_bridge_routes(value_for(
+                "ref-location-a", "ref-location-bridge", "ref-location-bridge", "ref-location-b"
+            ), catalog)
+        with self.assertRaisesRegex(UnifiedContentError, "서로 다른"):
+            validate_transition_bridge_routes(value_for(
+                "ref-location-a", "ref-location-bridge", "ref-location-a"
+            ), catalog)
+
+    def test_direct_location_edit_is_allowed_without_registered_transition_bridge(self):
+        value = document(["안심"])
+        first = value["production"]["timeline"]["scenes"][0]
+        second = json.loads(json.dumps(first))
+        first["reference_ids"] = ["ref-location-a"]
+        second.update(id="scene-02", reference_ids=["ref-location-b"],
+                      sequence={"continuity_from":"scene-01"})
+        value["production"]["timeline"]["scenes"] = [first, second]
+        value["production"]["reference_assets"] = [
+            {"id":"ref-location-a","kind":"location"},
+            {"id":"ref-location-b","kind":"location"},
+        ]
+
+        validate_transition_bridge_routes(value)
 
     def test_table_geometry_is_declared_and_consistent_with_scene_prompts(self):
         value = document(["안심"])

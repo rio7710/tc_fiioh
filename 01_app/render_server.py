@@ -1010,6 +1010,7 @@ def group_reference_asset_catalog(resources):
     fields = {
         "id", "kind", "uri", "status", "usage", "character_id", "display_name",
         "identity_group", "appearance_lock", "reference_version", "wardrobe_variant", "aliases",
+        "assignment", "usage_role",
     }
     catalog = {}
 
@@ -1357,7 +1358,7 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
 - 모든 씬 이미지는 풀블리드 16:9 가로 원본이다. 9:16은 중앙 크롭 안전영역일 뿐이다. 세로 이미지 삽입, 흰/검은 레터박스, 테두리, 분할 패널을 절대 생성하지 않는다.
 - 인접 씬마다 샷을 실제로 다르게 만든다. 같은 공간이라도 매번 같은 두 인물 투샷을 반복하지 않는다. 서사에 맞게 한 명만 줌인/클로즈업하거나, 와이드로 줌아웃하거나, 손·소품 디테일 또는 상대 리액션숏으로 전환한다. 매 씬의 주 피사체/행동 및 프레이밍을 직전 씬과 분명히 다르게 쓰고 image_prompt와 camera에 구체화한다. 동일 구도에서 미세한 줌만 바꾼 연속 씬은 허용하지 않는다.
 - 한번 이동한 장소는 명시적이고 서사적인 귀환 동선이 보이기 전까지 유지한다. A→B→A 복귀에는 이유와 사이 장면의 이동 경로가 있어야 한다. 화면 크기를 바꿔도 확립된 180도 동작축과 인물 좌우·시선은 유지한다.
-- 장소 변경은 꼭 필요할 때만 사용한다. 문·문손잡이·문턱을 이미지로 만들지 말고, 출발 장소에서 같은 방향으로 프레임 아웃 → 등록된 ready 상태의 연결 복도 location 레퍼런스에서 이동 → 목적지 내부 도착 순서로 연결한다. 복도 레퍼런스가 없으면 복도를 발명하지 않고 편집상 이동 시간을 생략한다. 각 씬에는 현재 장소 레퍼런스 하나만 사용한다.
+- 장소 변경은 꼭 필요할 때만 사용한다. 문·문손잡이·문턱을 이미지로 만들지 말고, 출발 장소에서 같은 방향으로 프레임 아웃 → `usage_role=transition_bridge`인 ready 상태의 연결 복도 location 레퍼런스 정확히 1씬 → 서로 다른 목적지 내부 도착 순서로 연결한다. 전환 전용 복도는 첫 씬·마지막 씬 또는 연속된 여러 씬에 사용할 수 없다. 복도 레퍼런스가 없으면 복도를 발명하지 않고 편집상 이동 시간을 생략한다. 각 씬에는 현재 장소 레퍼런스 하나만 사용한다.
 - sequence.camera_axis_transition은 첫 씬 establish, 이후 기본 same_side로 기록한다. 실제 화면상 이동을 보여줄 때만 motivated_cross를 쓰고 camera_bridge에 이동을 명시한다.
 - 제공된 장소 레퍼런스에 보이는 테이블·가구의 형태, 윤곽, 비율, 모서리, 다리 수, 재질과 방향을 바꾸지 않는다. 확인된 형태를 continuity.props 및 그 장소를 사용하는 모든 image_prompt에 명시하고, 원형을 사각형으로 바꾸는 등의 형태 변형은 금지한다.
 - 마지막 씬은 가능하면 주인공 한 명의 정면 구도와 자연스러운 카메라 렌즈 응시로 마무리한다. 안전·존엄·서사상 부적절한 경우에만 사유를 명시해 예외로 한다.
@@ -1410,6 +1411,7 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
         if progress_callback:
             progress_callback(values)
 
+    canonical_reference_assets = group_reference_asset_catalog(resources)
     generated = run_generation_harness(
         generate, selected_labels, source_material,
         previous_documents=previous_documents,
@@ -1421,7 +1423,7 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
             "notes": ["그룹 리소스를 참조해 AI가 생성한 필드는 source=ai_inferred로 구분함."],
         },
         locked_plan=script_plan,
-        canonical_reference_assets=group_reference_asset_catalog(resources),
+        canonical_reference_assets=canonical_reference_assets,
         progress_callback=report_progress,
         diagnostic_callback=diagnostic_callback,
     )
@@ -1431,7 +1433,10 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
     def validate_reviewed_scene(index, reviewed_scene):
         candidate_document = copy.deepcopy(base_document)
         candidate_document["production"]["timeline"]["scenes"][index] = reviewed_scene
-        validate_document(candidate_document, selected_labels, True, script_plan)
+        validate_document(
+            candidate_document, selected_labels, True, script_plan,
+            canonical_reference_assets=canonical_reference_assets,
+        )
 
     scene_review = review_storyboard_scenes(
         base_document,
@@ -1443,7 +1448,10 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
         max_attempts=3,
     )
     generated["document"] = scene_review["document"]
-    validate_document(generated["document"], selected_labels, True, script_plan)
+    validate_document(
+        generated["document"], selected_labels, True, script_plan,
+        canonical_reference_assets=canonical_reference_assets,
+    )
     generated["scene_review"] = {
         key: scene_review[key]
         for key in ("written_scenes", "reviewed_scenes", "completed_scenes", "total_scenes", "failed_scenes", "repaired_scenes")

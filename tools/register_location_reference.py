@@ -72,6 +72,7 @@ def register_location(
         "uri": logical_path,
         "source_filename": filename,
         "assignment": "connector_corridor",
+        "usage_role": "transition_bridge",
         "source_kind": "ai_supplemented_reference",
         "aliases": aliases,
         "usage": usage,

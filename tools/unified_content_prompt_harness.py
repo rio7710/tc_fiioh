@@ -772,8 +772,106 @@ def normalize_location_return_routes(document: dict[str, Any]) -> dict[str, Any]
     return document
 
 
-def validate_visual_continuity(document: dict[str, Any]) -> None:
+def transition_bridge_asset_ids(
+    document: dict[str, Any],
+    canonical_assets: dict[str, dict[str, Any]] | None = None,
+) -> set[str]:
+    """Return ready location assets explicitly registered for transition-only use."""
+    production = document.get("production") or {}
+    assets = {
+        str(asset.get("id")): asset
+        for asset in production.get("reference_assets") or []
+        if isinstance(asset, dict) and asset.get("id")
+    }
+    for reference_id, asset in (canonical_assets or {}).items():
+        if isinstance(asset, dict):
+            assets[str(asset.get("id") or reference_id)] = asset
+    return {
+        reference_id for reference_id, asset in assets.items()
+        if str(asset.get("kind", "")).lower() in {"location", "facility"}
+        and str(asset.get("status", "ready")).lower() == "ready"
+        and (
+            str(asset.get("usage_role", "")).lower() == "transition_bridge"
+            or str(asset.get("assignment", "")).lower() == "connector_corridor"
+        )
+    }
+
+
+def validate_transition_bridge_routes(
+    document: dict[str, Any],
+    canonical_assets: dict[str, dict[str, Any]] | None = None,
+) -> None:
+    """Require one transition-only corridor scene between distinct locations."""
+    production = document.get("production") or {}
+    scenes = (production.get("timeline") or {}).get("scenes") or []
+    bridge_ids = transition_bridge_asset_ids(document, canonical_assets)
+    if not bridge_ids or not scenes:
+        return
+    assets = {
+        str(asset.get("id")): asset
+        for asset in production.get("reference_assets") or []
+        if isinstance(asset, dict) and asset.get("id")
+    }
+    assets.update({
+        str(asset.get("id") or reference_id): asset
+        for reference_id, asset in (canonical_assets or {}).items()
+        if isinstance(asset, dict)
+    })
+    location_ids = {
+        reference_id for reference_id, asset in assets.items()
+        if str(asset.get("kind", "")).lower() in {"location", "facility"}
+    }
+    locations: list[str | None] = []
+    for scene in scenes:
+        scene_locations = [
+            str(reference_id) for reference_id in (scene.get("reference_ids") or [])
+            if str(reference_id) in location_ids
+        ]
+        if len(scene_locations) > 1:
+            raise UnifiedContentError(
+                f"{scene.get('id', 'scene')}는 현재 장소 레퍼런스를 정확히 하나만 사용해야 합니다"
+            )
+        locations.append(scene_locations[0] if scene_locations else None)
+
+    for index, location_id in enumerate(locations):
+        if location_id not in bridge_ids:
+            continue
+        scene_id = scenes[index].get("id", f"scene-{index + 1:02d}")
+        if index == 0:
+            raise UnifiedContentError(f"{scene_id}는 전환 전용 연결 복도를 첫 씬으로 사용할 수 없습니다")
+        if index == len(locations) - 1:
+            raise UnifiedContentError(f"{scene_id}는 전환 전용 연결 복도에서 콘텐츠를 끝낼 수 없습니다")
+        origin, destination = locations[index - 1], locations[index + 1]
+        if origin in bridge_ids or destination in bridge_ids:
+            raise UnifiedContentError(
+                f"{scene_id} 전환 전용 연결 복도는 연속 사용하지 말고 장소 이동당 정확히 1씬만 사용해야 합니다"
+            )
+        if not origin or not destination:
+            raise UnifiedContentError(
+                f"{scene_id} 전환 전용 연결 복도 앞뒤에는 출발 장소와 목적지 장소가 필요합니다"
+            )
+        if origin == destination:
+            raise UnifiedContentError(
+                f"{scene_id} 전환 전용 연결 복도는 서로 다른 출발 장소와 목적지를 연결해야 합니다"
+            )
+
+    for index in range(1, len(locations)):
+        previous, current = locations[index - 1], locations[index]
+        if not previous or not current or previous == current:
+            continue
+        if previous not in bridge_ids and current not in bridge_ids:
+            raise UnifiedContentError(
+                f"{scenes[index - 1].get('id', 'scene')}에서 {scenes[index].get('id', 'scene')}로 "
+                "장소가 직접 바뀌었습니다. 준비된 전환 전용 연결 복도 정확히 1씬을 사이에 배치해야 합니다"
+            )
+
+
+def validate_visual_continuity(
+    document: dict[str, Any],
+    canonical_assets: dict[str, dict[str, Any]] | None = None,
+) -> None:
     """Reject storyboard plans that encode an unmotivated location return or lose known furniture geometry."""
+    validate_transition_bridge_routes(document, canonical_assets)
     production = document.get("production") or {}
     scenes = (production.get("timeline") or {}).get("scenes") or []
     assets = production.get("reference_assets") or []
@@ -982,7 +1080,8 @@ def validate_scene_reference_media(document: dict[str, Any]) -> None:
 
 
 def validate_document(document: dict[str, Any], selected_keywords: list[str], strict_schema: bool = False,
-                      locked_plan: dict[str, Any] | None = None) -> float:
+                      locked_plan: dict[str, Any] | None = None,
+                      canonical_reference_assets: dict[str, dict[str, Any]] | None = None) -> float:
     if strict_schema:
         try:
             validate_json_schema_file(document, SCHEMA_PATH)
@@ -996,7 +1095,7 @@ def validate_document(document: dict[str, Any], selected_keywords: list[str], st
     validate_character_reference_versions(document)
     if strict_schema:
         validate_scene_reference_media(document)
-    validate_visual_continuity(document)
+    validate_visual_continuity(document, canonical_reference_assets)
     if locked_plan:
         scenes = document.get("production", {}).get("timeline", {}).get("scenes", [])
         locked_beats = locked_plan.get("narration_beats") or []
@@ -1060,6 +1159,7 @@ def build_repair_prompt(candidate: str, error: Exception,
         "화면축 검증 오류라면 camera_bridge·entry_action·exit_action에 실제로 보이는 카메라/인물의 축 횡단 이동이 명시된 경우에만 motivated_cross를 유지한다. 이동 근거가 없으면 해당 씬을 same_side로 고치며, 단순한 샷 크기·각도 변화는 축 횡단으로 취급하지 않는다.\n"
         "테이블 형태 누락 오류라면 오류에 표시된 한국어 형태명을 해당 scene의 image_prompt.text에 직접 넣고, continuity.props 및 기준 레퍼런스와 일치시킨다.\n"
         "캐릭터 버전 오류라면 해당 character_id에 등록된 V2 reference asset 하나를 선택해 모든 씬의 reference_ids에서 동일하게 사용한다. V2가 없는 캐릭터만 V1을 유지하며, 동일 캐릭터의 의상 variant도 콘티 중간에 바꾸지 않는다.\n"
+        "전환 전용 연결 복도 오류라면 출발 장소 → usage_role=transition_bridge인 ready 복도 정확히 1씬 → 서로 다른 목적지 장소 순서로 reference_ids와 sequence를 정리한다. 복도를 첫 씬·마지막 씬 또는 연속 씬에 두지 않고, 준비된 복도를 건너뛴 직접 장소 점프를 만들지 않는다.\n"
         "참조 자산 오류라면 제공된 레퍼런스 인덱스의 정식 character/location 자산만 사용하고 id·uri·status·버전·의상 값을 추측하거나 변형하지 않는다. style은 연출 메타데이터로 유지하되 이미지 파일 URI를 만들어 내지 않는다.\n"
         "씬 수 오류라면 확정 내레이션 문장은 바꾸지 않고 행동·리액션·손과 소품 디테일·공간 확립·연결 구도를 추가하거나 합쳐 production.timeline.scenes를 12~20개로 맞춘다. 각 씬은 최소 1.5초이며 인접 구도를 반복하지 않는다.\n"
         "자막 연결 오류라면 확정된 13자 이하 narration beat 각각이 최소 한 씬에서 새로 시작하도록 narration_cue_ids를 순서대로 배치한다. caption.text는 해당 narration.text와 동일하게 유지하고 줄바꿈이나 두 자막 합치기를 금지한다.\n"
@@ -1267,7 +1367,10 @@ def run_generation_harness(
     while True:
         try:
             document = complete_provenance(parse_json_document(candidate))
-            validate_document(document, selected_keywords, strict_schema, locked_plan)
+            validate_document(
+                document, selected_keywords, strict_schema, locked_plan,
+                canonical_reference_assets=canonical_reference_assets,
+            )
             break
         except (UnifiedContentError, KeyError, TypeError, ValueError) as validation_error:
             diagnose(
@@ -1331,7 +1434,10 @@ def run_generation_harness(
             json.dumps(document, ensure_ascii=False), similarity, locked_plan))
         try:
             revised_document = complete_provenance(parse_json_document(revised))
-            validate_document(revised_document, selected_keywords, strict_schema, locked_plan)
+            validate_document(
+                revised_document, selected_keywords, strict_schema, locked_plan,
+                canonical_reference_assets=canonical_reference_assets,
+            )
             revised_similarity = maximum_similarity(revised_document, previous_documents)
             if revised_similarity < similarity:
                 document, similarity = revised_document, revised_similarity

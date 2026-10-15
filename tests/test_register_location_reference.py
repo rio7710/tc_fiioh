@@ -52,6 +52,7 @@ class RegisterLocationReferenceTests(unittest.TestCase):
             connection.close()
             index = json.loads(rows["GREENHILL_REFERENCES/greenhill_reference_index.json"])
             self.assertEqual("ref-location-corridor", index["document"]["assets"][0]["id"])
+            self.assertEqual("transition_bridge", index["document"]["assets"][0]["usage_role"])
             self.assertEqual(1, index["document"]["summary"]["ready_locations"])
             default = json.loads(rows["greenhill-facilities-characters"])
             manifest = json.loads(rows["kakaotalk-greenhill-bundle"])
