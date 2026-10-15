@@ -1,5 +1,11 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
+  "classification": {
+    "explicit_role_fields": ["location_activity_role", "activity_role"],
+    "identity_fields": ["id", "uri", "source_filename", "display_name", "aliases"],
+    "excluded_usage_roles": ["transition_bridge"],
+    "excluded_assignments": ["connector_corridor"]
+  },
   "location_roles": {
     "physical_therapy": {
       "label": "물리치료실",

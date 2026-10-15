@@ -588,6 +588,39 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         scene["image_prompt"]["text"] = "넓은 공용 공간에서 꽃꽂이 문화 프로그램을 함께한다."
         validate_location_activity_policy(value)
 
+    def test_transition_corridor_description_does_not_become_physical_therapy_room(self):
+        value = document(["안심"])
+        corridor_id = "ref-location-asset-corridor-ai-v1-d8811f672936"
+        value["production"]["reference_assets"][1] = {
+            "id": corridor_id,
+            "kind": "location",
+            "status": "ready",
+            "uri": "시설/시설_연결복도_AI보완_v1.png",
+            "usage_role": "transition_bridge",
+            "assignment": "connector_corridor",
+            "usage": "가족상담실·재활물리치료실을 참조한 장소 전환 전용 자산",
+        }
+        scene = value["production"]["timeline"]["scenes"][0]
+        scene["reference_ids"] = ["ref-character-elder", corridor_id]
+        scene["image_prompt"]["text"] = "연결 복도에서 출입구 방향으로 천천히 걷는다."
+        validate_location_activity_policy(value)
+
+    def test_explicit_location_activity_role_classifies_opaque_new_asset(self):
+        value = document(["안심"])
+        opaque_id = "ref-location-asset-new-opaque"
+        value["production"]["reference_assets"][1] = {
+            "id": opaque_id,
+            "kind": "location",
+            "status": "ready",
+            "uri": "시설/new-opaque.png",
+            "location_activity_role": "physical_therapy",
+        }
+        scene = value["production"]["timeline"]["scenes"][0]
+        scene["reference_ids"] = ["ref-character-elder", opaque_id]
+        scene["image_prompt"]["text"] = "의자에 앉아 창밖을 바라본다."
+        with self.assertRaisesRegex(UnifiedContentError, "물리치료실 장면"):
+            validate_location_activity_policy(value)
+
     def test_prior_output_is_supplied_as_avoidance_context(self):
         prior = document(["재활", "존중"])
         prior["document_id"] = "prior-one"

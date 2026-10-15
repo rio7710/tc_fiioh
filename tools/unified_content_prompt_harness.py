@@ -620,6 +620,7 @@ def validate_location_activity_policy(
 ) -> None:
     """Keep therapy, dining, and event scenes in their registered spaces."""
     policy = json.loads(LOCATION_ACTIVITY_POLICY_PATH.read_text(encoding="utf-8"))
+    classification = policy.get("classification") or {}
     location_roles = policy.get("location_roles") or {}
     activity_classes = policy.get("activity_classes") or {}
     production = document.get("production") or {}
@@ -641,14 +642,51 @@ def validate_location_activity_policy(
     def asset_role(asset: dict[str, Any]) -> str | None:
         if str(asset.get("kind", "")).lower() not in {"location", "facility"}:
             return None
+        if str(asset.get("usage_role", "")).lower() in {
+            str(item).lower() for item in classification.get("excluded_usage_roles") or []
+        }:
+            return None
+        if str(asset.get("assignment", "")).lower() in {
+            str(item).lower() for item in classification.get("excluded_assignments") or []
+        }:
+            return None
+        explicit_roles = {
+            str(asset.get(field) or "").strip()
+            for field in classification.get("explicit_role_fields") or []
+            if str(asset.get(field) or "").strip()
+        }
+        unknown_roles = explicit_roles - set(location_roles)
+        if unknown_roles:
+            raise UnifiedContentError(
+                f"장소 레퍼런스 {asset.get('id', 'unknown')}의 전용 용도 값이 올바르지 않습니다: "
+                f"{', '.join(sorted(unknown_roles))}"
+            )
+        if len(explicit_roles) > 1:
+            raise UnifiedContentError(
+                f"장소 레퍼런스 {asset.get('id', 'unknown')}의 전용 용도 분류가 중복됩니다: "
+                f"{', '.join(sorted(explicit_roles))}"
+            )
+        if explicit_roles:
+            return next(iter(explicit_roles))
+        exact_matches = [
+            role for role, spec in location_roles.items()
+            if str(asset.get("id") or "") in (spec.get("asset_ids") or [])
+        ]
+        if len(exact_matches) > 1:
+            raise UnifiedContentError(
+                f"장소 레퍼런스 {asset.get('id', 'unknown')}의 용도 분류가 중복됩니다: "
+                f"{', '.join(exact_matches)}"
+            )
+        if exact_matches:
+            return exact_matches[0]
         searchable = _all_text({
             key: asset.get(key) for key in
-            ("id", "uri", "usage", "display_name", "appearance_lock", "description", "aliases")
+            classification.get("identity_fields") or
+            ("id", "uri", "source_filename", "display_name", "aliases")
         })
         matches = [
             role for role, spec in location_roles.items()
-            if str(asset.get("id") or "") in (spec.get("asset_ids") or [])
-            or contains_any(searchable, spec.get("location_terms") or [])
+            if contains_any(searchable, spec.get("location_terms") or [])
         ]
         if len(matches) > 1:
             raise UnifiedContentError(
