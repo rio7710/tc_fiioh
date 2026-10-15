@@ -25,7 +25,7 @@
       errors.push({ feature, error });
       console.error(`[Step04:${feature}]`, error);
       const status = one('#renderStatus');
-      if (status && !status.textContent) status.textContent = `${feature} 기능 초기화 오류`;
+      if (status) status.textContent = `${feature} 오류: ${error?.message || '기능을 실행하지 못했습니다.'}`;
     };
     const feature = (name, callback) => {
       try { callback(); } catch (error) { report(name, error); }

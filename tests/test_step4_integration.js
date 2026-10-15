@@ -394,7 +394,7 @@ assert.match(html, /function updateWatermarkPreview\(\)\{return brandStagePrevie
 assert.match(html, /function updateCommonOutroPreview\(\)\{return brandStagePreview\.updateOutro\(\)\}/, 'P1 keeps the outro preview compatibility wrapper');
 assert.doesNotMatch(html, /function updateCommonOutroPreview\(\)\{const controls=/, 'P1 does not retain the common outro preview implementation');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-navigation-controller\.js\?v=20261007_v7"/, 'HTML cache-busts navigation controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-bindings\.js\?v=20261007_v7"/, 'HTML cache-busts UI bindings');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-bindings\.js\?v=20261015_v8"/, 'HTML cache-busts UI bindings');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-bridge\.js\?v=20261010_v9"/, 'HTML cache-busts timeline bridge');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-narration-controller\.js\?v=20261010_v18"/, 'HTML cache-busts narration controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-preview-controller\.js\?v=20261010_v12"/, 'HTML cache-busts timeline preview controller');
@@ -406,7 +406,7 @@ assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-timeline-orches
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-lifecycle-controller\.js\?v=20261008_v18"/, 'HTML cache-busts lifecycle controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-image-regeneration-controller\.js\?v=20261009_v50"/, 'HTML cache-busts image regeneration controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-ui-actions-controller\.js\?v=20261008_v25"/, 'HTML cache-busts UI actions controller');
-assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-render-controller\.js\?v=20261012_v75"/, 'HTML cache-busts render controller');
+assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-render-controller\.js\?v=20261015_v76"/, 'HTML cache-busts render controller');
 assert.match(html, /src="\/01_app\/assets\/steps\/step04\/step04-video\.js\?v=20261010_v4"/, 'HTML cache-busts Step 4 controller');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /#prevBtn|#nextBtn|#mobileSceneSelect|#sceneList/, 'UI bindings do not duplicate navigation listeners');
 assert.doesNotMatch(fs.readFileSync(bindingsPath, 'utf8'), /feature\('playback'|#playBtn|addEventListener\('play'|addEventListener\('pause'/, 'UI bindings do not duplicate playback listeners');

@@ -564,9 +564,24 @@ def render_video_staged(
     dissolve = max(0.0, min(5.0, float(config.get(
         "scene_dissolve_seconds", dependencies.render_defaults["scene_dissolve_seconds"]
     ))))
+    format_index = max(1, int(config.get("format_index", 1)))
+    format_total = max(format_index, int(config.get("format_total", 1)))
+    format_fields = {
+        "format_id": config.get("format_id") or format_label.replace("x", ":"),
+        "format_index": format_index,
+        "format_total": format_total,
+    }
+
+    def overall_progress(local_progress: float) -> float:
+        local = max(0.0, min(1.0, float(local_progress)))
+        return max(0.0, min(1.0, ((format_index - 1) + local) / format_total))
+
+    def report(**changes) -> None:
+        dependencies.update_progress(job_id, **format_fields, **changes)
+
     if _valid_output(output_path, dependencies):
-        dependencies.update_progress(
-            job_id, status="succeeded", progress=1.0, rendered_seconds=output_duration,
+        report(
+            status="succeeded", progress=overall_progress(1.0), rendered_seconds=output_duration,
             completed_scenes=len(scenes), scene_total=len(scenes),
             detail="동일 작업의 기존 최종 MP4를 재사용했습니다.",
         )
@@ -578,11 +593,10 @@ def render_video_staged(
             "height": height,
             "scene_count": len(scenes),
         }
-    dependencies.update_progress(
-        job_id, status="running", phase="staged_scenes", progress=0.01,
+    report(
+        status="running", phase="staged_scenes", progress=overall_progress(0.01),
         rendered_seconds=0.0, completed_scenes=0, scene_total=len(scenes),
-        format_id=config.get("format_id"), format_index=config.get("format_index", 1),
-        format_total=config.get("format_total", 1), detail="장면별 FFmpeg 합성을 시작했습니다.",
+        detail="장면별 FFmpeg 합성을 시작했습니다.",
     )
     work_parent = exports / ".render_work"
     work_parent.mkdir(parents=True, exist_ok=True)
@@ -594,9 +608,9 @@ def render_video_staged(
                 target = work / f"scene-{index:04d}.mp4"
                 _render_scene(dependencies, config, scene, index, width, height, format_label, target)
                 normalized.append(target)
-                dependencies.update_progress(
-                    job_id, status="running", phase="staged_scenes",
-                    progress=max(0.01, min(0.55, 0.55 * (index + 1) / len(scenes))),
+                report(
+                    status="running", phase="staged_scenes",
+                    progress=overall_progress(max(0.01, min(0.55, 0.55 * (index + 1) / len(scenes)))),
                     rendered_seconds=float(scene["end"]), completed_scenes=index + 1,
                     scene_total=len(scenes), detail=f"장면 {index + 1:02d} / {len(scenes):02d} 정규화 완료",
                 )
@@ -648,9 +662,9 @@ def render_video_staged(
                 except (TypeError, ValueError):
                     return
                 completed = sum(rendered >= end + intro_duration for end in scene_ends)
-                dependencies.update_progress(
-                    job_id, status="running", phase="audio_mux",
-                    progress=max(0.56, min(0.98, rendered / output_duration)),
+                report(
+                    status="running", phase="audio_mux",
+                    progress=overall_progress(max(0.56, min(0.98, rendered / output_duration))),
                     rendered_seconds=round(rendered, 1), completed_scenes=completed,
                     scene_total=len(scenes), detail=(
                         f"장면 {completed:02d} / {len(scenes):02d} 완료 · "
@@ -668,8 +682,8 @@ def render_video_staged(
             os.replace(staged_output, output_path)
         if not _valid_output(output_path, dependencies):
             raise StagedRenderError("출력 MP4가 정상적으로 생성되지 않았습니다.")
-        dependencies.update_progress(
-            job_id, status="succeeded", progress=1.0, rendered_seconds=output_duration,
+        report(
+            status="succeeded", progress=overall_progress(1.0), rendered_seconds=output_duration,
             completed_scenes=len(scenes), scene_total=len(scenes),
             detail=f"장면 {len(scenes):02d} / {len(scenes):02d} 완료 · 최종 MP4 합성이 완료됐습니다.",
         )
@@ -684,5 +698,5 @@ def render_video_staged(
     except Exception as exc:
         if output_path.exists():
             output_path.unlink()
-        dependencies.update_progress(job_id, status="failed", detail=str(exc))
+        report(status="failed", detail=str(exc))
         raise

@@ -27,17 +27,26 @@
         catch (error) { if (renderStatus) renderStatus.textContent = `API 설정 확인 오류: ${error.message}`; return undefined; }
         try { await d.saveBrandSelections(); }
         catch (error) { if (renderStatus) renderStatus.textContent = `브랜드 설정 저장 오류: ${error.message}`; return undefined; }
+        let modal, roles, progress, foot, summary, now, renderJobId, payload;
+        try {
+          modal = d.configureWorkflowModal('export');
+          roles = Array.from(modal.querySelectorAll('.ai-role'));
+          progress = query('#aiProgressBar');
+          foot = query('#aiFootStatus');
+          summary = query('#aiWorkflowSummary');
+          now = query('#aiNow');
+          if (!progress || !foot || !summary || !now || roles.length < 4) throw new Error('영상 제작 진행 화면을 준비하지 못했습니다.');
+          renderJobId = `render-${d.now()}-${d.random().toString(36).slice(2, 8)}`;
+          payload = d.getPayload(renderJobId);
+          if (!payload || typeof payload !== 'object') throw new Error('영상 제작 설정을 불러오지 못했습니다.');
+        } catch (error) {
+          if (renderStatus) renderStatus.textContent = `영상 제작 준비 오류: ${error.message}`;
+          d.onError?.(error);
+          return undefined;
+        }
         d.pausePreview?.();
         if (renderBtn) { renderBtn.disabled = true; renderBtn.setAttribute('aria-busy', 'true'); }
         if (renderStatus) renderStatus.textContent = '승인 이미지로 최종 영상을 제작하고 있습니다. 이 페이지를 닫지 마세요.';
-        const modal = d.configureWorkflowModal('export');
-        const roles = Array.from(modal.querySelectorAll('.ai-role'));
-        const progress = query('#aiProgressBar');
-        const foot = query('#aiFootStatus');
-        const summary = query('#aiWorkflowSummary');
-        const now = query('#aiNow');
-        const renderJobId = `render-${d.now()}-${d.random().toString(36).slice(2, 8)}`;
-        const payload = d.getPayload(renderJobId);
         const hasMissingNarrationVoice = Boolean(payload?.narration && d.hasMissingNarrationVoice?.());
         const actions = [
           hasMissingNarrationVoice
@@ -107,12 +116,12 @@
                 now.textContent = `자막 PNG 생성 중 · ${String(completedCaptions).padStart(2, '0')} / ${String(job.caption_total || captionBadgeTotal).padStart(2, '0')}`;
               } else if (['caption_ready', 'composite', 'staged_scenes', 'audio_mux'].includes(job.phase)) {
                 await completeCaptionStage();
-                const formatIndex = Math.max(1, Number(job.format_index) || 1); const formatId = job.format_id || `${formatIndex}번 비율`;
+                const formatIndex = Math.max(1, Number(job.format_index) || 1); const formatTotal = Math.max(formatIndex, Number(job.format_total) || 1); const formatId = job.format_id || `${formatIndex}번 비율`;
                 d.applyCompositeFormatProgress(roles[2], formatIndex);
                 d.applySequentialSceneProgress(roles[2], completedScenes); roles[2].querySelector('.ai-role-state').textContent = `${completedScenes} / ${sceneTotal}`;
                 progress.style.width = `${(2 + jobProgress) / roles.length * 100}%`;
                 const phaseLabel = job.phase === 'staged_scenes' ? '장면 정규화' : job.phase === 'audio_mux' ? '음성·BGM 합성' : '최종 합성';
-                now.textContent = `FFmpeg Worker · ${formatId} (${formatIndex}/${job.format_total || 1}) ${phaseLabel} 중 · ${percent}% · 장면 ${String(completedScenes).padStart(2, '0')} / ${String(sceneTotal).padStart(2, '0')}`;
+                now.textContent = `FFmpeg Worker · ${formatId} (${formatIndex}/${formatTotal}) ${phaseLabel} 중 · 전체 ${percent}% · 현재 비율 장면 ${String(completedScenes).padStart(2, '0')} / ${String(sceneTotal).padStart(2, '0')}`;
               } else { now.textContent = '나레이션 음성과 자막 PNG 생성 작업을 준비하고 있습니다'; foot.textContent = '음성·자막 작업 등록 대기 중'; }
               foot.textContent = job.detail || `장면 ${String(completedScenes).padStart(2, '0')} / ${String(sceneTotal).padStart(2, '0')} 완료 · ${job.rendered_seconds || 0}초 / ${d.timelineDuration()}초 처리 중`;
             } catch (error) { if (!String(error.message).includes('찾을 수 없습니다')) foot.textContent = '합성 진행률을 확인하고 있습니다.'; }

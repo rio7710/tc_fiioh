@@ -152,6 +152,27 @@ class StagedFfmpegRendererTests(unittest.TestCase):
         self.assertIn("+faststart", audio)
         self.assertIn("aac", audio)
 
+    def test_multi_format_progress_is_monotonic_and_keeps_format_identity(self):
+        first = self.config("youtube")
+        first.update({"format_id": "16:9", "format_index": 1, "format_total": 3})
+        render_video_staged(first, "format-one", dependencies=self.dependencies())
+        first_values = [item[1] for item in self.progress]
+        self.assertTrue(all(item["format_id"] == "16:9" for item in first_values))
+        self.assertTrue(all(item["format_index"] == 1 and item["format_total"] == 3 for item in first_values))
+        self.assertLessEqual(first_values[-1]["progress"], 1 / 3)
+
+        self.progress.clear()
+        self.runner = FakeRunner()
+        second = self.config("instagram")
+        second.update({"format_id": "9:16", "format_index": 2, "format_total": 3})
+        render_video_staged(second, "format-two", dependencies=self.dependencies())
+        second_values = [item[1] for item in self.progress]
+        numeric = [item["progress"] for item in second_values if "progress" in item]
+        self.assertTrue(all(left <= right for left, right in zip(numeric, numeric[1:])))
+        self.assertGreater(numeric[0], 1 / 3)
+        self.assertAlmostEqual(2 / 3, numeric[-1])
+        self.assertTrue(all(item["format_id"] == "9:16" for item in second_values))
+
     def test_ratio_specific_outro_is_selected(self):
         result = render_video_staged(self.config("instagram"), "vertical", dependencies=self.dependencies())
         self.assertEqual((1080, 1920), (result["width"], result["height"]))

@@ -52,6 +52,12 @@ class FinalExportQueueTests(unittest.TestCase):
         progress = self.queue.update_progress(job["job_id"], "worker-a", {"status": "queued", "phase": "composite", "progress": 0.5})
         self.assertEqual(progress["progress"]["phase"], "composite")
         self.assertNotIn("status", progress["progress"])
+        merged = self.queue.update_progress(
+            job["job_id"], "worker-a", {"completed_scenes": 3}
+        )
+        self.assertEqual("composite", merged["progress"]["phase"])
+        self.assertEqual(0.5, merged["progress"]["progress"])
+        self.assertEqual(3, merged["progress"]["completed_scenes"])
         heartbeat = self.queue.heartbeat(job["job_id"], "worker-a", now="2026-10-09T00:00:30+00:00", lease_seconds=60)
         self.assertEqual(heartbeat["lease_until"], "2026-10-09T00:01:30+00:00")
         done = self.queue.succeed(job["job_id"], "worker-a", {"ok": True, "url": "/final.mp4"})

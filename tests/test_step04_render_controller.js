@@ -29,6 +29,8 @@ function fixture(overrides = {}) {
   assert.match(file.nodes['#renderStatus'].textContent,/bat/);
   const apiEarly=fixture({ensureStepApiReady:async()=>false}); await apiEarly.controller.start(); assert.equal(apiEarly.get().fetchBody,null);
   const brandEarly=fixture({saveBrandSelections:async()=>{throw new Error('brand');}}); await brandEarly.controller.start(); assert.equal(brandEarly.nodes['#renderStatus'].textContent,'브랜드 설정 저장 오류: brand');
+  const payloadEarly=fixture({getPayload:()=>{throw new Error('payload state');}}); await payloadEarly.controller.start(); assert.equal(payloadEarly.get().fetchBody,null); assert.equal(payloadEarly.nodes['#renderStatus'].textContent,'영상 제작 준비 오류: payload state'); assert.equal(payloadEarly.nodes['#renderBtn'].disabled,false);
+  const modalEarly=fixture({configureWorkflowModal:()=>{throw new Error('modal state');}}); await modalEarly.controller.start(); assert.equal(modalEarly.get().fetchBody,null); assert.equal(modalEarly.nodes['#renderStatus'].textContent,'영상 제작 준비 오류: modal state'); assert.equal(modalEarly.nodes['#renderBtn'].disabled,false);
 
   const success=fixture(); const result=await success.controller.start();
   assert.equal(success.get().intervalDelay,500); assert.equal(success.get().clears,1); assert.equal(success.get().fetchBody.project_id,'p');

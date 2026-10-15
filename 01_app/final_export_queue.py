@@ -251,11 +251,13 @@ class FinalExportQueue:
         # Lifecycle state belongs to the queue row. A compositor callback may
         # report a display status, but it must never shadow a terminal state.
         progress_copy.pop("status", None)
-        progress_json = _json(progress_copy, "progress")
         stamp = _timestamp(now)
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
-            self._owned(db, job_id, worker_id)
+            owned = self._owned(db, job_id, worker_id)
+            previous = json.loads(owned["progress_json"]) if owned["progress_json"] else {}
+            previous.update(progress_copy)
+            progress_json = _json(previous, "progress")
             db.execute(
                 "UPDATE final_export_jobs SET progress_json=?,updated_at=? WHERE job_id=?",
                 (progress_json, stamp, job_id),
