@@ -723,6 +723,16 @@ def normalize_location_return_routes(document: dict[str, Any]) -> dict[str, Any]
         and (str(asset.get("kind", "")).lower() in {"location", "facility"}
              or str(asset.get("id", "")).startswith(("ref-location-", "ref-facility-")))
     }
+    has_connector_corridor = any(
+        isinstance(asset, dict)
+        and str(asset.get("kind", "")).lower() in {"location", "facility"}
+        and str(asset.get("status", "ready")).lower() == "ready"
+        and any(term in " ".join((
+            _text(asset.get("id")), _text(asset.get("assignment")),
+            _text(asset.get("usage")), " ".join(map(_text, asset.get("aliases") or [])),
+        )).lower() for term in ("복도", "이동 통로", "corridor", "hallway"))
+        for asset in assets
+    )
     seen_locations: set[str] = set()
     previous_locations: set[str] = set()
     for scene in scenes:
@@ -744,7 +754,18 @@ def normalize_location_return_routes(document: dict[str, Any]) -> dict[str, Any]
             if not any(term in route for term in return_terms) or not any(term in route for term in travel_terms):
                 title = str(scene.get("title") or "현재 활동").strip()
                 existing = _text(sequence.get("entry_action")).strip()
-                completed = f"{title}을 이어가기 위해 복도와 문턱을 통과해 이전 장소로 돌아오는 이동을 화면에 보여준다."
+                if has_connector_corridor:
+                    completed = (
+                        f"{title}을 이어가기 위해 출발 장소에서 같은 방향으로 프레임 아웃하고 "
+                        "등록된 연결 복도 레퍼런스를 따라 이전 장소 내부로 돌아오는 이동을 화면에 보여준다. "
+                        "문·문손잡이·문턱은 생성하지 않는다."
+                    )
+                else:
+                    completed = (
+                        f"{title}을 이어가기 위해 출발 장소에서 같은 방향으로 프레임 아웃한 뒤 "
+                        "편집상 이동 시간을 생략하고 이전 장소 내부로 돌아오는 이동 연결을 만든다. "
+                        "복도를 임의로 만들지 않는다."
+                    )
                 sequence["entry_action"] = f"{completed} {existing}".strip()
         seen_locations.update(current_locations)
         previous_locations = current_locations

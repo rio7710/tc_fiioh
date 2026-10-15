@@ -796,7 +796,32 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         result = run_generation_harness(lambda prompt: json.dumps(value, ensure_ascii=False), ["안심"], "시설 자료")
 
         route = result["document"]["production"]["timeline"]["scenes"][2]["sequence"]["entry_action"]
-        self.assertIn("돌아오는 이동", route)
+        self.assertIn("돌아오는", route)
+        self.assertIn("편집상 이동 시간", route)
+        self.assertNotIn("문턱", route)
+        self.assertEqual(0, result["repair_count"])
+
+    def test_generation_uses_registered_corridor_for_location_return_without_doors(self):
+        value = document(["안심"])
+        scenes = value["production"]["timeline"]["scenes"]
+        first = json.loads(json.dumps(scenes[0])); second = json.loads(json.dumps(scenes[0])); third = json.loads(json.dumps(scenes[0]))
+        first.update(id="scene-a1", reference_ids=["ref-location-roof"], sequence={"continuity_from":None,"exit_action":"정원에서 실내로 이동한다."})
+        second.update(id="scene-b", reference_ids=["ref-location-room"], sequence={"continuity_from":"scene-a1","exit_action":"실내에서 머문다."})
+        third.update(id="scene-a2", title="정원 산책", reference_ids=["ref-location-roof"], sequence={"continuity_from":"scene-b","entry_action":"활동을 이어간다."})
+        value["production"]["reference_assets"] = [
+            {"id":"ref-location-roof","kind":"location"},
+            {"id":"ref-location-room","kind":"location"},
+            {"id":"ref-location-corridor","kind":"location","status":"ready","usage":"장소 전환용 연결 복도","aliases":["연결 복도"]},
+        ]
+        value["production"]["timeline"]["scenes"] = [first, second, third]
+        cue = value["production"]["narration_cues"][0]
+        cue.update(end=90, scene_ids=["scene-a1", "scene-b", "scene-a2"])
+
+        result = run_generation_harness(lambda prompt: json.dumps(value, ensure_ascii=False), ["안심"], "시설 자료")
+
+        route = result["document"]["production"]["timeline"]["scenes"][2]["sequence"]["entry_action"]
+        self.assertIn("등록된 연결 복도 레퍼런스", route)
+        self.assertIn("문·문손잡이·문턱은 생성하지 않는다", route)
         self.assertEqual(0, result["repair_count"])
 
     def test_table_geometry_is_declared_and_consistent_with_scene_prompts(self):
