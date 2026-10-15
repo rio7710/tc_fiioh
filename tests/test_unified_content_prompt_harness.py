@@ -2,7 +2,7 @@ import json
 import unittest
 
 from tools.reference_asset_index import build_reference_asset_index, normalize_scene_reference_ids
-from tools.unified_content_prompt_harness import build_novelty_repair_prompt, build_prompt, build_repair_prompt, normalize_character_reference_versions, normalize_document_shape, normalize_reference_asset_metadata, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_character_reference_versions, validate_document, validate_scene_reference_media, validate_transition_bridge_routes, validate_visual_continuity
+from tools.unified_content_prompt_harness import build_novelty_repair_prompt, build_prompt, build_repair_prompt, normalize_character_reference_versions, normalize_document_shape, normalize_reference_asset_metadata, normalize_unknown_table_reference_locks, parse_json_document, run_generation_harness, validate_character_reference_versions, validate_document, validate_location_activity_policy, validate_scene_reference_media, validate_transition_bridge_routes, validate_visual_continuity
 from tools.validate_unified_content import UnifiedContentError
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema
 
@@ -17,6 +17,7 @@ def document(keywords):
             "id": "scene-01", "start": 0, "end": 30, "media_type": "image",
             "reference_ids": ["ref-character-elder", "ref-location-dining"],
             "narration_cue_ids": ["narration-01"], "sequence": {"continuity_from": None},
+            "image_prompt": {"text": "식당에서 따뜻한 식사를 천천히 한다.", "source": "ai_inferred"},
             "narration": {"text": "함께 걷는 오늘", "source": "ai_inferred"},
             "caption": {"text": "함께 걷는 오늘", "source": "ai_inferred"}
         }]}, "narration_cues": [{
@@ -530,6 +531,51 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertIn("FURNITURE GEOMETRY LOCK", prompt)
         self.assertIn("한 레퍼런스 안에 서로 다른 테이블 형태가 함께 있으면", prompt)
         self.assertIn("sequence.camera_axis_transition", prompt)
+        self.assertIn("LOCATION ACTIVITY POLICY", prompt)
+        self.assertIn("물리치료실 장면에는 실제 물리치료·재활치료 행동만", prompt)
+        self.assertIn("기타 행사와 프로그램은 로비에서만", prompt)
+
+    def test_location_activity_policy_restricts_specialized_rooms(self):
+        value = document(["안심"])
+        scene = value["production"]["timeline"]["scenes"][0]
+        value["production"]["reference_assets"][1].update(
+            kind="location", uri="시설/시설_재활물리치료실.png", usage="재활물리치료실"
+        )
+        scene["image_prompt"]["text"] = "물리치료실에서 식판을 앞에 두고 식사한다."
+        with self.assertRaisesRegex(UnifiedContentError, "물리치료실 장면"):
+            validate_location_activity_policy(value)
+        scene["image_prompt"]["text"] = "물리치료실에서 물리치료사와 관절 운동을 한다."
+        scene["narration"]["text"] = "식사 후에도 편안한 움직임을 이어갑니다."
+        validate_location_activity_policy(value)
+
+    def test_location_activity_policy_keeps_meals_in_dining_and_events_in_lobby(self):
+        value = document(["안심"])
+        location = value["production"]["reference_assets"][1]
+        location.update(kind="location", uri="시설/식당.png", usage="식사 공간")
+        scene = value["production"]["timeline"]["scenes"][0]
+        scene["image_prompt"]["text"] = "식당 테이블 앞에서 대화만 나눈다."
+        with self.assertRaisesRegex(UnifiedContentError, "식사 행동만"):
+            validate_location_activity_policy(value)
+        scene["image_prompt"]["text"] = "식당에서 반찬과 밥을 천천히 식사한다."
+        validate_location_activity_policy(value)
+        location.update(uri="시설/로비.png", usage="공용 로비")
+        scene["image_prompt"]["text"] = "로비에서 꽃꽂이 문화 프로그램을 함께한다."
+        validate_location_activity_policy(value)
+        location.update(uri="시설/옥상정원.png", usage="옥상정원")
+        with self.assertRaisesRegex(UnifiedContentError, "로비 레퍼런스"):
+            validate_location_activity_policy(value)
+
+    def test_location_activity_policy_uses_configured_canonical_asset_roles(self):
+        value = document(["안심"])
+        location = value["production"]["reference_assets"][1]
+        location.update(
+            id="ref-location-asset-f14d0d07dd91b-7f15471eac8f",
+            kind="location", uri="시설/hash-only.png", usage="장면 배정 전 공용 자산",
+        )
+        scene = value["production"]["timeline"]["scenes"][0]
+        scene["reference_ids"] = ["ref-character-elder", location["id"]]
+        scene["image_prompt"]["text"] = "넓은 공용 공간에서 꽃꽂이 문화 프로그램을 함께한다."
+        validate_location_activity_policy(value)
 
     def test_prior_output_is_supplied_as_avoidance_context(self):
         prior = document(["재활", "존중"])

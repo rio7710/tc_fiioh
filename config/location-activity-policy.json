@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "location_roles": {
+    "physical_therapy": {
+      "label": "물리치료실",
+      "asset_ids": ["ref-location-asset-631578fb8a381"],
+      "location_terms": ["물리치료실", "재활물리치료실", "physical therapy room", "physiotherapy room"],
+      "required_activity": "therapy"
+    },
+    "dining": {
+      "label": "식사 공간",
+      "asset_ids": ["ref-location-asset-fa39aa12f95ce-e3d1924802b5"],
+      "location_terms": ["식당", "식사실", "식사 공간", "dining room", "dining area"],
+      "required_activity": "meal"
+    },
+    "lobby": {
+      "label": "로비",
+      "asset_ids": ["ref-location-asset-f14d0d07dd91b-7f15471eac8f"],
+      "location_terms": ["로비", "공용 로비", "main lobby", "lobby"]
+    }
+  },
+  "activity_classes": {
+    "therapy": {
+      "label": "물리치료",
+      "terms": ["물리치료", "재활치료", "운동치료", "보행 훈련", "관절 운동", "균형 훈련", "물리치료사", "physical therapy", "physiotherapy"]
+    },
+    "meal": {
+      "label": "식사",
+      "terms": ["식사", "식사한다", "밥을 먹", "음식을 먹", "식판", "반찬", "수저", "숟가락", "젓가락", "meal", "eating"]
+    },
+    "event": {
+      "label": "행사·프로그램",
+      "terms": ["행사", "문화 프로그램", "여가 프로그램", "꽃꽂이", "공예 활동", "미술 활동", "음악 활동", "원예 활동", "레크리에이션", "색종이", "만들기 활동", "생일 잔치", "기념식", "축하 공연", "소규모 공연", "모임", "놀이 활동"],
+      "required_location_role": "lobby"
+    }
+  }
+}
