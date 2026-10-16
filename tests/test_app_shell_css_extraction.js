@@ -10,19 +10,21 @@ const shell = fs.readFileSync(shellPath, 'utf8');
 const css = fs.readFileSync(cssPath, 'utf8');
 assert.equal((shell.match(/<style\b/g) || []).length, 0, 'P1 contains no inline style opening tag');
 assert.equal((shell.match(/<\/style>/g) || []).length, 0, 'P1 contains no inline style closing tag');
-assert.equal((shell.match(/app-shell\.css\?v=20261016_v90/g) || []).length, 1, 'P1 loads app shell CSS exactly once at v90');
+assert.equal((shell.match(/app-shell\.css\?v=20261017_v91/g) || []).length, 1, 'P1 loads app shell CSS exactly once at v91');
 assert.ok(
-  shell.indexOf('step05-calendar.css?v=20261007_v2') < shell.indexOf('app-shell.css?v=20261016_v90'),
+  shell.indexOf('step05-calendar.css?v=20261007_v2') < shell.indexOf('app-shell.css?v=20261017_v91'),
   'extracted CSS retains the original cascade position after feature stylesheets'
 );
-assert.equal(css.split('\n').length - 1, 907, 'all 907 current CSS lines are preserved');
+assert.equal(css.split('\n').length - 1, 910, 'all 910 current CSS lines are preserved');
 assert.equal(
   crypto.createHash('sha256').update(css).digest('hex'),
-  '8a768a80bb7db90cd272d58b0deb72fe90a7cd80999b6a7f0bf2bd9179478119',
+  'bf03835a82093638f3e06ebfc47cc8482111b97531d7f7f0e8059a6f6f0fb74d',
   'extracted CSS matches the current reviewed baseline'
 );
 assert.match(css, /\.content-index-hero\{z-index:50;/, 'automation hero establishes a layer above later index objects');
 assert.match(css, /\.user-automation-runs\{position:absolute;z-index:100;/, 'recent automation runs stay above sibling objects');
+assert.match(css, /\.user-automation-control\{[^}]*grid-template-columns:minmax\(0,1fr\)/, 'long server errors cannot expand the automation grid beyond its panel');
+assert.match(css, /\.user-automation-control-copy\{flex:1 1 0;overflow:hidden\}/, 'stage copy yields space to the switch');
 
 [
   ':root{',
