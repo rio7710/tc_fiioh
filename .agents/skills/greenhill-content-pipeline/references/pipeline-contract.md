@@ -66,6 +66,7 @@ Required result fields:
 
 ## Spatial progression continuity
 
+- Corridor coverage between different locations is soft editorial guidance, not a validation gate. Direct cuts to destination interiors are valid even when a ready corridor reference exists; do not add scenes or trigger repair solely because a corridor is absent. Avoid generated door/handle/threshold crossing while preserving character and prop continuity.
 - Treat a character's movement through doors, corridors, stairs, elevators, and room boundaries as a forward state transition, not a reusable pose.
 - Record the current zone, crossed threshold, travel direction, and next destination in each scene's `sequence.entry_action`, `sequence.exit_action`, `sequence.continuity_anchor`, and `sequence.character_blocking`.
 - Once a character crosses a threshold, later scenes inherit the new side of that threshold. Do not place the character back at the prior side or repeat the same entrance unless the narrative explicitly requires a return journey and shows the reason and intervening movement.

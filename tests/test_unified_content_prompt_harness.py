@@ -534,17 +534,17 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertIn("LOCATION ACTIVITY POLICY", prompt)
         self.assertIn("물리치료실 장면에는 실제 물리치료·재활치료 행동만", prompt)
         self.assertIn("기타 행사와 프로그램은 로비에서만", prompt)
-        self.assertIn("서로 다른 일반 장소가 2개 이상", prompt)
-        self.assertIn("사용 가능한 일반 장소가 0~1개뿐이면 연결 복도를", prompt)
+        self.assertIn("소프트 연출 권고이며 필수가 아니다", prompt)
+        self.assertIn("복도 누락만으로 검증 실패·재작성·씬 추가를 하지 않는다", prompt)
 
-    def test_transition_bridge_repair_prompt_excludes_corridor_with_one_normal_location(self):
+    def test_transition_bridge_repair_prompt_keeps_corridor_optional(self):
         prompt = build_repair_prompt(
             '{"production":{"timeline":{"scenes":[]}}}',
             UnifiedContentError("scene-01는 전환 전용 연결 복도를 첫 씬으로 사용할 수 없습니다"),
         )
-        self.assertIn("ready인 일반 장소 수를 먼저 센다", prompt)
-        self.assertIn("일반 장소가 0~1개뿐이면 연결 복도를", prompt)
-        self.assertIn("project.purpose, concept_variants와 모든 씬에서 완전히 제거", prompt)
+        self.assertIn("소프트 연출 권고이며 필수가 아니다", prompt)
+        self.assertIn("복도 누락만으로 씬을 추가하거나 재작성하지 않는다", prompt)
+        self.assertIn("등록된 ready 자산", prompt)
 
     def test_location_activity_policy_restricts_specialized_rooms(self):
         value = document(["안심"])
@@ -937,7 +937,7 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
 
         validate_transition_bridge_routes(value, catalog)
 
-    def test_transition_bridge_rejects_direct_location_jump_using_server_catalog(self):
+    def test_transition_bridge_allows_direct_location_cut_using_server_catalog(self):
         value = document(["안심"])
         first = value["production"]["timeline"]["scenes"][0]
         second = json.loads(json.dumps(first))
@@ -955,8 +955,9 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
             "ref-location-b":{"id":"ref-location-b","kind":"location","status":"ready"},
         }
 
-        with self.assertRaisesRegex(UnifiedContentError, "장소가 직접 바뀌었습니다"):
-            validate_transition_bridge_routes(value, catalog)
+        original = json.loads(json.dumps(value))
+        validate_transition_bridge_routes(value, catalog)
+        self.assertEqual(original, value, "Soft corridor guidance must not rewrite scenes")
 
     def test_transition_bridge_rejects_first_and_last_but_allows_same_destination(self):
         catalog = {

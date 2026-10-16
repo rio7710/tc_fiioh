@@ -950,7 +950,7 @@ def validate_transition_bridge_routes(
     document: dict[str, Any],
     canonical_assets: dict[str, dict[str, Any]] | None = None,
 ) -> None:
-    """Require one transition-only corridor scene between distinct locations."""
+    """Validate explicitly used bridges; direct editorial location cuts are allowed."""
     production = document.get("production") or {}
     scenes = (production.get("timeline") or {}).get("scenes") or []
     bridge_ids = transition_bridge_asset_ids(document, canonical_assets)
@@ -1003,15 +1003,8 @@ def validate_transition_bridge_routes(
             )
         index += 1
 
-    for index in range(1, len(locations)):
-        previous, current = locations[index - 1], locations[index]
-        if not previous or not current or previous == current:
-            continue
-        if previous not in bridge_ids and current not in bridge_ids:
-            raise UnifiedContentError(
-                f"{scenes[index - 1].get('id', 'scene')}에서 {scenes[index].get('id', 'scene')}로 "
-                "장소가 직접 바뀌었습니다. 준비된 전환 전용 연결 복도 정확히 1씬을 사이에 배치해야 합니다"
-            )
+    # Corridor coverage is an editorial recommendation, not a production gate.
+    # Preserve the authored scenes and allow cuts directly to destination interiors.
 
 
 def validate_visual_continuity(
@@ -1308,7 +1301,7 @@ def build_repair_prompt(candidate: str, error: Exception,
         "화면축 검증 오류라면 camera_bridge·entry_action·exit_action에 실제로 보이는 카메라/인물의 축 횡단 이동이 명시된 경우에만 motivated_cross를 유지한다. 이동 근거가 없으면 해당 씬을 same_side로 고치며, 단순한 샷 크기·각도 변화는 축 횡단으로 취급하지 않는다.\n"
         "테이블 형태 누락 오류라면 오류에 표시된 한국어 형태명을 해당 scene의 image_prompt.text에 직접 넣고, continuity.props 및 기준 레퍼런스와 일치시킨다.\n"
         "캐릭터 버전 오류라면 해당 character_id에 등록된 V2 reference asset 하나를 선택해 모든 씬의 reference_ids에서 동일하게 사용한다. V2가 없는 캐릭터만 V1을 유지하며, 동일 캐릭터의 의상 variant도 콘티 중간에 바꾸지 않는다.\n"
-        "전환 전용 연결 복도 오류라면 ready인 일반 장소 수를 먼저 센다. 서로 다른 일반 장소가 2개 이상이고 실제 장소 이동이 있을 때만 출발 장소 → usage_role=transition_bridge인 ready 복도 정확히 1씬 → 서로 다른 목적지 장소 순서로 reference_ids와 sequence를 정리한다. 일반 장소가 0~1개뿐이면 연결 복도를 production.reference_assets, project.purpose, concept_variants와 모든 씬에서 완전히 제거하고, 사용 가능한 일반 장소 내부에서 시작하고 끝나도록 완전한 JSON 전체를 고친다. 복도를 첫 씬·마지막 씬 또는 연속 씬에 두지 않고, 준비된 복도를 건너뛴 직접 장소 점프를 만들지 않는다.\n"
+        "장소 사이 연결 복도는 소프트 연출 권고이며 필수가 아니다. 복도 없이 다음 장소 내부로 직접 편집 전환해도 유효하므로 복도 누락만으로 씬을 추가하거나 재작성하지 않는다. 복도를 사용할 때만 등록된 ready 자산을 사용하고 첫 씬·마지막 씬을 피하며 앞뒤 출발·목적지 장소를 명시한다. 문·문손잡이·문턱 통과를 생성하지 않는다.\n"
         "장소 용도 오류라면 물리치료실에는 물리치료·재활치료 행동만, 식당·식사 공간에는 식사 행동만 남긴다. 꽃꽂이·공예·미술·음악·원예·레크리에이션·생일·기념·공연·모임 같은 기타 행사·프로그램은 로비 reference로 옮기고 image_prompt, motion_prompt, sequence의 장소와 행동을 함께 맞춘다.\n"
         "참조 자산 오류라면 제공된 레퍼런스 인덱스의 정식 character/location 자산만 사용하고 id·uri·status·버전·의상 값을 추측하거나 변형하지 않는다. style은 연출 메타데이터로 유지하되 이미지 파일 URI를 만들어 내지 않는다.\n"
         "씬 수 오류라면 확정 내레이션 문장은 바꾸지 않고 행동·리액션·손과 소품 디테일·공간 확립·연결 구도를 추가하거나 합쳐 production.timeline.scenes를 12~20개로 맞춘다. 각 씬은 최소 1.5초이며 인접 구도를 반복하지 않는다.\n"
