@@ -150,6 +150,7 @@ thinkcast-top-nav{display:block}
 .ai-dialog{width:min(680px,100%);max-height:calc(100dvh - 36px);overflow:hidden;border:1px solid rgba(255,255,255,.55);border-radius:22px;background:#f8f5ee;box-shadow:0 30px 90px rgba(0,0,0,.3)}
 .ai-dialog-head{position:relative;isolation:isolate;padding:20px 24px 14px;border-bottom:1px solid rgba(255,255,255,.18);background-image:linear-gradient(90deg,rgba(5,25,22,.97) 0%,rgba(5,25,22,.86) 48%,rgba(5,25,22,.38) 100%),var(--workflow-bg);background-position:center;background-size:cover;color:#fff}
 .ai-workflow-background{position:absolute;z-index:2;top:14px;right:16px;padding:7px 10px;border:1px solid rgba(255,255,255,.45);border-radius:999px;background:rgba(6,35,30,.62);color:#fff;font:800 10px/1 inherit;cursor:pointer}.ai-workflow-background:hover{background:rgba(255,255,255,.2)}
+.ai-workflow-cancel{right:150px;border-color:rgba(255,190,190,.7);color:#ffe7e7}.ai-workflow-cancel:disabled{opacity:.55;cursor:wait}
 .ai-modal[data-workflow="storyboard"] .ai-dialog-head{--workflow-bg:url('/01_app/assets/workflow/storyboard-header.webp')}
 .ai-modal[data-workflow="production"] .ai-dialog-head,.ai-modal[data-workflow="export"] .ai-dialog-head{--workflow-bg:url('/01_app/assets/workflow/production-header.webp')}
 .ai-kicker{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:var(--gold);font-size:11px;font-weight:900;letter-spacing:.12em}

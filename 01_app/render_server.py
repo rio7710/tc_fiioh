@@ -37,7 +37,12 @@ from auth_store import AuthStore
 from automation_store import AutomationStore, VersionConflict, validate_config, STAGES
 from visual_decisions import VisualDecisions, DecisionConflict
 from staged_ffmpeg_renderer import StagedRenderDependencies, render_video_staged
+from final_export_preflight import preflight_final_export_snapshot
+from final_export_access import requested_export_filename
+from process_file_lock import process_file_lock
 from final_export_queue import FinalExportConflict, FinalExportNotFound, FinalExportQueue
+from final_export_snapshot import verify_snapshot
+from final_export_snapshot_builder import build_final_export_snapshot
 from worker_core import JobConflict, JobNotFound, JobStore
 kling_submission_lock = threading.Lock()
 from keyword_pool import load_month_pool, normalize_keyword_label
@@ -58,7 +63,6 @@ DATA_FILE = Path(os.environ.get("DEMO_DATA_PATH", str(APP_DIR / "data" / "demo_d
 CAPTION_REGISTRY_FILE = Path(os.environ.get("CAPTION_REGISTRY_PATH", str(APP_DIR / "data" / "caption_artifacts.json")))
 RENDER_CATALOG_PATH = ROOT / "config" / "render-catalog.json"
 SOURCE_CLIPS = ROOT / "02_media" / "video" / "source_clips"
-MERGED_DEMO_VIDEO = ROOT / "02_media" / "video" / "P1_merged.mp4"
 PORT = int(os.environ.get("PORT", "8765"))
 IS_RENDER_HOSTED = bool(os.environ.get("RENDER") or os.environ.get("RENDER_EXTERNAL_URL"))
 SQLITE_PATH = Path(os.environ.get("SQLITE_PATH", str(APP_DIR / "data" / "tc.sqlite")))
@@ -1890,22 +1894,6 @@ MUSIC = {
     for key, value in RENDER_CATALOG["music"].items()
 }
 
-NARRATION_TRACKS = [
-    (1.00, "audio_0.mp3"),
-    (1.10, "audio_1.mp3"),
-    (1.00, "audio_2.mp3"),
-    (1.00, "audio_3.mp3"),
-    (1.00, "audio_4.mp3"),
-    (1.00, "audio_5.mp3"),
-    (1.00, "audio_6.mp3"),
-    (1.02, "audio_7.mp3"),
-    (1.02, "audio_8.mp3"),
-    (1.00, "audio_9.mp3"),
-    (1.00, "audio_10.mp3"),
-    (1.10, "audio_11.mp3"),
-    (1.16, "audio_13.mp3"),
-]
-
 ASS_STYLES = {key: tuple(value) for key, value in RENDER_CATALOG["styles"].items()}
 PLATFORM_FORMATS = {
     key: (value["width"], value["height"], value["format"])
@@ -2241,8 +2229,6 @@ def scene_video_path(scene, index, scene_videos=None):
         raise ValueError(f"{index + 1}번 장면의 원격 영상은 FFmpeg 작업 공간에 아직 준비되지 않았습니다.")
     candidate = ROOT / configured if configured else SOURCE_CLIPS / f"{index + 1}.mp4"
     candidate = candidate.resolve()
-    if not configured and not candidate.is_file() and MERGED_DEMO_VIDEO.is_file():
-        return MERGED_DEMO_VIDEO.resolve()
     if ROOT.resolve() not in candidate.parents or not candidate.is_file():
         raise ValueError(f"{index + 1}번 장면의 원본 MP4를 찾을 수 없습니다.")
     return candidate
@@ -2358,7 +2344,7 @@ def update_caption_artifact(scene, index, style_name, text, width, height, capti
     logical_key = f"{project_id}:{scene['id']}:{width}x{height}:{style_name}:{caption_size}:{text_hash}"
     artifact_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"thinkcast:caption:{logical_key}"))
     now = datetime.now().astimezone().isoformat(timespec="seconds")
-    with caption_registry_lock:
+    with caption_registry_lock, process_file_lock(CAPTION_REGISTRY_FILE):
         if CAPTION_REGISTRY_FILE.is_file():
             registry = json.loads(CAPTION_REGISTRY_FILE.read_text(encoding="utf-8"))
         else:
@@ -2401,7 +2387,7 @@ def update_caption_artifact(scene, index, style_name, text, width, height, capti
 def clean_caption_artifacts(cache_roots):
     roots = [path.resolve() for path in cache_roots]
     now = datetime.now().astimezone().isoformat(timespec="seconds")
-    with caption_registry_lock:
+    with caption_registry_lock, process_file_lock(CAPTION_REGISTRY_FILE):
         if CAPTION_REGISTRY_FILE.is_file():
             registry = json.loads(CAPTION_REGISTRY_FILE.read_text(encoding="utf-8"))
             changed = False
@@ -2430,7 +2416,7 @@ def validate_caption_overlays(prepared_overlays, expected_total):
     invalid = [path for path, _, _ in overlays if not path.is_file() or path.stat().st_size < 1000]
     if invalid:
         raise ValueError(f"정상적으로 생성되지 않은 자막 PNG가 {len(invalid)}개 있습니다. 합성을 시작하지 않습니다.")
-    with caption_registry_lock:
+    with caption_registry_lock, process_file_lock(CAPTION_REGISTRY_FILE):
         registry = json.loads(CAPTION_REGISTRY_FILE.read_text(encoding="utf-8"))
     succeeded_uris = {item.get("uri") for item in registry.get("artifacts", []) if item.get("status") == "succeeded"}
     missing_registry = []
@@ -2547,7 +2533,7 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
-def staged_render_dependencies(progress_callback=None):
+def staged_render_dependencies(progress_callback=None, cancel_callback=None):
     """Bind server-owned asset resolution to the isolated FFmpeg compositor."""
     hosted_mode = os.environ.get("PORT", "8765") != "8765"
 
@@ -2562,7 +2548,6 @@ def staged_render_dependencies(progress_callback=None):
         exports_dir=EXPORTS,
         platform_formats=PLATFORM_FORMATS,
         music=MUSIC,
-        narration_tracks=NARRATION_TRACKS,
         render_defaults=RENDER_DEFAULTS,
         timeline_from_data=timeline_from_data,
         timed_script_scenes=timed_script_scenes,
@@ -2573,21 +2558,24 @@ def staged_render_dependencies(progress_callback=None):
         media_duration=media_duration,
         prepare_caption_overlays=prepare_caption_overlays,
         update_progress=report,
-        merged_demo_video=MERGED_DEMO_VIDEO,
         ffmpeg_threads=RUNTIME_CONFIG["ffmpeg_threads"],
         render_preset=RUNTIME_CONFIG["render_preset"],
         hosted_mode=hosted_mode,
+        cancel_requested=cancel_callback,
     )
 
 
-def render_video(config, job_id=None, progress_callback=None):
+def render_video(config, job_id=None, progress_callback=None, cancel_callback=None):
     """Render one output ratio through bounded, restart-safe FFmpeg stages."""
     return render_video_staged(
-        config, job_id, dependencies=staged_render_dependencies(progress_callback)
+        config, job_id, dependencies=staged_render_dependencies(progress_callback, cancel_callback)
     )
 
 
-def execute_render_request(user_id: str, payload: dict, progress_callback=None) -> dict:
+def execute_render_request(
+    user_id: str, payload: dict, progress_callback=None,
+    cancel_callback=None, finalize_callback=None,
+) -> dict:
     """Execute one durable final-export job outside the HTTP API process."""
     if not isinstance(payload, dict):
         raise ValueError("렌더 요청 형식이 올바르지 않습니다.")
@@ -2602,47 +2590,70 @@ def execute_render_request(user_id: str, payload: dict, progress_callback=None) 
             progress_callback(dict(changes))
 
     try:
-        project_id = str(payload.get("project_id", "")).strip()
-        latest = get_auth_store().latest_stage_data(user_id, project_id, 3)
-        document = (latest or {}).get("data", {}).get("document")
-        if not isinstance(document, dict):
-            raise ValueError("최종 출력할 콘텐츠 대본을 찾을 수 없습니다.")
-        script, project_timeline = unified_document_view(document)
-        voice_clips = get_auth_store().list_scene_voice_clips(
-            user_id, project_id, latest["revision_id"]
-        )
-        project_timeline = timeline_with_voice_durations(project_timeline, voice_clips)
-        content_data = {"state": {"script": script}, "timeline": project_timeline}
-        selected_images = get_auth_store().list_scene_images(
-            user_id, project_id, latest["revision_id"]
-        )
-        selected_videos = get_auth_store().list_scene_videos(
-            user_id, project_id, latest["revision_id"]
-        )
-        brand_selections = get_auth_store().content_brand_selections(user_id, project_id)
+        snapshot_value = payload.get("final_export_snapshot")
+        snapshot = None
+        if isinstance(snapshot_value, dict):
+            snapshot = preflight_final_export_snapshot(
+                snapshot_value, image_path=storyboard_image_path,
+                video_path=scene_video_path, voice_path=voice_audio_path,
+                brand_path=brand_asset_path, sha256_file=sha256_file,
+                probe_video=media_duration,
+            )
+            if snapshot["user_id"] != user_id or snapshot["job_id"] != job_id:
+                raise ValueError("최종 영상 스냅샷의 작업 소유권이 일치하지 않습니다.")
+            project_id = snapshot["project_id"]
+            latest = {"revision_id": snapshot["revision_id"]}
+            content_data = snapshot["content_data"]
+            settings = snapshot["render_settings"]
+            voice_clips = snapshot["voice_assets"]
+            selected_images = [item for item in snapshot["scene_assets"] if item["media_type"] == "image"]
+            selected_videos = [item for item in snapshot["scene_assets"] if item["media_type"] == "video"]
+            brand_selections = snapshot["brand_assets"]
+        else:
+            project_id = str(payload.get("project_id", "")).strip()
+            latest = get_auth_store().latest_stage_data(user_id, project_id, 3)
+            document = (latest or {}).get("data", {}).get("document")
+            if not isinstance(document, dict):
+                raise ValueError("최종 출력할 콘텐츠 대본을 찾을 수 없습니다.")
+            script, project_timeline = unified_document_view(document)
+            voice_clips = get_auth_store().list_scene_voice_clips(
+                user_id, project_id, latest["revision_id"]
+            )
+            project_timeline = timeline_with_voice_durations(project_timeline, voice_clips)
+            content_data = {"state": {"script": script}, "timeline": project_timeline}
+            selected_images = get_auth_store().list_scene_images(
+                user_id, project_id, latest["revision_id"]
+            )
+            selected_videos = get_auth_store().list_scene_videos(
+                user_id, project_id, latest["revision_id"]
+            )
+            brand_selections = get_auth_store().content_brand_selections(user_id, project_id)
+            explicit = {key: payload[key] for key in RENDER_SETTING_KEYS if key in payload}
+            settings = resolve_render_settings(user_id, explicit)
         scene_total = len(timeline_from_data(content_data))
         report(
             status="queued", progress=0.0, rendered_seconds=0.0,
             completed_scenes=0, scene_total=scene_total,
             detail="변환 작업을 준비하고 있습니다.",
         )
-        explicit = {key: payload[key] for key in RENDER_SETTING_KEYS if key in payload}
-        settings = resolve_render_settings(user_id, explicit)
-        raw_crop_positions = (
-            payload.get("scene_crop_positions")
-            or get_auth_store().scene_crop_positions(user_id, project_id)
-        )
-        scene_crop_positions = {}
-        if isinstance(raw_crop_positions, dict):
-            for scene_id, formats in list(raw_crop_positions.items())[:200]:
-                if not isinstance(formats, dict):
-                    continue
-                scene_crop_positions[str(scene_id)[:100]] = {
-                    output_format: max(
-                        0.0, min(1.0, float(formats.get(output_format, 50)) / 100)
-                    )
-                    for output_format in ("9x16", "4x5")
-                }
+        if snapshot:
+            scene_crop_positions = snapshot["scene_crop_positions"]
+        else:
+            raw_crop_positions = (
+                payload.get("scene_crop_positions")
+                or get_auth_store().scene_crop_positions(user_id, project_id)
+            )
+            scene_crop_positions = {}
+            if isinstance(raw_crop_positions, dict):
+                for scene_id, formats in list(raw_crop_positions.items())[:200]:
+                    if not isinstance(formats, dict):
+                        continue
+                    scene_crop_positions[str(scene_id)[:100]] = {
+                        output_format: max(
+                            0.0, min(1.0, float(formats.get(output_format, 50)) / 100)
+                        )
+                        for output_format in ("9x16", "4x5")
+                    }
         config = {
             "type": settings["type"],
             "music": settings["music"],
@@ -2660,9 +2671,11 @@ def execute_render_request(user_id: str, payload: dict, progress_callback=None) 
             "content_data": content_data,
             "brand_selections": brand_selections,
         }
+        if snapshot:
+            config["input_hash"] = snapshot["input_hash"]
         if config["preview_platform"] not in PLATFORM_FORMATS:
             raise ValueError("미리보기 플랫폼 설정이 올바르지 않습니다.")
-        requested_platforms = payload.get("platforms")
+        requested_platforms = snapshot["requested_platforms"] if snapshot else payload.get("platforms")
         if requested_platforms is None:
             requested_platforms = config["platforms"]
         if not isinstance(requested_platforms, list):
@@ -2675,6 +2688,8 @@ def execute_render_request(user_id: str, payload: dict, progress_callback=None) 
         prepared_overlays = {}
         started_at = time.monotonic()
         for format_index, format_group in enumerate(format_groups):
+            if cancel_callback and cancel_callback():
+                raise RuntimeError("최종 영상 제작이 취소되었습니다.")
             platform = format_group["render_platform"]
             platform_config = {
                 **config,
@@ -2700,7 +2715,10 @@ def execute_render_request(user_id: str, payload: dict, progress_callback=None) 
         )
         rendered_outputs = []
         artifacts = []
+        created_output_paths = set()
         for format_index, format_group in enumerate(format_groups):
+            if cancel_callback and cancel_callback():
+                raise RuntimeError("최종 영상 제작이 취소되었습니다.")
             platform = format_group["render_platform"]
             _, _, format_label = PLATFORM_FORMATS[platform]
             platform_config = {
@@ -2711,7 +2729,9 @@ def execute_render_request(user_id: str, payload: dict, progress_callback=None) 
                 "format_index": format_index + 1,
                 "format_total": len(format_groups),
             }
-            rendered = render_video(platform_config, job_id, progress_callback)
+            rendered = render_video(platform_config, job_id, progress_callback, cancel_callback)
+            if not rendered.get("reused"):
+                created_output_paths.add(rendered["path"])
             artifact_uri = "/" + quote(f"04_exports/{rendered['filename']}")
             created_at = datetime.fromtimestamp(
                 rendered["path"].stat().st_mtime, timezone.utc
@@ -2725,6 +2745,9 @@ def execute_render_request(user_id: str, payload: dict, progress_callback=None) 
                 "height": rendered["height"],
                 "aspect_ratio": format_label.replace("x", ":"),
                 "created_at": created_at,
+                "local_date": datetime.fromisoformat(created_at).astimezone(
+                    timezone(timedelta(hours=9))
+                ).date().isoformat(),
             })
             artifacts.append({
                 "name": rendered["filename"],
@@ -2749,32 +2772,24 @@ def execute_render_request(user_id: str, payload: dict, progress_callback=None) 
                     ],
                 },
             })
-        for output, artifact in zip(rendered_outputs, artifacts):
-            completed_at = datetime.fromisoformat(output["created_at"])
-            local_date = completed_at.astimezone(
-                timezone(timedelta(hours=9))
-            ).date().isoformat()
-            registered = get_auth_store().register_final_export(
-                user_id, project_id, latest["revision_id"], artifact["uri"],
-                artifact["checksum"], {
-                    **artifact["metadata"],
-                    "filename": artifact["name"],
-                    "job_id": job_id,
-                    "aspect_ratio": output["aspect_ratio"],
-                }, local_date, output["platforms"], output["created_at"],
+        if cancel_callback and cancel_callback():
+            raise RuntimeError("최종 영상 제작이 취소되었습니다.")
+        if finalize_callback:
+            finalize_callback()
+        else:
+            report(
+                status="running", phase="finalize", progress=0.99,
+                detail="MP4 파일과 콘텐츠 캘린더를 확정하고 있습니다.",
             )
+        registrations = get_auth_store().finalize_final_exports(
+            user_id, project_id, latest["revision_id"], job_id,
+            rendered_outputs, artifacts, brand_selections,
+        )
+        for output, artifact, registered in zip(
+            rendered_outputs, artifacts, registrations,
+        ):
             output["artifact_id"] = registered["artifact_id"]
             artifact["artifact_id"] = registered["artifact_id"]
-            get_auth_store().snapshot_final_export_brand_assets(
-                registered["artifact_id"], brand_selections
-            )
-        latest_completed_at = max(output["created_at"] for output in rendered_outputs)
-        latest_local_date = datetime.fromisoformat(latest_completed_at).astimezone(
-            timezone(timedelta(hours=9))
-        ).date().isoformat()
-        get_auth_store().consolidate_production_calendar(
-            user_id, project_id, latest_local_date, latest_completed_at
-        )
         primary = rendered_outputs[0]
         result = {
             "schema_version": "1.0.0",
@@ -2803,7 +2818,12 @@ def execute_render_request(user_id: str, payload: dict, progress_callback=None) 
         )
         return response
     except Exception as exc:
-        report(status="failed", detail=str(exc))
+        for path in locals().get("created_output_paths", set()):
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                LOGGER.exception("failed to clean final export output path=%s", path)
+        report(status="failed", detail="최종 영상 실행 단계에서 작업을 완료하지 못했습니다.")
         raise
     finally:
         try:
@@ -2974,8 +2994,11 @@ class Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
         parsed_path = urlparse(path).path
         if parsed_path.startswith("/04_exports/"):
-            filename = Path(parsed_path).name
-            if filename and filename == parsed_path.removeprefix("/04_exports/"):
+            try:
+                filename = requested_export_filename(path)
+            except ValueError:
+                return str(ROOT / ".invalid-final-export-path")
+            if filename:
                 return str(EXPORTS / filename)
         return super().translate_path(path)
 
@@ -3037,6 +3060,20 @@ class Handler(SimpleHTTPRequestHandler):
         return json.loads(self.rfile.read(length) or b"{}")
 
     def send_head(self):
+        parsed_path = urlparse(self.path).path
+        if parsed_path.startswith("/04_exports/"):
+            user = self.current_user()
+            if not user:
+                self.send_error(401, "Authentication required")
+                return None
+            try:
+                filename = requested_export_filename(self.path)
+            except ValueError:
+                self.send_error(404, "File not found")
+                return None
+            if not get_auth_store().can_download_final_export(user["user_id"], filename):
+                self.send_error(404, "File not found")
+                return None
         path = Path(self.translate_path(self.path))
         if path.is_dir() or path.suffix == ".html":
             return super().send_head()
@@ -3088,6 +3125,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(206 if partial else 200)
         self.send_header("Content-Type", self.guess_type(str(path)))
         self.send_header("Accept-Ranges", "bytes")
+        if parsed_path.startswith("/04_exports/"):
+            self.send_header("Cache-Control", "private, no-store")
         self.send_header("Content-Length", str(end - start + 1))
         self.send_header("Last-Modified", self.date_time_string(stat.st_mtime))
         if partial:
@@ -3509,6 +3548,9 @@ class Handler(SimpleHTTPRequestHandler):
                     "error": queued.get("error"),
                     "attempt": queued["attempt"],
                     "max_attempts": queued["max_attempts"],
+                    "queue_position": get_final_export_queue().position(
+                        job_id, user_id=user["user_id"],
+                    ),
                 })
                 return
             except FinalExportNotFound:
@@ -3575,6 +3617,24 @@ class Handler(SimpleHTTPRequestHandler):
     def _do_POST(self):
         if self.path == "/api/render-settings":
             handle_render_settings_request(self, merge=False)
+            return
+        if self.path == "/api/render/cancel":
+            user = self.current_user()
+            if not user:
+                self.send_json(401, {"error": "로그인 후 이용해 주세요."}); return
+            try:
+                payload = self.read_json()
+                job_id = str((payload or {}).get("job_id", "")).strip()[:100]
+                if not job_id:
+                    raise ValueError("취소할 작업을 선택해 주세요.")
+                job = get_final_export_queue().request_cancel(job_id, user_id=user["user_id"])
+                self.send_json(202, {"ok": True, "job_id": job_id, "status": job["status"], "cancel_requested": True})
+            except FinalExportNotFound:
+                self.send_json(404, {"error": "변환 작업을 찾을 수 없습니다."})
+            except FinalExportConflict as exc:
+                self.send_json(409, {"error": str(exc)})
+            except ValueError as exc:
+                self.send_json(400, {"error": str(exc)})
             return
         if self.path in {'/api/storyboard/auto-select', '/api/project/auto-crop'}:
             user = self.current_user()
@@ -4770,47 +4830,42 @@ class Handler(SimpleHTTPRequestHandler):
             project_id = str(data.get("project_id", "")).strip()
             if not project_id:
                 raise ValueError("최종 출력할 콘텐츠를 선택해 주세요.")
-            explicit = {key: data[key] for key in RENDER_SETTING_KEYS if key in data}
-            effective_settings = resolve_render_settings(user["user_id"], explicit)
-            if effective_settings["narration"]:
-                ensure_render_voice_ready(
-                    provider_values("openai").get("api_key", ""),
-                    user["user_id"], project_id,
-                )
             job_id = str(data.get("job_id", "")).strip()[:100]
             if not job_id:
                 job_id = f"render-{time.time_ns()}"
                 data = {**data, "job_id": job_id}
+            snapshot = build_final_export_snapshot(
+                job_id=job_id, user_id=user["user_id"], project_id=project_id,
+                payload=data, store=get_auth_store(), document_view=unified_document_view,
+                retime_timeline=timeline_with_voice_durations,
+                resolve_settings=resolve_render_settings,
+                image_path=storyboard_image_path, video_path=scene_video_path,
+                voice_path=voice_audio_path, brand_path=brand_asset_path,
+                sha256_file=sha256_file, platform_formats=PLATFORM_FORMATS,
+                render_setting_keys=set(RENDER_SETTING_KEYS),
+            )
+            validate_json_schema_file(snapshot, ROOT / "contracts" / "final-export-job.schema.json")
+            data = {
+                "job_id": job_id,
+                "project_id": project_id,
+                "final_export_snapshot": verify_snapshot(snapshot),
+            }
             queue = get_final_export_queue()
-            queue.enqueue(
+            queued = queue.enqueue(
                 job_id, user["user_id"], data, project_id=project_id,
                 max_attempts=max(1, safe_env_int("FINAL_EXPORT_MAX_ATTEMPTS", 3, 1, 10)),
+                idempotency_key=snapshot["idempotency_key"],
             )
-            deadline = time.monotonic() + safe_env_int(
-                "FINAL_EXPORT_HTTP_WAIT_SECONDS", 7200, 30, 21600
-            )
-            while time.monotonic() < deadline:
-                queued = queue.get(job_id, user_id=user["user_id"])
-                if queued["status"] == "succeeded":
-                    try:
-                        self.send_json(200, queued["result"])
-                    except (BrokenPipeError, ConnectionResetError):
-                        pass
-                    return
-                if queued["status"] in {"failed", "cancelled"}:
-                    error = queued.get("error") or {}
-                    self.send_json(500, {
-                        "error": error.get("message") or "최종 영상 제작에 실패했습니다.",
-                        "job_id": job_id,
-                    })
-                    return
-                time.sleep(0.25)
-            self.send_json(504, {
-                "error": "최종 영상 워커 응답 대기 시간이 초과되었습니다. 저장된 작업 상태를 다시 확인해 주세요.",
-                "job_id": job_id,
+            actual_job_id = queued["job_id"]
+            self.send_json(202, {
+                "ok": True, "job_id": actual_job_id, "status": queued["status"],
+                "status_url": f"/api/render/status?job_id={quote(actual_job_id)}",
+                "deduplicated": actual_job_id != job_id,
             })
         except FinalExportConflict as exc:
             self.send_json(409, {"error": str(exc)})
+        except FileNotFoundError as exc:
+            self.send_json(400, {"error": str(exc)})
         except ValueError as exc:
             self.send_json(400, {"error": str(exc)})
         except RuntimeError as exc:

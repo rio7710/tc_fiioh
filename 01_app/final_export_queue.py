@@ -14,6 +14,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from final_export_errors import sanitize_public_error
+from final_export_queue_schema import active_idempotent_job, ensure_idempotency_schema
+from final_export_queue_control import (
+    QueueControlConflict, QueueControlNotFound, begin_finalize as control_begin_finalize,
+    finish_cancel as control_finish_cancel, request_cancel as control_request_cancel,
+)
+from final_export_queue_metrics import queue_position
+
 
 STATUSES = ("queued", "running", "succeeded", "failed", "cancelled")
 
@@ -94,6 +102,7 @@ class FinalExportQueue:
                 """
             )
             db.execute("CREATE INDEX IF NOT EXISTS final_export_jobs_claim ON final_export_jobs(status, created_at)")
+            ensure_idempotency_schema(db)
             db.commit()
 
     @staticmethod
@@ -112,6 +121,7 @@ class FinalExportQueue:
     def enqueue(
         self, job_id: str, user_id: str, payload: Mapping[str, Any], *,
         project_id: str | None = None, max_attempts: int = 3,
+        idempotency_key: str | None = None,
         now: datetime | str | None = None,
     ) -> dict[str, Any]:
         if not isinstance(job_id, str) or len(job_id.strip()) < 8:
@@ -132,6 +142,12 @@ class FinalExportQueue:
         progress_json = _json({"phase": "queued", "progress": 0.0}, "progress")
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
+            active = active_idempotent_job(
+                db, user_id, resolved_project, str(idempotency_key or "").strip(),
+            )
+            if active:
+                db.commit()
+                return self._row(active)
             existing = db.execute("SELECT * FROM final_export_jobs WHERE job_id=?", (job_id,)).fetchone()
             if existing:
                 if (
@@ -144,11 +160,11 @@ class FinalExportQueue:
                 return self._row(existing)
             db.execute(
                 """INSERT INTO final_export_jobs
-                   (job_id,user_id,project_id,status,attempt,max_attempts,payload_hash,payload_json,
+                   (job_id,user_id,project_id,status,attempt,max_attempts,payload_hash,payload_json,idempotency_key,
                     result_json,error_json,progress_json,lease_owner,lease_until,created_at,updated_at)
-                   VALUES(?,?,?,'queued',1,?,?,?,NULL,NULL,?,NULL,NULL,?,?)""",
+                   VALUES(?,?,?,'queued',1,?,?,?,?,NULL,NULL,?,NULL,NULL,?,?)""",
                 (job_id, user_id, resolved_project, max_attempts, payload_hash, payload_json,
-                 progress_json, stamp, stamp),
+                 str(idempotency_key or "").strip() or None, progress_json, stamp, stamp),
             )
             row = db.execute("SELECT * FROM final_export_jobs WHERE job_id=?", (job_id,)).fetchone()
             db.commit()
@@ -163,6 +179,9 @@ class FinalExportQueue:
         if row is None:
             raise FinalExportNotFound(job_id)
         return self._row(row)
+
+    def position(self, job_id: str, *, user_id: str) -> int:
+        return queue_position(self.path, job_id, user_id)
 
     def recover_expired(self, *, now: datetime | str | None = None) -> list[dict[str, Any]]:
         stamp = _timestamp(now)
@@ -271,7 +290,9 @@ class FinalExportQueue:
         stamp = _timestamp(now)
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
-            self._owned(db, job_id, worker_id)
+            owned = self._owned(db, job_id, worker_id)
+            if owned["cancel_requested_at"]:
+                raise FinalExportConflict("final-export cancellation was requested")
             db.execute(
                 """UPDATE final_export_jobs SET status='succeeded',result_json=?,error_json=NULL,
                    progress_json=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE job_id=?""",
@@ -289,15 +310,13 @@ class FinalExportQueue:
             will_retry = bool(retryable and row["attempt"] < row["max_attempts"])
             status = "queued" if will_retry else "failed"
             attempt = row["attempt"] + 1 if will_retry else row["attempt"]
-            safe_error = {
-                "code": str(error.get("code") or "final_export_failed")[:100],
-                "message": str(error.get("message") or "최종 영상 제작에 실패했습니다.")[:500],
-                "retryable": will_retry,
-            }
+            safe_error = sanitize_public_error(error, retryable=will_retry)
+            progress = json.loads(row["progress_json"] or "{}")
+            progress["detail"] = safe_error["message"]
             db.execute(
                 """UPDATE final_export_jobs SET status=?,attempt=?,error_json=?,lease_owner=NULL,
-                   lease_until=NULL,updated_at=? WHERE job_id=?""",
-                (status, attempt, _json(safe_error, "error"), stamp, job_id),
+                   lease_until=NULL,progress_json=?,updated_at=? WHERE job_id=?""",
+                (status, attempt, _json(safe_error, "error"), _json(progress, "progress"), stamp, job_id),
             )
             result = db.execute("SELECT * FROM final_export_jobs WHERE job_id=?", (job_id,)).fetchone()
             db.commit()
@@ -323,3 +342,27 @@ class FinalExportQueue:
             result = db.execute("SELECT * FROM final_export_jobs WHERE job_id=?", (job_id,)).fetchone()
             db.commit()
             return self._row(result)
+
+    def request_cancel(self, job_id: str, *, user_id: str) -> dict[str, Any]:
+        try:
+            return self._row(control_request_cancel(self.path, job_id, user_id))
+        except QueueControlNotFound as exc:
+            raise FinalExportNotFound(job_id) from exc
+        except QueueControlConflict as exc:
+            raise FinalExportConflict(str(exc)) from exc
+
+    def begin_finalize(self, job_id: str, worker_id: str) -> dict[str, Any]:
+        try:
+            return self._row(control_begin_finalize(self.path, job_id, worker_id))
+        except QueueControlNotFound as exc:
+            raise FinalExportNotFound(job_id) from exc
+        except QueueControlConflict as exc:
+            raise FinalExportConflict(str(exc)) from exc
+
+    def finish_cancel(self, job_id: str, worker_id: str) -> dict[str, Any]:
+        try:
+            return self._row(control_finish_cancel(self.path, job_id, worker_id))
+        except QueueControlNotFound as exc:
+            raise FinalExportNotFound(job_id) from exc
+        except QueueControlConflict as exc:
+            raise FinalExportConflict(str(exc)) from exc

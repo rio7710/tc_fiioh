@@ -50,11 +50,13 @@ class FinalExportWorkerTests(unittest.TestCase):
         self.queue.enqueue("render-job-1", "user-1", self.payload)
 
         def broken(*args, **kwargs):
+            kwargs["progress_callback"]({"phase": "audio_mux", "detail": "secret /private/token"})
             raise RuntimeError("secret /private/token")
 
         failed = execute_once(self.queue, broken, "worker-a", heartbeat_seconds=0.01)
         self.assertEqual(failed["status"], "failed")
         self.assertNotIn("private/token", failed["error"]["message"])
+        self.assertNotIn("private/token", failed["progress"]["detail"])
 
     def test_late_executor_result_cannot_resurrect_cancelled_job(self):
         self.queue.enqueue("render-job-1", "user-1", self.payload)
@@ -66,6 +68,15 @@ class FinalExportWorkerTests(unittest.TestCase):
         result = execute_once(self.queue, cancelled, "worker-a", heartbeat_seconds=0.01)
         self.assertEqual(result["status"], "cancelled")
         self.assertIsNone(result["result"])
+
+    def test_shutdown_does_not_claim_new_job(self):
+        self.queue.enqueue("render-job-1", "user-1", self.payload)
+        result = execute_once(
+            self.queue, lambda *_args, **_kwargs: {}, "worker-a",
+            shutdown_requested=lambda: True,
+        )
+        self.assertIsNone(result)
+        self.assertEqual(self.queue.get("render-job-1")["status"], "queued")
 
 
 if __name__ == "__main__":

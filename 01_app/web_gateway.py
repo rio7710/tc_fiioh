@@ -27,7 +27,7 @@ SENSITIVE_HEADERS = {
 def api_timeout_for_path(path: str) -> int:
     route = path.split("?", 1)[0]
     if route == "/render":
-        return 7200
+        return 120
     if route == "/api/script/generate":
         return 660
     return 120

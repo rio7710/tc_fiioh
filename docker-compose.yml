@@ -84,6 +84,10 @@ services:
       FINAL_EXPORT_LEASE_SECONDS: "300"
       FINAL_EXPORT_HEARTBEAT_SECONDS: "30"
       FINAL_EXPORT_POLL_SECONDS: "2"
+      FFMPEG_STAGE_TIMEOUT_BASE_SECONDS: "120"
+      FFMPEG_STAGE_TIMEOUT_DURATION_FACTOR: "12"
+      FFMPEG_STAGE_TIMEOUT_MAX_SECONDS: "3600"
+      FFMPEG_TERMINATE_GRACE_SECONDS: "5"
       EXPORTS_DIR: "/data/exports"
       DEMO_DATA_PATH: "/data/demo_data.json"
       CAPTION_REGISTRY_PATH: "/data/caption_artifacts.json"
@@ -97,6 +101,7 @@ services:
       - tc_temp_internal
     mem_limit: 1536m
     restart: unless-stopped
+    stop_grace_period: 3660s
     security_opt:
       - no-new-privileges:true
 

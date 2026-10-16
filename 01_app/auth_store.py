@@ -50,6 +50,11 @@ class AuthStore:
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
+    def can_download_final_export(self, user_id: str, filename: str) -> bool:
+        from final_export_access import user_owns_final_export
+
+        return user_owns_final_export(self._connect, user_id, filename)
+
     def _initialize(self) -> None:
         with closing(self._connect()) as connection:
             connection.executescript("""
@@ -920,6 +925,17 @@ class AuthStore:
                     )
             connection.commit()
         return {"artifact_id": artifact_id, "uri": uri, "reused": bool(existing)}
+
+    def finalize_final_exports(self, user_id: str, project_id: str, revision_id: str,
+                               job_id: str, outputs: list[dict], artifacts: list[dict],
+                               brand_selections: list[dict]) -> list[dict]:
+        from final_export_finalize import finalize_final_exports
+
+        return finalize_final_exports(
+            self._connect, user_id=user_id, project_id=project_id,
+            revision_id=revision_id, job_id=job_id, outputs=outputs,
+            artifacts=artifacts, brand_selections=brand_selections,
+        )
 
     def list_calendar_entries(self, user_id: str) -> list[dict]:
         with closing(self._connect()) as connection:

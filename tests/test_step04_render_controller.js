@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const RenderController = require('../01_app/assets/steps/step04/step04-render-controller.js');
+const RenderJobClient = require('../01_app/assets/steps/step04/step04-render-job-client.js');
 
 function classes() { const set = new Set(); return { add: (...v) => v.forEach(x => set.add(x)), remove: (...v) => v.forEach(x => set.delete(x)), toggle: (v, on) => on ? set.add(v) : set.delete(v), contains: v => set.has(v) }; }
 function element() { return { textContent: '', innerHTML: '', hidden: true, disabled: false, style: {}, dataset: {}, classList: classes(), attrs: {}, setAttribute(k,v){this.attrs[k]=v;}, removeAttribute(k){delete this.attrs[k];}, addEventListener(){}, append(){}, querySelector(){return element();}, querySelectorAll(){return [];} }; }
@@ -9,9 +10,11 @@ function fixture(overrides = {}) {
   const modal=element(); modal.querySelectorAll=()=>roles;
   const nodes = Object.fromEntries(['#renderStatus','#renderBtn','#aiProgressBar','#aiFootStatus','#aiWorkflowSummary','#aiNow'].map(id=>[id,element()]));
   const root={body:{classList:classes()},querySelector:s=>nodes[s]||null,createElement:()=>element()};
-  let clears=0, intervalDelay=0, fetchBody=null, productions=0, shown=0;
+  let clears=0, intervalDelay=0, intervalFn=null, fetchBody=null, productions=0, shown=0, pending=null;
   const deps={
     root,getLocation:()=>({protocol:'https:'}),ensureStepApiReady:async()=>true,saveBrandSelections:async()=>{},pausePreview(){},
+    resolveRenderResponse:options=>RenderJobClient.resolve(options),
+    getActiveProjectId:()=> 'p',getPendingRenderJob:()=>pending,setPendingRenderJob:value=>{pending=value;},clearPendingRenderJob:()=>{pending=null;},
     getRenderButton:()=>nodes['#renderBtn'],getRenderStatus:()=>nodes['#renderStatus'],configureWorkflowModal:()=>modal,
     setupCaptionProgressBadges(){},setupCompositeFormatBadges(){},setupSceneProgressBadges(){},
     applySequentialCaptionProgress(_r,n){captionBadges.forEach((b,i)=>b.dataset.status=i<n?'succeeded':'queued');},applyCompositeFormatProgress(){},applySequentialSceneProgress(){},
@@ -19,9 +22,9 @@ function fixture(overrides = {}) {
     fetch:async(_url,options)=>{fetchBody=JSON.parse(options.body);return {ok:true,json:async()=>({exports:[{filename:'<one>.mp4',url:'/one',platforms:['youtube']} ]})};},
     api:async()=>({phase:'captions'}),sleep:async()=>{},recordCurrentProduction(){productions++;},showLatestExport(){},showStep(step){shown=step;},
     platformLabels:{youtube:'유튜브'},escapeHtml:value=>String(value).replaceAll('<','&lt;').replaceAll('>','&gt;'),now:()=>123,random:()=>.5,
-    setInterval(_fn,delay){intervalDelay=delay;return 9;},clearInterval(){clears++;},onError(){},...overrides
+    setInterval(fn,delay){intervalFn=fn;intervalDelay=delay;return 9;},clearInterval(){clears++;},onError(){},...overrides
   };
-  return {controller:RenderController.create(deps),nodes,modal,get:()=>({clears,intervalDelay,fetchBody,productions,shown})};
+  return {controller:RenderController.create(deps),nodes,modal,get:()=>({clears,intervalDelay,intervalFn,fetchBody,productions,shown,pending}),setPending:value=>{pending=value;}};
 }
 
 (async()=>{
@@ -38,6 +41,12 @@ function fixture(overrides = {}) {
   assert.match(success.nodes['#renderStatus'].innerHTML,/유튜브/); assert.match(success.nodes['#renderStatus'].innerHTML,/&lt;one&gt;\.mp4/);
   assert.equal(success.nodes['#renderBtn'].disabled,false); assert.equal(success.nodes['#renderBtn'].textContent,'최종 영상 제작'); assert.ok(result.exports);
   assert.match(success.nodes['#aiNow'].textContent,/완료/);
+  assert.equal(success.get().pending,null);
+
+  const resumed=fixture({api:async()=>({status:'succeeded',response:{filename:'resume.mp4',url:'/resume'}})});
+  resumed.setPending({job_id:'remembered-job',project_id:'p'});
+  const resumedResult=await resumed.controller.resumePending();
+  assert.equal(resumedResult.filename,'resume.mp4'); assert.equal(resumed.get().fetchBody,null); assert.equal(resumed.get().pending,null);
 
   let releaseMissing, releaseMissingDelay;
   const missingVoice=fixture({hasMissingNarrationVoice:()=>true,fetch:()=>new Promise(resolve=>{releaseMissing=resolve;}),sleep:ms=>ms===700&&!releaseMissingDelay?new Promise(resolve=>{releaseMissingDelay=resolve;}):Promise.resolve()});
@@ -59,6 +68,11 @@ function fixture(overrides = {}) {
   const failed=fixture({fetch:async()=>{throw new Error('drop');},api:async()=>({status:'failed',detail:'worker failed'})});
   await failed.controller.start(); assert.equal(failed.nodes['#renderStatus'].textContent,'오류: worker failed'); assert.equal(failed.nodes['#renderBtn'].disabled,false);
   const nonOk=fixture({fetch:async()=>({ok:false,json:async()=>({error:'bad response'})})}); await nonOk.controller.start(); assert.equal(nonOk.nodes['#renderStatus'].textContent,'오류: bad response');
+  let releaseQueued;
+  const queued=fixture({fetch:()=>new Promise(resolve=>{releaseQueued=resolve;}),api:async()=>({status:'queued',queue_position:3})});
+  const queuedPending=queued.controller.start(); while(!queued.get().intervalFn) await Promise.resolve(); await queued.get().intervalFn();
+  assert.equal(queued.nodes['#aiNow'].textContent,'최종 영상 작업 대기열 · 3번째');
+  releaseQueued({ok:true,json:async()=>({filename:'queued.mp4',url:'/queued'})}); await queuedPending;
   let timeoutSleeps=0;
   const timeout=fixture({fetch:async()=>{throw new Error('drop');},api:async()=>{throw new Error('찾을 수 없습니다');},sleep:async ms=>{if(ms===500)timeoutSleeps++;}});
   await timeout.controller.start(); assert.equal(timeoutSleeps,1200); assert.equal(timeout.nodes['#renderStatus'].textContent,'오류: drop');

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://thinkcast.local/contracts/final-export-job.schema.json",
+  "title": "ThinkCast immutable final export snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "job_id", "user_id", "project_id", "revision_id",
+    "timeline_hash", "input_hash", "idempotency_key", "render_settings", "voice_profile_id",
+    "content_data", "scene_assets", "voice_assets", "brand_assets",
+    "scene_crop_positions", "requested_platforms"
+  ],
+  "properties": {
+    "schema_version": {"const": "final-export-job.v2"},
+    "job_id": {"type": "string", "minLength": 8},
+    "user_id": {"type": "string", "minLength": 1},
+    "project_id": {"type": "string", "minLength": 1},
+    "revision_id": {"type": "string", "minLength": 1},
+    "timeline_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "input_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "idempotency_key": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "render_settings": {"type": "object"},
+    "voice_profile_id": {"type": "string", "minLength": 1},
+    "content_data": {
+      "type": "object",
+      "required": ["state", "timeline"],
+      "properties": {
+        "state": {"type": "object"},
+        "timeline": {"type": "object"}
+      }
+    },
+    "scene_assets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["artifact_id", "scene_id", "media_type", "selected", "uri", "checksum"],
+        "properties": {
+          "artifact_id": {"type": "string", "minLength": 1},
+          "scene_id": {"type": "string", "minLength": 1},
+          "media_type": {"enum": ["image", "video"]},
+          "selected": {"const": true},
+          "uri": {"type": "string", "minLength": 1},
+          "checksum": {"type": "string", "minLength": 8}
+        }
+      }
+    },
+    "voice_assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["artifact_id", "scene_id", "cue_id", "profile_id", "text_hash", "uri", "checksum"],
+        "properties": {
+          "artifact_id": {"type": "string", "minLength": 1},
+          "scene_id": {"type": "string", "minLength": 1},
+          "cue_id": {"type": "string", "minLength": 1},
+          "profile_id": {"type": "string", "minLength": 1},
+          "text_hash": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+          "uri": {"type": "string", "minLength": 1},
+          "checksum": {"type": "string", "minLength": 8}
+        }
+      }
+    },
+    "brand_assets": {"type": "array", "items": {"type": "object"}},
+    "scene_crop_positions": {"type": "object"},
+    "requested_platforms": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

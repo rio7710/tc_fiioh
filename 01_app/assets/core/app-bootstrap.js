@@ -58,6 +58,7 @@ const SCRIPT_STORAGE_KEY='greenhill-script-saved-v1';
 const CALENDAR_STORAGE_KEY='greenhill-content-calendar-v2';
 const CALENDAR_UI_STORAGE_KEY='greenhill-content-calendar-ui-v1';
 const LATEST_EXPORT_STORAGE_KEY='greenhill-latest-export-v1';
+const FINAL_RENDER_JOB_STORAGE_KEY='greenhill-final-render-job-v1';
 const latestExport=document.querySelector('#latestExport');
 const latestExportList=document.querySelector('#latestExportList');
 const calendarGrid=document.querySelector('#calendarGrid');
@@ -480,6 +481,12 @@ const renderController=Step04RenderController.create({
   getLocation:()=>location,
   api,
   fetch:(...args)=>fetch(...args),
+  resolveRenderResponse:options=>Step04RenderJobClient.resolve(options),
+  bindCancel:options=>Step04RenderCancelController.bind({button:document.querySelector('#finalRenderCancel'),api,confirm:message=>window.confirm(message),...options}),
+  getActiveProjectId:()=>activeProjectId,
+  getPendingRenderJob:()=>{try{return JSON.parse(localStorage.getItem(FINAL_RENDER_JOB_STORAGE_KEY)||'null')}catch{return null}},
+  setPendingRenderJob:value=>localStorage.setItem(FINAL_RENDER_JOB_STORAGE_KEY,JSON.stringify(value)),
+  clearPendingRenderJob:()=>localStorage.removeItem(FINAL_RENDER_JOB_STORAGE_KEY),
   sleep,
   ensureStepApiReady,
   saveBrandSelections,
@@ -720,7 +727,7 @@ async function ensureStep4Loaded() {
   return false;
 }
 
-async function boot(){await ensureStepPartialsLoaded();await ensureStep4Loaded();await initDemo();await restoreLoginSession();if(authUIController.isLoggedIn())scriptGenerationController.discover().catch(error=>console.warn('[ScriptGeneration:discover]',error))}
+async function boot(){await ensureStepPartialsLoaded();await ensureStep4Loaded();await initDemo();await restoreLoginSession();if(authUIController.isLoggedIn()){scriptGenerationController.discover().catch(error=>console.warn('[ScriptGeneration:discover]',error));renderController.resumePending().catch(error=>console.warn('[FinalRender:resume]',error))}}
 const bootPromise=boot();
 const userSettingsController=ThinkCastUserSettingsController.create({getRoot:()=>document,request:(...args)=>api(...args),getIndexProjects:()=>indexProjects,refreshProjectIndex,setManualProjectActionsLocked:locked=>contentIndexView.setAutomationLocked(locked),confirm:message=>window.confirm(message),alert:message=>window.alert(message),fetch:(...args)=>fetch(...args),createObjectURL:blob=>URL.createObjectURL(blob),revokeObjectURL:url=>URL.revokeObjectURL(url),createRequestId:()=>crypto.randomUUID(),setInterval:(callback,delay)=>setInterval(callback,delay),clearInterval:timer=>clearInterval(timer),onError:(feature,error)=>console.warn(`[UserSettings:${feature}]`,error),authUI:authUIController,storage:localStorage,automationPanel:{create:options=>ThinkCastAutomationControlPanel.create({...options,model:snapshot=>ThinkCastAutomationProgressModel.view(snapshot)})}});
 userSettingsController.mount();

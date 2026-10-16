@@ -79,7 +79,6 @@ class PipelineContractTests(unittest.TestCase):
         timed_scenes = self.server.timed_script_scenes(self.demo_data)
         script_lines = self.demo_data["state"]["script"]["lines"]
         self.assertEqual(len(script_lines), len(timed_scenes))
-        self.assertEqual(len(self.server.NARRATION_TRACKS), len(timed_scenes))
         self.assertEqual(list(range(len(timed_scenes))), [scene["script_line_index"] for scene in timed_scenes])
 
     def test_multi_cue_bridge_starts_the_last_cue_without_dropping_a_line(self):
@@ -106,7 +105,6 @@ class PipelineContractTests(unittest.TestCase):
         self.assertEqual("cue-4", timeline["scenes"][-1]["narration_cue_id"])
 
     def test_render_assets_exist(self):
-        self.assertTrue((ROOT / "02_media" / "video" / "P1_merged.mp4").is_file())
         scene_dir = ROOT / "02_media" / "images" / "scenes"
         for index in range(1, 15):
             self.assertTrue((scene_dir / f"scene_{index:02d}.webp").is_file())
@@ -118,8 +116,6 @@ class PipelineContractTests(unittest.TestCase):
         for path in self.server.MUSIC.values():
             if path is not None:
                 self.assertTrue(path.is_file(), path)
-        for _, filename in self.server.NARRATION_TRACKS:
-            self.assertTrue((ROOT / "02_media" / "narration" / filename).is_file(), filename)
 
     def test_final_composite_accepts_scene_artifacts(self):
         scene = {"id": "scene-01"}
@@ -129,7 +125,8 @@ class PipelineContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "원격 영상"):
             self.server.scene_video_path(scene, 0, {"scene-01": {"uri": "https://object.example/scene-01.mp4"}})
         with mock.patch.object(self.server, "SOURCE_CLIPS", ROOT / "missing-scene-clips"):
-            self.assertEqual(self.server.MERGED_DEMO_VIDEO.resolve(), self.server.scene_video_path(scene, 0))
+            with self.assertRaisesRegex(ValueError, "원본 MP4"):
+                self.server.scene_video_path(scene, 0)
 
     def test_platforms_share_matching_output_formats(self):
         groups = self.server.group_platform_formats([

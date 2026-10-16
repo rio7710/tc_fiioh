@@ -19,10 +19,8 @@ COPY --chown=appuser:appuser tools/unified_content_prompt_harness.py /app/tools/
 COPY --chown=appuser:appuser tools/reference_asset_index.py /app/tools/reference_asset_index.py
 COPY --chown=appuser:appuser tools/validate_unified_content.py /app/tools/validate_unified_content.py
 COPY --chown=appuser:appuser tools/validate_json_schema.py /app/tools/validate_json_schema.py
-COPY --chown=appuser:appuser 02_media/video/P1_merged.mp4 /app/02_media/video/P1_merged.mp4
 COPY --chown=appuser:appuser 02_media/images/scenes/scene_*.webp /app/02_media/images/scenes/
 COPY --chown=appuser:appuser 02_media/music /app/02_media/music
-COPY --chown=appuser:appuser 02_media/narration /app/02_media/narration
 
 ENV PYTHONPATH=/app:/app/01_app
 ENV DATA_DIR=/data

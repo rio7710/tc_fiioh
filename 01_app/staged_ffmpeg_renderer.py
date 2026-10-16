@@ -11,13 +11,13 @@ from __future__ import annotations
 import hashlib
 import os
 import re
-import subprocess
 import tempfile
-from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional, Sequence
+
+from ffmpeg_process_runner import FfmpegProcessFailed, run_ffmpeg_process
 
 
 ProgressCallback = Callable[..., None]
@@ -32,7 +32,6 @@ class StagedRenderDependencies:
     exports_dir: Path
     platform_formats: Mapping[str, tuple[int, int, str]]
     music: Mapping[str, Path | None]
-    narration_tracks: Sequence[tuple[float, str]]
     render_defaults: Mapping[str, Any]
     timeline_from_data: Callable[[dict], list[dict]]
     timed_script_scenes: Callable[[dict], list[dict]]
@@ -43,12 +42,14 @@ class StagedRenderDependencies:
     media_duration: Callable[[Path], float]
     prepare_caption_overlays: Callable[[dict, str | None, int, int, dict], list[tuple[Path, float, float]]]
     update_progress: ProgressCallback
-    merged_demo_video: Path
     ffmpeg_threads: int = 2
     render_preset: str = "medium"
     hosted_mode: bool = False
     command_runner: CommandRunner | None = None
+    cancel_requested: Callable[[], bool] | None = None
     minimum_output_bytes: int = 1_000_000
+    narration_tracks: Sequence[tuple[float, str]] = ()
+    merged_demo_video: Path | None = None
 
 
 class StagedRenderError(RuntimeError):
@@ -68,39 +69,23 @@ def _valid_output(
     return actual_duration > 0
 
 
-def _default_command_runner(
-    args: Sequence[str], stage: str, line_callback: LineCallback
-) -> None:
-    process = subprocess.Popen(
-        list(args),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        bufsize=1,
-    )
-    output_tail: deque[str] = deque(maxlen=24)
-    for raw_line in process.stdout or ():
-        line = raw_line.strip()
-        if line:
-            output_tail.append(line)
-            if line_callback:
-                line_callback(line)
-    return_code = process.wait()
-    if return_code:
-        detail = "\n".join(output_tail)
-        raise StagedRenderError(f"{stage} 단계 FFmpeg 변환에 실패했습니다.\n{detail}".rstrip())
-
-
 def _run(
     dependencies: StagedRenderDependencies,
     args: Sequence[str],
     stage: str,
     line_callback: LineCallback = None,
 ) -> None:
-    runner = dependencies.command_runner or _default_command_runner
-    runner(tuple(str(value) for value in args), stage, line_callback)
+    values = tuple(str(value) for value in args)
+    if dependencies.command_runner:
+        dependencies.command_runner(values, stage, line_callback)
+        return
+    try:
+        run_ffmpeg_process(
+            values, stage, line_callback,
+            cancel_requested=dependencies.cancel_requested,
+        )
+    except FfmpegProcessFailed as exc:
+        raise StagedRenderError(str(exc)) from exc
 
 
 def _encoding_args(preset: str, threads: int) -> list[str]:
@@ -462,11 +447,7 @@ def _narration_sources(
                 raise ValueError(f"{scene.get('name', scene.get('id'))} 장면의 나레이션 파일을 찾을 수 없습니다.")
             sources.append((float(scene["cue_start"]), 1.0, path))
         return sources
-    if len(dependencies.narration_tracks) != len(title_scenes):
-        raise ValueError("음성 파일과 대본 타임라인의 개수가 일치하지 않습니다.")
-    for scene, (rate, filename) in zip(title_scenes, dependencies.narration_tracks):
-        sources.append((float(scene["cue_start"]), float(rate), dependencies.root / "02_media" / "narration" / filename))
-    return sources
+    raise ValueError("모든 장면의 음성을 생성한 뒤 최종 영상을 제작해 주세요.")
 
 
 def _mux_audio(
@@ -542,7 +523,9 @@ def render_video_staged(
     style, music = config["type"], config["music"]
     if job_id:
         job_token = re.sub(r"[^A-Za-z0-9_-]", "-", str(job_id)).strip("-")[:80] or "job"
-        stamp = f"job_{job_token}"
+        digest = str(config.get("input_hash") or "").lower().rsplit(":", 1)[-1]
+        input_token = re.sub(r"[^a-f0-9]", "", digest)[:12]
+        stamp = f"job_{job_token}" + (f"_{input_token}" if input_token else "")
     else:
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     output_name = f"P1_final_{style}_{platform}_{format_label}_{music}_{stamp}.mp4"
@@ -592,6 +575,7 @@ def render_video_staged(
             "width": width,
             "height": height,
             "scene_count": len(scenes),
+            "reused": True,
         }
     report(
         status="running", phase="staged_scenes", progress=overall_progress(0.01),
@@ -694,9 +678,10 @@ def render_video_staged(
             "width": width,
             "height": height,
             "scene_count": len(scenes),
+            "reused": False,
         }
     except Exception as exc:
         if output_path.exists():
             output_path.unlink()
-        report(status="failed", detail=str(exc))
+        report(status="failed", detail="FFmpeg 합성 단계에서 작업을 완료하지 못했습니다.")
         raise

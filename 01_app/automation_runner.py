@@ -12,19 +12,9 @@ from urllib.request import Request, urlopen
 from urllib.parse import quote
 
 from automation_store import STAGES
+from automation_errors import AdapterFailure, RenderResultUnknown, RenderTerminalFailure
+from final_export_recovery import FinalExportRecoveryAdapter as _FinalExportAdapter
 from worker_core import JobConflict, WorkerRuntimeSettings
-
-
-class AdapterFailure(RuntimeError):
-    pass
-
-
-class RenderTerminalFailure(AdapterFailure):
-    """The render API recorded a terminal failure for the stable render job."""
-
-
-class RenderResultUnknown(AdapterFailure):
-    """Submission may have started, so replaying it would be unsafe."""
 
 
 REPLAY_SAFE_API_PATHS = frozenset({
@@ -323,7 +313,10 @@ class AutomationRunner:
         render_job_id = export_input['render_job_id']
         final_adapter = _FinalExportAdapter(
             export,
-            lambda: api.call('/api/render/status?job_id='+quote(render_job_id,safe=''), None),
+            lambda active_job_id: api.call(
+                '/api/render/status?job_id='+quote(active_job_id or render_job_id,safe=''), None
+            ),
+            initial_job_id=render_job_id,
             poll_interval_seconds=self.settings.i2v_poll_interval_seconds,
             recovery_timeout_seconds=self.settings.api_timeout_seconds,
         )
@@ -341,62 +334,3 @@ class _OperationAdapter:
 
     def run(self, job):
         return {'value': self.operation()}
-
-
-class _FinalExportAdapter:
-    """At-most-once render submission with status-based response recovery.
-
-    Attempt one may submit the stable render job. Later attempts only inspect
-    that job and existing artifacts; they never replay an ambiguous POST.
-    """
-
-    def __init__(self, submit, status, *, poll_interval_seconds, recovery_timeout_seconds):
-        self.submit = submit
-        self.status = status
-        self.poll_interval_seconds = poll_interval_seconds
-        self.recovery_timeout_seconds = recovery_timeout_seconds
-
-    def _status(self):
-        try:
-            result = self.status()
-        except AdapterFailure:
-            return None
-        return result if isinstance(result, dict) and result.get('status') else None
-
-    @staticmethod
-    def _terminal(status):
-        state = status.get('status')
-        if state == 'succeeded':
-            response = status.get('response')
-            if not isinstance(response, dict) or response.get('ok') is not True:
-                raise RenderResultUnknown('완료된 렌더 작업의 저장 응답을 확인하지 못했습니다.')
-            return {'value': response}
-        if state in ('failed', 'cancelled'):
-            raise RenderTerminalFailure('최종 영상 합성 작업이 실패했습니다. 저장된 작업 상태를 확인해 주세요.')
-        return None
-
-    def _recover(self):
-        deadline = time.monotonic() + self.recovery_timeout_seconds
-        while True:
-            status = self._status()
-            if status:
-                terminal = self._terminal(status)
-                if terminal:
-                    return terminal
-            if time.monotonic() >= deadline:
-                raise RenderResultUnknown('렌더 응답이 끊겨 저장된 작업 상태만 확인 중입니다. 동일 작업을 다시 제출하지 않았습니다.')
-            time.sleep(self.poll_interval_seconds)
-
-    def run(self, job):
-        status = self._status()
-        if status:
-            terminal = self._terminal(status)
-            if terminal:
-                return terminal
-            return self._recover()
-        if job.get('attempt', 1) > 1:
-            raise RenderResultUnknown('이전 렌더 제출 여부를 확인할 수 없어 중복 실행을 차단했습니다.')
-        try:
-            return {'value': self.submit()}
-        except AdapterFailure:
-            return self._recover()

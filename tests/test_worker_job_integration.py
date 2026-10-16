@@ -267,7 +267,8 @@ class WorkerJobIntegrationTests(unittest.TestCase):
             raise AdapterFailure("connection dropped")
 
         adapter = _FinalExportAdapter(
-            submit, lambda: statuses.pop(0), poll_interval_seconds=0.001, recovery_timeout_seconds=1,
+            submit, lambda _job_id: statuses.pop(0), initial_job_id="render-1",
+            poll_interval_seconds=0.001, recovery_timeout_seconds=1,
         )
         job = {"attempt": 1}
 
@@ -277,7 +278,8 @@ class WorkerJobIntegrationTests(unittest.TestCase):
     def test_final_export_retry_never_resubmits_when_status_is_missing(self):
         submits = []
         adapter = _FinalExportAdapter(
-            lambda: submits.append("render"), lambda: {"ok": True},
+            lambda: submits.append("render"), lambda _job_id: {"ok": True},
+            initial_job_id="render-1",
             poll_interval_seconds=0.001, recovery_timeout_seconds=0.001,
         )
 

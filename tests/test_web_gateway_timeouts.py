@@ -11,9 +11,9 @@ from web_gateway import api_timeout_for_path
 
 
 class WebGatewayTimeoutTests(unittest.TestCase):
-    def test_render_wait_matches_durable_worker_contract(self):
-        self.assertEqual(7200, api_timeout_for_path("/render"))
-        self.assertEqual(7200, api_timeout_for_path("/render?retry=1"))
+    def test_render_submission_uses_short_api_timeout(self):
+        self.assertEqual(120, api_timeout_for_path("/render"))
+        self.assertEqual(120, api_timeout_for_path("/render?retry=1"))
 
     def test_other_routes_keep_existing_limits(self):
         self.assertEqual(660, api_timeout_for_path("/api/script/generate"))
