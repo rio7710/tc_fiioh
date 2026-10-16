@@ -14,13 +14,16 @@
     function mount(){
       if(mounted)return true;
       const document=deps.getRoot();if(!document?.querySelector||!document?.createElement)throw new TypeError('ThinkCastAutomationControlPanel requires a DOM root');
-      nodes={document,switch:resolve(document,'userAutomationToggle'),switchText:resolve(document,'userAutomationSwitchText'),badge:resolve(document,'userAutomationStateBadge'),percent:resolve(document,'userAutomationPercent'),bar:resolve(document,'userAutomationProgressBar'),stage:resolve(document,'userAutomationCurrentStage'),detail:resolve(document,'userAutomationCurrentDetail'),phases:resolve(document,'userAutomationProgressSteps'),server:resolve(document,'userAutomationServerStatus'),runs:resolve(document,'userAutomationRuns')};
-      listen(nodes.switch,'change',async()=>{
-        if(busy||!current){nodes.switch.checked=Boolean(current?.enabled);return;}
-        const wanted=nodes.switch.checked;setBusy(true);
+      nodes={document,switchControl:resolve(document,'userAutomationSwitch'),switch:resolve(document,'userAutomationToggle'),switchText:resolve(document,'userAutomationSwitchText'),badge:resolve(document,'userAutomationStateBadge'),percent:resolve(document,'userAutomationPercent'),bar:resolve(document,'userAutomationProgressBar'),stage:resolve(document,'userAutomationCurrentStage'),detail:resolve(document,'userAutomationCurrentDetail'),phases:resolve(document,'userAutomationProgressSteps'),server:resolve(document,'userAutomationServerStatus'),runs:resolve(document,'userAutomationRuns')};
+      async function toggle(wanted){
+        if(busy||!current){nodes.switch.checked=Boolean(current?.enabled);return false;}
+        nodes.switch.checked=Boolean(wanted);setBusy(true);
         try{const changed=await deps.onToggle(wanted);if(!changed)nodes.switch.checked=Boolean(current.enabled);}
         finally{setBusy(false);}
-      });
+        return nodes.switch.checked===Boolean(wanted);
+      }
+      listen(nodes.switchControl,'click',event=>{event.preventDefault?.();return toggle(!Boolean(current?.enabled))});
+      listen(nodes.switch,'change',()=>toggle(nodes.switch.checked));
       mounted=true;return true;
     }
     function setBusy(value){busy=Boolean(value);if(nodes)nodes.switch.disabled=busy;}

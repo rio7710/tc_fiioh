@@ -22,7 +22,7 @@ assert.doesNotMatch(shell, /id="userSettingsDialog"|id="userChannelKeyDialog"/);
 assert.match(shell, /<div id="userSettingsContainer"><\/div>/);
 assert.match(bootstrap, /container:'#userSettingsContainer',path:'\/01_app\/pages\/components\/user-settings\.html'/);
 assert.match(shell, /automation-progress-model\.js\?v=20261014_v2/);
-assert.match(shell, /automation-control-panel\.js\?v=20261014_v2/);
+assert.match(shell, /automation-control-panel\.js\?v=20261016_v3/);
 assert.match(shell, /user-settings-controller\.js\?v=20261014_v83/);
 assert.match(bootstrap, /ThinkCastUserSettingsController\.create\(/);
 assert.match(bootstrap, /ThinkCastAutomationControlPanel\.create\(/);

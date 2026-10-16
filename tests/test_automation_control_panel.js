@@ -9,7 +9,7 @@ function element(){
     setAttribute(name,value){this[name]=value},replaceChildren(...items){this.children=items},append(...items){this.children.push(...items)},
     async emit(type){return listeners.get(type)?.({target:this,currentTarget:this})}};
 }
-const ids=['userAutomationToggle','userAutomationSwitchText','userAutomationStateBadge','userAutomationPercent','userAutomationProgressBar','userAutomationCurrentStage','userAutomationCurrentDetail','userAutomationProgressSteps','userAutomationServerStatus','userAutomationRuns'];
+const ids=['userAutomationSwitch','userAutomationToggle','userAutomationSwitchText','userAutomationStateBadge','userAutomationPercent','userAutomationProgressBar','userAutomationCurrentStage','userAutomationCurrentDetail','userAutomationProgressSteps','userAutomationServerStatus','userAutomationRuns'];
 const nodes=Object.fromEntries(ids.map(id=>[id,element()]));
 nodes.userAutomationProgressBar.parentElement=element();
 const root={querySelector:selector=>nodes[selector.slice(1)]||null,createElement:()=>element()};
@@ -19,6 +19,7 @@ const panel=Panel.create({getRoot:()=>root,model:Model.view,onToggle:async value
   assert.equal(panel.mount(),true);assert.equal(panel.mount(),true);
   panel.render({settings:{enabled:0,config:{endpoint:'4'}},runs:[]});
   assert.deepEqual(nodes.userAutomationProgressSteps.children.map(item=>item.className),['configured','configured','configured','configured','configured','configured','pending']);
+  await nodes.userAutomationSwitch.emit('click');assert.deepEqual(toggles,[true]);
   panel.render({settings:{enabled:1,next_run_at:'2030-01-01T00:00:00Z'},runs:[{status:'running',stage:'image_scene-01',attempt:1,created_at:'2030-01-01T00:00:00Z'}]});
   assert.equal(nodes.userAutomationToggle.checked,true);
   assert.equal(nodes.userAutomationPercent.textContent,'62%');
@@ -27,7 +28,7 @@ const panel=Panel.create({getRoot:()=>root,model:Model.view,onToggle:async value
   assert.equal(panel.setNotice('설정을 확인해 주세요.','failed'),true);
   assert.equal(nodes.userAutomationCurrentDetail.textContent,'설정을 확인해 주세요.');
   assert.equal(nodes.userAutomationStateBadge.dataset.state,'failed');
-  nodes.userAutomationToggle.checked=false;await nodes.userAutomationToggle.emit('change');assert.deepEqual(toggles,[false]);
+  nodes.userAutomationToggle.checked=false;await nodes.userAutomationToggle.emit('change');assert.deepEqual(toggles,[true,false]);
   assert.equal(panel.unmount(),true);assert.equal(panel.unmount(),false);
   console.log('Automation control panel tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
