@@ -32,6 +32,14 @@ PRODUCTION_SECTION_KEYS = (
 )
 MAX_VALIDATION_REPAIRS = 3
 MAX_FRESH_REGENERATIONS = 1
+MAX_TRANSITION_BRIDGE_REPAIRS = 1
+
+
+def validation_repair_limit(error: Exception) -> int:
+    """Avoid repeatedly rewriting a full document for bridge topology errors."""
+    if "전환 전용 연결 복도" in str(error):
+        return MAX_TRANSITION_BRIDGE_REPAIRS
+    return MAX_VALIDATION_REPAIRS
 
 
 def parse_json_document(candidate: str) -> dict[str, Any]:
@@ -1516,10 +1524,11 @@ def run_generation_harness(
                 "storyboard_candidate_validation_failed", candidate, validation_error,
                 repair_count=repair_count, regeneration_count=regeneration_count,
             )
-            if repairs_in_generation < MAX_VALIDATION_REPAIRS:
+            repair_limit = validation_repair_limit(validation_error)
+            if repairs_in_generation < repair_limit:
                 report(
                     "repair_requested", percent=60 + repairs_in_generation * 5,
-                    detail=f"검증 보정 {repairs_in_generation + 1}/{MAX_VALIDATION_REPAIRS} 요청 중",
+                    detail=f"검증 보정 {repairs_in_generation + 1}/{repair_limit} 요청 중",
                     repair_count=repair_count + 1, regeneration_count=regeneration_count,
                     validation_error=str(validation_error)[:300],
                 )

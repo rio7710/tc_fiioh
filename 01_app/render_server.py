@@ -1352,6 +1352,7 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage, local_
     # reviewer; story metadata remains server-owned and immutable here.
     reviewed = generate(script_plan_editorial_review_prompt(plan, request_contract))
     editorial_errors = []
+    editorial_fallback = False
     for attempt in range(3):
         reviewed = normalize_script_plan(reviewed)
         reviewed_plan = dict(plan)
@@ -1364,8 +1365,11 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage, local_
         except (JsonSchemaError, TypeError, ValueError) as exc:
             editorial_errors.append(str(exc))
             if attempt == 2:
-                detail = str(exc).strip() or type(exc).__name__
-                raise RuntimeError(f"1차 대본 문장 검수에 실패했습니다: {detail}") from None
+                # The original plan already passed every hard contract.  Copy
+                # editing is a quality enhancement, so a malformed reviewer
+                # response must not turn valid user content into an HTTP 502.
+                editorial_fallback = True
+                break
             reviewed = generate(
                 script_plan_editorial_review_prompt(plan, request_contract) + "\n"
                 "직전 검수 결과가 계약을 위반했다. 원본의 사실과 메타데이터는 유지하고 "
@@ -1382,6 +1386,7 @@ def openai_script_plan(api_key, selected_labels, resources, recent_usage, local_
                       "validation_errors": validation_errors,
                       "editorial_review_requests": 1 + len(editorial_errors),
                       "editorial_validation_errors": editorial_errors,
+                      "editorial_fallback": editorial_fallback,
                       "normalized_before_validation": True,
                   }}
 
