@@ -134,6 +134,34 @@ class FinalExportSnapshotBuilderTests(unittest.TestCase):
         with self.assertRaisesRegex(FileNotFoundError, "선택된 image 자산"):
             self.build()
 
+    def test_video_plan_without_completed_video_uses_selected_image(self):
+        self.store.list_scene_video_candidates = lambda *args: []
+        self.store.list_scene_image_candidates = lambda *args: [
+            {"artifact_id": f"image-{i}", "scene_id": f"scene-{i}",
+             "uri": "selected.png", "selected": True} for i in (1, 2)
+        ]
+        snapshot = self.build()
+        self.assertEqual(["image", "image"], [a["media_type"] for a in snapshot["scene_assets"]])
+        self.assertEqual(["image", "image"], [s["media_type"] for s in snapshot["content_data"]["timeline"]["scenes"]])
+
+    def test_completed_selected_video_overrides_image_plan(self):
+        original = self.store.list_scene_video_candidates
+        self.store.list_scene_video_candidates = lambda *args: original() + [
+            {"artifact_id": "completed-video", "scene_id": "scene-1",
+             "uri": "selected.mp4", "selected": True}
+        ]
+        snapshot = self.build()
+        self.assertEqual("video", snapshot["content_data"]["timeline"]["scenes"][0]["media_type"])
+        self.assertEqual("completed-video", snapshot["scene_assets"][0]["artifact_id"])
+
+    def test_missing_selected_video_file_is_not_silently_replaced(self):
+        self.store.list_scene_video_candidates = lambda *args: [
+            {"artifact_id": "broken-video", "scene_id": "scene-1",
+             "uri": "missing.mp4", "selected": True}
+        ]
+        with self.assertRaisesRegex(FileNotFoundError, "장면 자산 파일"):
+            self.build()
+
     def test_revision_mismatch_is_rejected_before_asset_work(self):
         with self.assertRaisesRegex(ValueError, "리비전"):
             build_final_export_snapshot(

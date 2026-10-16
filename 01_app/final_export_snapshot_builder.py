@@ -117,7 +117,7 @@ def build_final_export_snapshot(
         if str(voice.get("cue_id") or "") in expected_cues
         and str(voice.get("profile_id") or "") == profile_id
     ]
-    timeline = retime_timeline(timeline, eligible_voices)
+    timeline = copy.deepcopy(retime_timeline(timeline, eligible_voices))
     content_data = {"state": {"script": script}, "timeline": timeline}
     explicit = {key: payload[key] for key in render_setting_keys if key in payload}
     settings = resolve_settings(user_id, explicit)
@@ -132,7 +132,9 @@ def build_final_export_snapshot(
     scene_assets = []
     for index, scene in enumerate(timeline.get("scenes") or []):
         scene_id = str(scene.get("id") or "")
-        media_type = scene.get("media_type")
+        # Script media_type is a production plan, not evidence of a generated
+        # clip. Resolve output from selected artifacts, matching preview.
+        media_type = "video" if scene_id in videos else "image"
         artifact = (images if media_type == "image" else videos).get(scene_id)
         if not artifact:
             raise FileNotFoundError(f"선택된 {media_type} 자산이 없습니다: {scene_id}")
@@ -141,6 +143,7 @@ def build_final_export_snapshot(
         )
         if not path:
             raise FileNotFoundError(f"장면 자산 파일이 없습니다: {scene_id}")
+        scene["media_type"] = media_type
         scene_assets.append({
             **copy.deepcopy(artifact), "scene_id": scene_id, "media_type": media_type,
             "selected": True, "checksum": _checksum(path, sha256_file),
