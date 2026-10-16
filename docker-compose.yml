@@ -74,6 +74,7 @@ services:
 
   final_export_worker:
     container_name: tc_temp_final_export_worker
+    init: true
     build:
       context: .
       dockerfile: Dockerfile.final-export
@@ -85,6 +86,7 @@ services:
       FINAL_EXPORT_HEARTBEAT_SECONDS: "30"
       FINAL_EXPORT_POLL_SECONDS: "2"
       FFMPEG_STAGE_TIMEOUT_BASE_SECONDS: "120"
+      CAPTION_RENDER_WORKERS: "1"
       FFMPEG_STAGE_TIMEOUT_DURATION_FACTOR: "12"
       FFMPEG_STAGE_TIMEOUT_MAX_SECONDS: "3600"
       FFMPEG_TERMINATE_GRACE_SECONDS: "5"

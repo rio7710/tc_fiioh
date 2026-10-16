@@ -43,6 +43,7 @@ from process_file_lock import process_file_lock
 from final_export_queue import FinalExportConflict, FinalExportNotFound, FinalExportQueue
 from final_export_snapshot import verify_snapshot
 from final_export_snapshot_builder import build_final_export_snapshot
+from caption_browser_process import run_caption_browser
 from worker_core import JobConflict, JobNotFound, JobStore
 kling_submission_lock = threading.Lock()
 from keyword_pool import load_month_pool, normalize_keyword_label
@@ -2122,6 +2123,7 @@ body{{margin:0}}.stage{{width:{width}px;height:{height}px;aspect-ratio:auto;back
             html_path.write_text(document, encoding="utf-8")
             command = [
                 browser, "--headless=new", "--no-sandbox", "--disable-gpu", "--hide-scrollbars",
+                "--disable-dev-shm-usage", "--disable-background-networking", "--no-first-run",
                 "--force-device-scale-factor=1", f"--window-size={width},{height}",
                 "--default-background-color=00000000", "--virtual-time-budget=5000",
                 "--run-all-compositor-stages-before-draw",
@@ -2129,10 +2131,14 @@ body{{margin:0}}.stage{{width:{width}px;height:{height}px;aspect-ratio:auto;back
                 f"--screenshot={png_path}", html_path.as_uri(),
             ]
             try:
-                completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=RUNTIME_CONFIG["browser_render_timeout"])
+                completed = run_caption_browser(command, cwd=ROOT, timeout=RUNTIME_CONFIG["browser_render_timeout"])
                 if completed.returncode != 0 or not png_path.is_file():
                     update_caption_artifact(scene, index, style_name, line, width, height, caption_size, png_path, "failed")
                     raise RuntimeError(completed.stderr.strip() or "투명 자막 PNG 생성에 실패했습니다.")
+            except subprocess.TimeoutExpired:
+                update_caption_artifact(scene, index, style_name, line, width, height, caption_size, png_path, "failed")
+                png_path.unlink(missing_ok=True)
+                raise
             finally:
                 shutil.rmtree(profile_path, ignore_errors=True)
                 html_path.unlink(missing_ok=True)

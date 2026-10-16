@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -86,6 +87,7 @@ class FinalExportErrorContractTests(unittest.TestCase):
             (RetryableFinalExportError("network"), "transient_io", True),
             (sqlite3.OperationalError("database is locked"), "transient_io", True),
             (TimeoutError("late"), "timeout", True),
+            (subprocess.TimeoutExpired(["chromium"], 30), "timeout", True),
             (FileNotFoundError("missing"), "asset_missing", False),
             (ValueError("bad"), "input_invalid", False),
         ]

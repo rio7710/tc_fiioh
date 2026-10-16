@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import subprocess
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -32,7 +33,7 @@ def classify_final_export_error(exc: Exception) -> FinalExportFailure:
         return FinalExportFailure(
             "storage_busy", "transient_io", "저장소가 사용 중입니다. 잠시 후 다시 시도합니다.", True,
         )
-    if isinstance(exc, TimeoutError):
+    if isinstance(exc, (TimeoutError, subprocess.TimeoutExpired)):
         return FinalExportFailure("render_timeout", "timeout", "최종 영상 처리 시간이 초과되었습니다.", True)
     return FinalExportFailure(
         "final_export_failed", "internal", "최종 영상 워커 실행에 실패했습니다.", False,
