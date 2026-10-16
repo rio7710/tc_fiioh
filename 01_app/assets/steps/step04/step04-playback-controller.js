@@ -13,6 +13,7 @@
     const query = selector => root()?.querySelector?.(selector) || null;
     const all = selector => Array.from(root()?.querySelectorAll?.(selector) || []);
     const report = (name, error) => deps.onError?.(name, error);
+    const previewTime = video => deps.getPreviewTime?.() ?? video?.currentTime ?? 0;
     const playSafely = (media, name) => {
       if (!media || typeof media.play !== 'function') return;
       try {
@@ -40,7 +41,7 @@
     function syncMusicVolume(time) {
       const bgm = query('#bgm');
       if (!bgm) return 0;
-      const timelineTime = Math.max(0, Number(time ?? query('#video')?.currentTime) || 0);
+      const timelineTime = Math.max(0, Number(time ?? previewTime(query('#video'))) || 0);
       const fadeIn = musicTiming().fadeIn;
       const target = Math.max(0, Math.min(1, Number(deps.getCurrentVolume?.()) || 0));
       const gain = fadeIn > 0 ? Math.max(0, Math.min(1, timelineTime / fadeIn)) : 1;
@@ -53,10 +54,10 @@
       const bgm = query('#bgm');
       if (!video || !bgm || deps.getSelectedMusic?.() === 'none') return;
       if (bgm.readyState >= 1 && Number.isFinite(bgm.duration) && bgm.duration > 0) {
-        const target = (video.currentTime + musicTiming().startOffset) % bgm.duration;
+        const target = (previewTime(video) + musicTiming().startOffset) % bgm.duration;
         if (Math.abs(bgm.currentTime - target) > 0.25) bgm.currentTime = target;
       }
-      syncMusicVolume(video.currentTime);
+      syncMusicVolume(previewTime(video));
     }
 
     function setMusic(track) {
@@ -82,7 +83,7 @@
     function togglePlay() {
       const video = query('#video');
       if (!video) return;
-      if (video.paused) playSafely(video, 'video-play');
+      if (video.paused) { deps.preparePlay?.(); playSafely(video, 'video-play'); }
       else video.pause();
     }
 
@@ -113,10 +114,10 @@
       });
       video.addEventListener('seeked', () => {
         alignMusic();
-        deps.syncNarration?.(video.currentTime, true);
+        deps.syncNarration?.(previewTime(video), true);
         deps.sync?.();
       });
-      video.addEventListener('timeupdate', () => syncMusicVolume(video.currentTime));
+      video.addEventListener('timeupdate', () => syncMusicVolume(previewTime(video)));
       video.addEventListener('loadedmetadata', () => { deps.updatePanAvailability?.(); deps.sync?.(); });
       video.addEventListener('ended', () => { query('#bgm')?.pause?.(); deps.sync?.(); });
       return true;

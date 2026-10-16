@@ -63,6 +63,7 @@
       const target = index >= 0 ? narrations[index] : null;
       const audio = index >= 0 ? narrationAudios[index] : null;
       if (!enabled() || !target || !audio) return null;
+      if (audio.ended) return Number(target.end);
       const cueDuration = Math.max(0.001, Number(target.end) - Number(target.start));
       const audioDuration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : cueDuration;
       if (pendingTimelineTime != null) {
@@ -104,7 +105,7 @@
           button.textContent = next ? 'STT 내레이션 켬' : 'STT 내레이션 끔';
         }
         const video = currentRoot.querySelector?.('#video');
-        if (video) next ? sync(video.currentTime, true) : stop();
+        if (video) next ? sync(deps.getPreviewTime?.() ?? video.currentTime, true) : stop();
       }
       deps.saveEditorSettings?.();
     }

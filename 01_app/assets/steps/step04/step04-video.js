@@ -26,6 +26,7 @@
     formatTime: fmt
   });
   const narrationController = NarrationController.create({
+    getPreviewTime: () => timelineOrchestrator?.getPreviewTime() || 0,
     getRoot: () => typeof document !== 'undefined' ? document : null,
     isNarrationEnabled: () => editorState.get('narrationEnabled'),
     setNarrationEnabled: value => editorState.set('narrationEnabled', value),
@@ -63,6 +64,11 @@
     onError: (message, error) => console.error(message, error)
   });
   const playbackController = PlaybackController.create({
+    getPreviewTime: () => timelineOrchestrator?.getPreviewTime() || 0,
+    preparePlay: () => {
+      const scenes = timelineOrchestrator.getScenes();
+      if (timelineOrchestrator.getPreviewTime() >= Number(scenes[scenes.length - 1]?.end)) timelineOrchestrator.setPreviewTime(0);
+    },
     getRoot: () => typeof document !== 'undefined' ? document : null,
     getSelectedMusic: () => editorState.get('selectedMusic'),
     setSelectedMusic: value => editorState.set('selectedMusic', value),

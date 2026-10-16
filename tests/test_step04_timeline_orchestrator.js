@@ -55,12 +55,12 @@ assert.equal(unseekable.controller.getPreviewTime(),3.55,'pending navigation rem
 assert.deepEqual(unseekable.order,[['preview',3.55],['narration',3.55,false],['frame']]);
 unseekable.setMediaTime(3.55);
 unseekable.order.length=0;
-unseekable.controller.sync();
+unseekable.getFrame()();
 assert.equal(unseekable.controller.getPreviewTime(),3.55,'logical time remains aligned once the pending media seek succeeds');
 assert.deepEqual(unseekable.order,[['preview',3.55],['narration',3.55,false],['frame']]);
 unseekable.setMediaTime(4.25);
 unseekable.order.length=0;
-unseekable.controller.sync();
+unseekable.getFrame()();
 assert.equal(unseekable.controller.getPreviewTime(),4.25,'active playback follows the media clock after pending seek confirmation');
 assert.deepEqual(unseekable.order,[['preview',4.25],['narration',4.25,false],['frame']]);
 
@@ -71,3 +71,30 @@ const narrationMaster=make({paused:false,time:1,playbackTime:4.5});
 narrationMaster.controller.applyTimeline({scenes:[{start:0,end:6}]});
 assert.equal(narrationMaster.controller.getPreviewTime(),4.5,'active narration time drives the visual and caption timeline');
 console.log('Step04 timeline orchestrator tests passed');
+
+const long = make({paused: false, time: 45.9});
+long.video.duration = 46;
+long.video.pause = () => { long.video.paused = true; };
+long.controller.applyTimeline({scenes: [{start: 0, end: 45.42}, {start: 45.42, end: 48.84}, {start: 48.84, end: 60.68}]});
+assert.equal(long.video.loop, true, 'sample media cannot end the project preview');
+long.setMediaTime(0.2);
+long.getFrame()();
+assert.ok(Math.abs(long.controller.getPreviewTime() - 46.2) < 1e-8, 'sample loop continues logical time beyond 46 seconds');
+long.controller.setPreviewTime(55.84);
+long.getFrame()();
+assert.equal(long.controller.getPreviewTime(), 55.84, 'navigation beyond sample duration remains authoritative');
+assert.ok(long.video.currentTime < 46, 'physical seek stays in sample seek range');
+long.setMediaTime(14.68);
+long.getFrame()();
+assert.ok(Math.abs(long.controller.getPreviewTime() - 60.68) < 1e-8);
+assert.equal(long.video.paused, true, 'preview stops at actual project end');
+
+const minutes = make({paused: true});
+minutes.video.duration = 46;
+minutes.controller.applyTimeline({scenes: [{start: 0, end: 600}]});
+minutes.controller.setPreviewTime(300);
+minutes.controller.sync();
+minutes.video.paused = false;
+minutes.setMediaTime(25);
+minutes.controller.sync();
+assert.equal(minutes.controller.getPreviewTime(), 301, 'long project seeks have no fixed duration cap');
