@@ -1206,6 +1206,7 @@ def script_plan_request_contract(selected_labels, local_date=None, client_name="
 - JSON 객체 하나만 출력하고 설명, Markdown, 코드펜스를 덧붙이지 않는다.
 - 허용 필드는 schema_version, title, synopsis, narration_beats, cast_choices, location_choices뿐이며 schema_version은 1.0.0이다.
 - narration_beats는 15~18개, 각 항목은 앞뒤 공백을 제외하고 내부 공백·문장부호를 포함해 13자 이하, 전체는 180~210자로 작성한다.
+- 일반적인 한국어 낭독 기준 영상 본편 약 30초를 목표로 간결하게 작성한다. 30초는 작성 방향일 뿐이며 예상·실측 길이 차이를 검증 실패·자동 보정·재작성 조건으로 사용하지 않는다.
 - cast_choices의 인물 이름·캐릭터 ID를 title, synopsis, narration_beats에 쓰지 않는다.
 - 사람 작성 원고의 제목·내레이션을 직접 인용하거나 단어만 바꿔 재사용하지 않는다.
 - 모든 narration beat를 실제 한국어로 소리 내어 읽어 조사 생략, 주어·서술어 불일치, 뜻이 통하지 않는 추상어 결합이 없는지 확인한다. 짧은 시적 호흡은 허용하지만 문법 오류를 시적 표현으로 포장하지 않는다.
