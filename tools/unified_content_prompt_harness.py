@@ -996,10 +996,6 @@ def validate_transition_bridge_routes(
             raise UnifiedContentError(f"{scene_id}는 전환 전용 연결 복도를 첫 씬으로 사용할 수 없습니다")
         if end == len(locations) - 1:
             raise UnifiedContentError(f"{scene_id}는 전환 전용 연결 복도에서 콘텐츠를 끝낼 수 없습니다")
-        if end - start + 1 > 2:
-            raise UnifiedContentError(
-                f"{scene_id} 전환 전용 연결 복도는 장소 이동당 최대 2씬까지만 사용할 수 있습니다"
-            )
         origin, destination = locations[start - 1], locations[end + 1]
         if not origin or not destination:
             raise UnifiedContentError(
