@@ -958,7 +958,7 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(UnifiedContentError, "장소가 직접 바뀌었습니다"):
             validate_transition_bridge_routes(value, catalog)
 
-    def test_transition_bridge_rejects_first_last_repeated_and_same_destination(self):
+    def test_transition_bridge_rejects_first_last_three_repeated_and_same_destination(self):
         catalog = {
             "ref-location-a":{"id":"ref-location-a","kind":"location","status":"ready"},
             "ref-location-bridge":{"id":"ref-location-bridge","kind":"location","status":"ready","assignment":"connector_corridor"},
@@ -984,9 +984,13 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
             validate_transition_bridge_routes(value_for("ref-location-bridge", "ref-location-b"), catalog)
         with self.assertRaisesRegex(UnifiedContentError, "끝낼 수 없습니다"):
             validate_transition_bridge_routes(value_for("ref-location-a", "ref-location-bridge"), catalog)
-        with self.assertRaisesRegex(UnifiedContentError, "연속 사용"):
+        validate_transition_bridge_routes(value_for(
+            "ref-location-a", "ref-location-bridge", "ref-location-bridge", "ref-location-b"
+        ), catalog)
+        with self.assertRaisesRegex(UnifiedContentError, "최대 2씬"):
             validate_transition_bridge_routes(value_for(
-                "ref-location-a", "ref-location-bridge", "ref-location-bridge", "ref-location-b"
+                "ref-location-a", "ref-location-bridge", "ref-location-bridge",
+                "ref-location-bridge", "ref-location-b"
             ), catalog)
         with self.assertRaisesRegex(UnifiedContentError, "서로 다른"):
             validate_transition_bridge_routes(value_for(

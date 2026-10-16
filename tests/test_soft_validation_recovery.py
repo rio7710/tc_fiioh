@@ -82,6 +82,15 @@ class SoftValidationRecoveryTests(unittest.TestCase):
         self.assertEqual(1, result["regeneration_count"])
         self.assertEqual(calls[0], calls[2])
 
+    def test_location_activity_policy_uses_targeted_repair_limit(self):
+        error = UnifiedContentError(
+            "scene-05: 물리치료실 장면에는 물리치료 행동만 배치해야 합니다"
+        )
+        self.assertEqual(1, harness.validation_repair_limit(error))
+        self.assertEqual(3, harness.validation_repair_limit(
+            UnifiedContentError("schema validation failed")
+        ))
+
 
 if __name__ == "__main__":
     unittest.main()

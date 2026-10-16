@@ -32,13 +32,17 @@ PRODUCTION_SECTION_KEYS = (
 )
 MAX_VALIDATION_REPAIRS = 3
 MAX_FRESH_REGENERATIONS = 1
-MAX_TRANSITION_BRIDGE_REPAIRS = 1
+MAX_TARGETED_POLICY_REPAIRS = 1
 
 
 def validation_repair_limit(error: Exception) -> int:
-    """Avoid repeatedly rewriting a full document for bridge topology errors."""
-    if "전환 전용 연결 복도" in str(error):
-        return MAX_TRANSITION_BRIDGE_REPAIRS
+    """Avoid repeatedly rewriting a full document for narrow policy errors."""
+    message = str(error)
+    if (
+        "전환 전용 연결 복도" in message
+        or ("장면에는 " in message and " 행동만 배치해야 합니다" in message)
+    ):
+        return MAX_TARGETED_POLICY_REPAIRS
     return MAX_VALIDATION_REPAIRS
 
 
@@ -978,19 +982,25 @@ def validate_transition_bridge_routes(
             )
         locations.append(scene_locations[0] if scene_locations else None)
 
-    for index, location_id in enumerate(locations):
-        if location_id not in bridge_ids:
+    index = 0
+    while index < len(locations):
+        if locations[index] not in bridge_ids:
+            index += 1
             continue
-        scene_id = scenes[index].get("id", f"scene-{index + 1:02d}")
-        if index == 0:
+        start = index
+        while index + 1 < len(locations) and locations[index + 1] in bridge_ids:
+            index += 1
+        end = index
+        scene_id = scenes[start].get("id", f"scene-{start + 1:02d}")
+        if start == 0:
             raise UnifiedContentError(f"{scene_id}는 전환 전용 연결 복도를 첫 씬으로 사용할 수 없습니다")
-        if index == len(locations) - 1:
+        if end == len(locations) - 1:
             raise UnifiedContentError(f"{scene_id}는 전환 전용 연결 복도에서 콘텐츠를 끝낼 수 없습니다")
-        origin, destination = locations[index - 1], locations[index + 1]
-        if origin in bridge_ids or destination in bridge_ids:
+        if end - start + 1 > 2:
             raise UnifiedContentError(
-                f"{scene_id} 전환 전용 연결 복도는 연속 사용하지 말고 장소 이동당 정확히 1씬만 사용해야 합니다"
+                f"{scene_id} 전환 전용 연결 복도는 장소 이동당 최대 2씬까지만 사용할 수 있습니다"
             )
+        origin, destination = locations[start - 1], locations[end + 1]
         if not origin or not destination:
             raise UnifiedContentError(
                 f"{scene_id} 전환 전용 연결 복도 앞뒤에는 출발 장소와 목적지 장소가 필요합니다"
@@ -999,6 +1009,7 @@ def validate_transition_bridge_routes(
             raise UnifiedContentError(
                 f"{scene_id} 전환 전용 연결 복도는 서로 다른 출발 장소와 목적지를 연결해야 합니다"
             )
+        index += 1
 
     for index in range(1, len(locations)):
         previous, current = locations[index - 1], locations[index]
