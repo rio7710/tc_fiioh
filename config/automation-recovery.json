@@ -1,0 +1,5 @@
+{
+  "schema_version": "1.0.0",
+  "scene_repair_attempts": 3,
+  "max_new_project_restarts": 2
+}

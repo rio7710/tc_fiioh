@@ -1504,6 +1504,7 @@ def openai_unified_storyboard(api_key, selected_labels, resources, previous_docu
         canonical_reference_assets=canonical_reference_assets,
         progress_callback=report_progress,
         diagnostic_callback=diagnostic_callback,
+        max_fresh_regenerations=0,
     )
     review_model = os.environ.get("OPENAI_SCENE_REVIEW_MODEL", model)
     base_document = generated["document"]

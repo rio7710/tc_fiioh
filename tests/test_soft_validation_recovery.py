@@ -55,7 +55,7 @@ class SoftValidationRecoveryTests(unittest.TestCase):
         self.assertTrue(metadata["recovery"]["editorial_fallback"])
         self.assertEqual(3, len(metadata["recovery"]["editorial_validation_errors"]))
 
-    def test_bridge_error_gets_one_repair_before_fresh_generation(self):
+    def test_bridge_error_gets_three_repairs_before_fresh_generation(self):
         candidate = {
             "project": {}, "concept_variants": [], "selected_variant_id": "",
             "production": {"timeline": {"scenes": []}},
@@ -64,7 +64,7 @@ class SoftValidationRecoveryTests(unittest.TestCase):
         bridge_error = UnifiedContentError(
             "scene-07 전환 전용 연결 복도는 연속 사용하지 말고 장소 이동당 정확히 1씬만 사용해야 합니다"
         )
-        outcomes = [bridge_error, bridge_error, None]
+        outcomes = [bridge_error, bridge_error, bridge_error, bridge_error, None]
 
         def validate(*_args, **_kwargs):
             outcome = outcomes.pop(0)
@@ -77,16 +77,16 @@ class SoftValidationRecoveryTests(unittest.TestCase):
                 ["안심"], "시설 자료",
             )
 
-        self.assertEqual(3, len(calls))
-        self.assertEqual(1, result["repair_count"])
+        self.assertEqual(5, len(calls))
+        self.assertEqual(3, result["repair_count"])
         self.assertEqual(1, result["regeneration_count"])
-        self.assertEqual(calls[0], calls[2])
+        self.assertEqual(calls[0], calls[4])
 
     def test_location_activity_policy_uses_targeted_repair_limit(self):
         error = UnifiedContentError(
             "scene-05: 물리치료실 장면에는 물리치료 행동만 배치해야 합니다"
         )
-        self.assertEqual(1, harness.validation_repair_limit(error))
+        self.assertEqual(3, harness.validation_repair_limit(error))
         self.assertEqual(3, harness.validation_repair_limit(
             UnifiedContentError("schema validation failed")
         ))

@@ -12,7 +12,8 @@ from urllib.request import Request, urlopen
 from urllib.parse import quote
 
 from automation_store import STAGES
-from automation_errors import AdapterFailure, RenderResultUnknown, RenderTerminalFailure
+from automation_errors import AdapterFailure, ContentRepairExhausted, RenderResultUnknown, RenderTerminalFailure
+from automation_recovery import is_content_repair_failure
 from final_export_recovery import FinalExportRecoveryAdapter as _FinalExportAdapter
 from worker_core import JobConflict, WorkerRuntimeSettings
 
@@ -81,6 +82,8 @@ class InternalAPI:
                 except (OSError, TypeError, ValueError, json.JSONDecodeError):
                     detail = ''
                 message = detail or '결과 확인 후 다시 시도해 주세요.'
+                if is_content_repair_failure(path, exc.code, message):
+                    raise ContentRepairExhausted(message) from None
                 raise AdapterFailure(f'제작 API 요청이 실패했습니다 (HTTP {exc.code}): {message}') from None
             except (URLError, TimeoutError, ConnectionError, json.JSONDecodeError):
                 if replay_safe and attempt + 1 < self.settings.api_retry_count:
@@ -136,6 +139,8 @@ class AutomationRunner:
             self.store.finish(run,'succeeded')
         except InterruptedError:
             self.store.finish(run,'cancelled')
+        except ContentRepairExhausted as exc:
+            self.store.finish(run,'failed','content_repair_exhausted',str(exc))
         except AdapterFailure as exc:
             self.store.finish(run,'failed','adapter_failed',str(exc))
         except Exception:

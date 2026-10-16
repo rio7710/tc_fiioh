@@ -177,10 +177,17 @@ def review_storyboard_scenes(
         for attempt in range(1, max_attempts + 1):
             response = ""
             try:
+                if attempt > 1:
+                    with report_lock:
+                        report(f"검증·보완 중 · {attempt}/{max_attempts}회 · {scenes[index].get('id', index + 1)}")
                 response = request_review(build_scene_review_prompt(document, index, error))
                 reviewed, issues = parse_scene_review(response, scenes[index])
                 if validate_reviewed_scene:
                     validate_reviewed_scene(index, reviewed)
+                if issues and diagnostic_callback:
+                    diagnostic_callback({'event': 'scene_review_repaired',
+                        'scene_id': scenes[index].get('id'), 'attempt': attempt,
+                        'before_scene': scenes[index], 'after_scene': reviewed, 'issues': issues})
                 return index, reviewed, issues
             except Exception as exc:
                 error = str(exc)[:500]

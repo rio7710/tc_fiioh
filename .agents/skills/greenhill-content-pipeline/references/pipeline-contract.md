@@ -78,6 +78,7 @@ Required result fields:
 
 ## Reliability
 
+- Automatic recovery is bounded by `config/automation-recovery.json`. Scene-local prompt validation uses text-only GPT patches and revalidates the full contract, preserving all other scenes and immutable narration/timing/reference fields. Production stops after three repair attempts rather than regenerating full candidates within the same request. A confirmed, allowlisted content-validation failure may create at most two fresh projects; persist the original failed run and parent/child links. Never restart on authentication, missing assets, storage, quota, cancellation, unknown submission outcome, or an unclassified failure. User stop and settings-version changes take precedence over replacement scheduling. Replacements are not additional user-requested count slots.
 - The canonical reference-asset index is derived at request time from all authorized registered group resources. Index entries retain server-owned metadata; aliases are accepted only when they resolve uniquely, so adding an asset does not require prompt or validator code changes.
 - Storyboard review is a field-patch operation. Review providers may update only prompt text fields; the server merges the patch onto immutable scene identity, timing, narration, reference, and sequence data.
 - A repair response cannot replace an already valid 12–20 scene topology with a missing or out-of-range scene list. Keep the last structurally complete candidate and retry the specific validation correction.

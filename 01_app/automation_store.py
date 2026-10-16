@@ -14,6 +14,7 @@ KST = timezone(timedelta(hours=9))
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from validate_json_schema import validate_json_schema_file
+from automation_recovery import initialize_recovery, enqueue_replacement
 STAGES = ('manual', '2', '3', '3-1', '4', '5')
 
 
@@ -152,6 +153,7 @@ class AutomationStore:
                     PRIMARY KEY(user_id,request_id));
                 INSERT OR IGNORE INTO automation_schema_versions VALUES(1,strftime('%Y-%m-%dT%H:%M:%f+00:00','now'));
             ''')
+            initialize_recovery(db)
             db.commit()
 
     def snapshot(self, user_id):
@@ -267,7 +269,8 @@ class AutomationStore:
                 db.execute("INSERT INTO automated_projects(project_id,run_id,created_at,status,stage,endpoint) VALUES(?,?,?,'queued','create_project',?)",(project_id,run_id,now,config['endpoint']))
                 repeat = config['repeat']
                 if repeat['unit'] == 'count':
-                    completed = db.execute('SELECT COUNT(*) AS n FROM automation_runs WHERE user_id=? AND settings_version=?', (row['user_id'], row['version'])).fetchone()['n']
+                    completed = db.execute('''SELECT COUNT(*) AS n FROM automation_runs WHERE user_id=? AND settings_version=?
+                        AND run_id NOT IN (SELECT child_run_id FROM automation_recovery_links)''', (row['user_id'], row['version'])).fetchone()['n']
                     if completed >= repeat['interval']:
                         db.execute('UPDATE automation_settings SET enabled=0,next_run_at=NULL WHERE user_id=?',(row['user_id'],))
                     else:
@@ -358,12 +361,17 @@ class AutomationStore:
     def finish(self, run, status, code=None, message=None):
         with closing(self.auth._connect()) as db:
             db.execute('BEGIN IMMEDIATE')
-            db.execute("UPDATE automation_runs SET status=CASE WHEN cancel_requested=1 THEN 'cancelled' ELSE ? END,error_code=?,error_message=?,lease_until=NULL,updated_at=? WHERE run_id=? AND lease_owner=? AND status='running'",(status,code,message,now_iso(),run['run_id'],run['lease_owner']))
+            changed = db.execute("UPDATE automation_runs SET status=CASE WHEN cancel_requested=1 THEN 'cancelled' ELSE ? END,error_code=?,error_message=?,lease_until=NULL,updated_at=? WHERE run_id=? AND lease_owner=? AND status='running'",(status,code,message,now_iso(),run['run_id'],run['lease_owner']))
+            if not changed.rowcount:
+                db.rollback()
+                return
             db.execute('''UPDATE automated_projects SET
                 status=(SELECT status FROM automation_runs WHERE run_id=?),
                 stage=(SELECT stage FROM automation_runs WHERE run_id=?),
                 error_message=(SELECT error_message FROM automation_runs WHERE run_id=?)
                 WHERE run_id=?''',(run['run_id'],run['run_id'],run['run_id'],run['run_id']))
             if status=='failed':
-                db.execute('UPDATE automation_settings SET enabled=0,next_run_at=NULL WHERE user_id=?',(run['user_id'],))
+                replaced = enqueue_replacement(db, run, now_iso(), code)
+                if not replaced:
+                    db.execute('UPDATE automation_settings SET enabled=0,next_run_at=NULL WHERE user_id=? AND version=?',(run['user_id'],run['settings_version']))
             db.commit()

@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from tools.validate_unified_content import UnifiedContentError, validate_timeline
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema_file
+from tools.scene_validation_repair import target_scene, repair_prompt, apply_patch_response
 from tools.reference_asset_index import (
     build_reference_asset_index,
     normalize_scene_reference_ids,
@@ -30,9 +31,9 @@ PRODUCTION_SECTION_KEYS = (
     "reference_assets", "continuity", "global_prompts", "timing_policy",
     "timeline", "narration_cues", "postproduction", "output",
 )
-MAX_VALIDATION_REPAIRS = 3
+MAX_VALIDATION_REPAIRS = int(json.loads((ROOT / 'config' / 'automation-recovery.json').read_text())['scene_repair_attempts'])
 MAX_FRESH_REGENERATIONS = 2
-MAX_TARGETED_POLICY_REPAIRS = 1
+MAX_TARGETED_POLICY_REPAIRS = MAX_VALIDATION_REPAIRS
 
 
 def validation_repair_limit(error: Exception) -> int:
@@ -1350,6 +1351,7 @@ def run_generation_harness(
     canonical_reference_assets: dict[str, dict[str, Any]] | None = None,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
     diagnostic_callback: Callable[[dict[str, Any]], None] | None = None,
+    max_fresh_regenerations: int = MAX_FRESH_REGENERATIONS,
 ) -> dict[str, Any]:
     def report(phase: str, **values: Any) -> None:
         if progress_callback:
@@ -1508,6 +1510,7 @@ def run_generation_harness(
     repairs_in_generation = 0
     regeneration_count = 0
     while True:
+        document = None
         try:
             document = complete_provenance(parse_json_document(candidate))
             validate_document(
@@ -1524,13 +1527,29 @@ def run_generation_harness(
             if repairs_in_generation < repair_limit:
                 report(
                     "repair_requested", percent=60 + repairs_in_generation * 5,
-                    detail=f"검증 보정 {repairs_in_generation + 1}/{repair_limit} 요청 중",
+                    detail=f"검증·보완 중 · {repairs_in_generation + 1}/{repair_limit}회",
                     repair_count=repair_count + 1, regeneration_count=regeneration_count,
                     validation_error=str(validation_error)[:300],
                 )
-                repaired_candidate = generate(build_repair_prompt(
-                    candidate, validation_error, locked_plan, asset_index,
-                ))
+                scene = target_scene(document, validation_error) if isinstance(document, dict) else None
+                if scene:
+                    report('repair_requested', percent=60 + repairs_in_generation * 5,
+                           detail=f"검증·보완 중 · {repairs_in_generation + 1}/{repair_limit}회 · {scene['id']}")
+                    response = generate(repair_prompt(document, scene, validation_error, asset_index))
+                    try:
+                        repaired_candidate = apply_patch_response(document, scene, response)
+                    except (ValueError, TypeError, KeyError) as patch_error:
+                        diagnose('scene_patch_rejected', response, patch_error, scene_id=scene['id'])
+                        repaired_candidate = candidate
+                    diagnose('scene_patch_attempt', repaired_candidate, validation_error,
+                             scene_id=scene['id'], before_scene=scene,
+                             after_scene=next((s for s in json.loads(repaired_candidate)['production']['timeline']['scenes']
+                                               if s.get('id') == scene['id']), None),
+                             attempt=repairs_in_generation + 1)
+                else:
+                    repaired_candidate = generate(build_repair_prompt(
+                        candidate, validation_error, locked_plan, asset_index,
+                    ))
                 # A provider can return a valid JSON error envelope for a
                 # transient failure. Keep the last content document in that
                 # case instead of replacing it with {"error": ...}.
@@ -1560,7 +1579,7 @@ def run_generation_harness(
                 repair_count += 1
                 repairs_in_generation += 1
                 continue
-            if regeneration_count >= MAX_FRESH_REGENERATIONS:
+            if regeneration_count >= max_fresh_regenerations:
                 raise
             # Repeatedly patching a malformed structure tends to preserve the
             # same defect.  Discard it after three repairs and ask for one
