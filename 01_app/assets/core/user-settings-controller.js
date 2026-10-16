@@ -134,7 +134,10 @@
           setAutomationBusy(true);saveStatus.textContent='서버에 반영 중…';
           try{
             const payload={action,request_id:crypto.randomUUID(),version:serverVersion};
-            if(['save','start'].includes(action))payload.config=configOverride||collectAutomationConfig();
+            if(['save','start'].includes(action)){
+              const {brand_versions,brand_settings,...config}=configOverride||collectAutomationConfig();
+              payload.config=config;
+            }
             if(runId)payload.run_id=runId;
             const data=await api('/api/automation',{method:'POST',body:JSON.stringify(payload)});
             applyServerSettings(data,dialog.open);saveStatus.textContent=action==='save'?'서버에 저장했습니다. 자동화는 중지 상태입니다.':action==='start'?'자동화를 시작했습니다. 첫 콘텐츠가 곧 생성됩니다.':'반영했습니다. 이미 시작한 외부 요청은 완료될 수 있습니다.';

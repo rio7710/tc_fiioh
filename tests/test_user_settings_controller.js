@@ -153,6 +153,8 @@ assert.equal(fixture.get('#userSettingsOpen').listeners.get('click').length, 1, 
   assert.equal(closeOnly.requests.some(([, options]) => options?.method === 'POST' && JSON.parse(options.body).action === 'start'), false, 'closing settings never starts automation implicitly');
 
   const indexControl = harness({automationData: {settings: {version: 3, enabled: false, config: {
+    schema_version: '1.0.0', brand_versions: {outro: 7}, brand_settings: {outro: {alpha: 0.5}},
+    render: {music: 'none', volume: 0.3},
     endpoint: '2', repeat: {interval: 1, unit: 'day'}, keywords: {count: 3, ai: true, month: ''},
     video: {scene_count: 0, crop: 'default'}, voice: {profile_id: 'warm_female'},
     brand: {intro: false, outro: false, watermark: false}, channels: []
@@ -163,6 +165,10 @@ assert.equal(fixture.get('#userSettingsOpen').listeners.get('click').length, 1, 
   await indexControl.get('#userAutomationToggle').emit('change');
   const indexStart = indexControl.requests.find(([, options]) => options?.method === 'POST' && JSON.parse(options.body).action === 'start');
   assert.equal(JSON.parse(indexStart[1].body).config.endpoint, '2', 'index switch starts with the server-saved configuration');
+  const sentConfig = JSON.parse(indexStart[1].body).config;
+  assert.equal('brand_versions' in sentConfig, false, 'server-owned versions are not resubmitted');
+  assert.equal('brand_settings' in sentConfig, false, 'server-owned brand snapshots are not resubmitted');
+  assert.deepEqual(sentConfig.render, {music: 'none', volume: 0.3}, 'saved render options survive restart');
   assert.equal(indexControl.get('#userSettingsDialog').open, false, 'index switch does not need to open settings');
   const activeControl = harness({automationData: {settings: {version: 4, enabled: true, config: {
     endpoint: '2', repeat: {interval: 1, unit: 'day'}, keywords: {count: 3, ai: true, month: ''},
