@@ -67,7 +67,7 @@ class CompositionRuleTests(unittest.TestCase):
 
     def test_storyboard_prompt_includes_main_extra_motion_and_shot_delta(self):
         prompt=build_prompt(['산책'],'격리 테스트 자료',reference_material='')
-        for phrase in ['MAIN SUBJECT SAFE FRAME','BACKGROUND CAST LEDGER','AMBIENT MOTION','SHOT DELTA PLAN','SOFT DEPTH OF FIELD','선택적 연출 지침','엑스트라는 일부 잘리거나','의자에 앉은 사람이 씬마다 교체','인접 씬은 한눈에 구분','레터박스는 절대 금지','주인공 한 명을 중심으로 정돈된 정면 구도','어르신의 선택과 속도를 존중','180도 동작축의 같은 편','원형은 원형']:
+        for phrase in ['MAIN SUBJECT SAFE FRAME','BACKGROUND CAST LEDGER','AMBIENT MOTION','SHOT DELTA PLAN','SOFT DEPTH OF FIELD','SOFT COLOR TEMPERATURE','5000~5500K','선택적 연출 지침','선택적 색보정 지침','엑스트라는 일부 잘리거나','의자에 앉은 사람이 씬마다 교체','인접 씬은 한눈에 구분','레터박스는 절대 금지','주인공 한 명을 중심으로 정돈된 정면 구도','어르신의 선택과 속도를 존중','180도 동작축의 같은 편','원형은 원형']:
             self.assertIn(phrase,prompt)
     def test_image_lock_keeps_declared_extras_and_motion_is_secondary(self):
         server=load_render_server()
@@ -86,6 +86,9 @@ class CompositionRuleTests(unittest.TestCase):
         self.assertIn('FURNITURE GEOMETRY LOCK',prompt)
         self.assertIn('SOFT DEPTH OF FIELD',prompt)
         self.assertIn('This is optional visual guidance, never a validity requirement.',prompt)
+        self.assertIn('SOFT COLOR TEMPERATURE',prompt)
+        self.assertIn('5000–5500K',prompt)
+        self.assertIn('This is optional color guidance, never a validity requirement.',prompt)
         self.assertIn('camera_axis_transition',prompt)
         self.assertIn('AMBIENT MOTION',server.KLING_I2V_HARNESS)
         self.assertIn('never add foliage',server.KLING_I2V_HARNESS)
