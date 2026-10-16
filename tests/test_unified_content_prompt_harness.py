@@ -958,7 +958,7 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(UnifiedContentError, "장소가 직접 바뀌었습니다"):
             validate_transition_bridge_routes(value, catalog)
 
-    def test_transition_bridge_rejects_first_last_and_same_destination(self):
+    def test_transition_bridge_rejects_first_and_last_but_allows_same_destination(self):
         catalog = {
             "ref-location-a":{"id":"ref-location-a","kind":"location","status":"ready"},
             "ref-location-bridge":{"id":"ref-location-bridge","kind":"location","status":"ready","assignment":"connector_corridor"},
@@ -991,10 +991,9 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
             "ref-location-a", "ref-location-bridge", "ref-location-bridge",
             "ref-location-bridge", "ref-location-b"
         ), catalog)
-        with self.assertRaisesRegex(UnifiedContentError, "서로 다른"):
-            validate_transition_bridge_routes(value_for(
-                "ref-location-a", "ref-location-bridge", "ref-location-a"
-            ), catalog)
+        validate_transition_bridge_routes(value_for(
+            "ref-location-a", "ref-location-bridge", "ref-location-a"
+        ), catalog)
 
     def test_direct_location_edit_is_allowed_without_registered_transition_bridge(self):
         value = document(["안심"])

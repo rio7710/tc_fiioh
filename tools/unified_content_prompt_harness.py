@@ -31,7 +31,7 @@ PRODUCTION_SECTION_KEYS = (
     "timeline", "narration_cues", "postproduction", "output",
 )
 MAX_VALIDATION_REPAIRS = 3
-MAX_FRESH_REGENERATIONS = 1
+MAX_FRESH_REGENERATIONS = 2
 MAX_TARGETED_POLICY_REPAIRS = 1
 
 
@@ -1000,10 +1000,6 @@ def validate_transition_bridge_routes(
         if not origin or not destination:
             raise UnifiedContentError(
                 f"{scene_id} 전환 전용 연결 복도 앞뒤에는 출발 장소와 목적지 장소가 필요합니다"
-            )
-        if origin == destination:
-            raise UnifiedContentError(
-                f"{scene_id} 전환 전용 연결 복도는 서로 다른 출발 장소와 목적지를 연결해야 합니다"
             )
         index += 1
 

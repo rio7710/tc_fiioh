@@ -90,6 +90,7 @@ class SoftValidationRecoveryTests(unittest.TestCase):
         self.assertEqual(3, harness.validation_repair_limit(
             UnifiedContentError("schema validation failed")
         ))
+        self.assertEqual(2, harness.MAX_FRESH_REGENERATIONS)
 
 
 if __name__ == "__main__":
