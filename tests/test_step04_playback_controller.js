@@ -29,9 +29,11 @@ const root = { querySelector: selector => nodes[selector] || null, querySelector
 let selected = 'satie';
 let catalog = { music: { satie: { uri: 'media/catalog-satie.mp3' } } };
 let saves = 0, syncs = 0, stops = 0, narrationSyncs = 0, panUpdates = 0, errors = 0;
+let previewDuration = 60;
 const controller = PlaybackController.create({
   root, getSelectedMusic: () => selected, setSelectedMusic: value => { selected = value; }, getCatalog: () => catalog,
   getCurrentVolume: () => 0.5,
+  getPreviewDuration: () => previewDuration,
   saveEditorSettings: () => { saves += 1; }, sync: () => { syncs += 1; }, stopNarration: () => { stops += 1; },
   syncNarration: (time, force) => { assert.equal(time, video.currentTime); assert.equal(force, true); narrationSyncs += 1; },
   updatePanAvailability: () => { panUpdates += 1; }, onError: () => { errors += 1; }
@@ -68,6 +70,12 @@ assert.equal(bgm.currentTime, 0, 'drift above 0.25 is corrected to the trimmed m
 video.currentTime = 0; video.emit('timeupdate'); assert.equal(bgm.volume, 0, 'music starts silent at the trimmed three-second source point');
 video.currentTime = 1; video.emit('timeupdate'); assert.equal(bgm.volume, 0.25, 'music fades to half of the selected volume after one second');
 video.currentTime = 2; video.emit('timeupdate'); assert.equal(bgm.volume, 0.5, 'music fade-in completes after two seconds');
+assert.equal(controller.syncMusicVolume(58), 0.5, 'tail begins at selected volume');
+assert.equal(controller.syncMusicVolume(59), 0.25, 'tail fades without boosting music');
+assert.equal(controller.syncMusicVolume(60), 0, 'project end is silent');
+previewDuration = 600;
+assert.equal(controller.syncMusicVolume(599), 0.25, 'fade follows actual project length');
+assert.equal(controller.syncMusicVolume(46), 0.5, 'sample video duration does not affect gain');
 
 video.paused = true; controller.togglePlay(); assert.equal(video.playCount, 1);
 video.paused = false; controller.togglePlay(); assert.equal(video.pauseCount, 1);

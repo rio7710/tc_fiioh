@@ -488,9 +488,9 @@ def _mux_audio(
         input_index += 1
     if len(labels) > 1:
         filters.append(
-            "".join(labels) + f"amix=inputs={len(labels)}:duration=longest:dropout_transition=0,"
+            "".join(labels) + f"amix=inputs={len(labels)}:duration=longest:dropout_transition=0:normalize=0,"
             f"atrim=duration={output_duration:.6f},apad=whole_dur={output_duration:.6f},"
-            "alimiter=limit=0.95[aout]"
+            "alimiter=limit=0.95:level=0[aout]"
         )
     elif labels:
         filters.append(labels[0] + f"atrim=duration={output_duration:.6f},apad=whole_dur={output_duration:.6f}[aout]")

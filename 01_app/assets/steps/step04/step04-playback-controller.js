@@ -34,7 +34,8 @@
       const number = (value, fallback) => Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : fallback;
       return {
         startOffset: number(defaults.music_start_offset_seconds, 3),
-        fadeIn: number(defaults.music_fade_in_seconds, 2)
+        fadeIn: number(defaults.music_fade_in_seconds, 2),
+        fadeOut: number(defaults.music_fade_out_seconds, 2)
       };
     }
 
@@ -42,10 +43,12 @@
       const bgm = query('#bgm');
       if (!bgm) return 0;
       const timelineTime = Math.max(0, Number(time ?? previewTime(query('#video'))) || 0);
-      const fadeIn = musicTiming().fadeIn;
+      const {fadeIn, fadeOut} = musicTiming();
+      const duration = Number(deps.getPreviewDuration?.()) || 0;
       const target = Math.max(0, Math.min(1, Number(deps.getCurrentVolume?.()) || 0));
       const gain = fadeIn > 0 ? Math.max(0, Math.min(1, timelineTime / fadeIn)) : 1;
-      bgm.volume = target * gain;
+      const endGain = duration > 0 && fadeOut > 0 ? Math.max(0, Math.min(1, (duration - timelineTime) / fadeOut)) : 1;
+      bgm.volume = target * Math.min(gain, endGain);
       return bgm.volume;
     }
 

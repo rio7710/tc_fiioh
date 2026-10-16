@@ -64,6 +64,10 @@
     onError: (message, error) => console.error(message, error)
   });
   const playbackController = PlaybackController.create({
+    getPreviewDuration: () => {
+      const scenes = timelineOrchestrator?.getScenes() || [];
+      return Number(scenes[scenes.length - 1]?.end) || 0;
+    },
     getPreviewTime: () => timelineOrchestrator?.getPreviewTime() || 0,
     preparePlay: () => {
       const scenes = timelineOrchestrator.getScenes();
