@@ -79,7 +79,7 @@ class RecoveryTests(unittest.TestCase):
         try:
             with mock.patch('automation_runner.urlopen', side_effect=HTTPError('url', 400, 'invalid', {}, body)):
                 with self.assertRaises(ContentRepairExhausted):
-                    api.call('/api/script/generate', {})
+                    api.call('/api/script/plan', {})
         finally:
             api.close()
 

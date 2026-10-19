@@ -14,6 +14,7 @@ from urllib.parse import quote
 from automation_store import STAGES
 from automation_errors import AdapterFailure, ContentRepairExhausted, RenderResultUnknown, RenderTerminalFailure
 from automation_recovery import is_content_repair_failure
+from automation_script_job import generate_via_script_job
 from final_export_recovery import FinalExportRecoveryAdapter as _FinalExportAdapter
 from worker_core import JobConflict, WorkerRuntimeSettings
 
@@ -59,6 +60,8 @@ class InternalAPI:
         self.auth.delete_session(self.token)
 
     def call(self, path, payload):
+        if path == '/api/script/generate':
+            return generate_via_script_job(self, payload)
         self.auth.delete_session(self.token)
         self.token = self.auth.create_session(self.user_id, days=1/8)
         body = json.dumps(payload, ensure_ascii=False).encode() if payload is not None else None

@@ -183,10 +183,11 @@ def append_script_diagnostic(values):
     return diagnostic
 
 
-def log_script_generation_failure(project_id, exc):
+def log_script_generation_failure(project_id, exc, *, job_id=None):
     diagnostic = {
         "event": "script_generation_failed",
         "project_id": project_id,
+        "job_id": job_id,
         "error_type": type(exc).__name__,
         "message": str(exc)[:800],
         "traceback": "".join(traceback.format_exception(exc))[-1600:],
@@ -2847,7 +2848,7 @@ def execute_render_request(
             render_lock.release()
 
 
-def execute_script_generation(user_id: str, project_id: str, progress_callback=None) -> dict:
+def execute_script_generation(user_id: str, project_id: str, progress_callback=None, *, job_id=None) -> dict:
     """Generate and persist STEP 03 without depending on an HTTP connection."""
     store = get_auth_store()
     project = store.get_project(user_id, project_id)
@@ -2892,7 +2893,7 @@ def execute_script_generation(user_id: str, project_id: str, progress_callback=N
         provider_values("openai").get("api_key", ""), labels, resources,
         previous_documents, script_plan_data["plan"], progress_callback=progress_callback,
         diagnostic_callback=lambda values: append_script_diagnostic({
-            "project_id": project_id, **values,
+            **values, "project_id": project_id, "job_id": job_id,
         }),
     )
     document = generated["document"]
@@ -2953,7 +2954,7 @@ def _run_script_job(job_id: str) -> None:
         })
         def progress(values):
             queue.update_progress(job_id, worker_id, values)
-        result = execute_script_generation(job["input"]["user_id"], job["project_id"], progress)
+        result = execute_script_generation(job["input"]["user_id"], job["project_id"], progress, job_id=job_id)
         scene_review = (result.get("generation") or {}).get("scene_review") or {}
         queue.update_progress(job_id, worker_id, {
             "phase": "completed", "percent": 100, "detail": "대본과 콘티 저장이 완료됐습니다.",
@@ -2961,7 +2962,7 @@ def _run_script_job(job_id: str) -> None:
         })
         queue.transition(job_id, "succeeded", result=result)
     except Exception as exc:
-        log_script_generation_failure(job["project_id"], exc)
+        log_script_generation_failure(job["project_id"], exc, job_id=job_id)
         safe = str(exc) if isinstance(exc, (ValueError, RuntimeError)) else "대본 생성을 완료하지 못했습니다."
         queue.transition(job_id, "failed", error={
             "code": type(exc).__name__, "message": safe[:500]
