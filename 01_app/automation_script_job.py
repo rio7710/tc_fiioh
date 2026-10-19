@@ -31,8 +31,12 @@ def generate_via_script_job(api, payload, *, sleep=time.sleep, poll_seconds=3):
                 raise AdapterFailure('완료된 대본 작업 결과를 확인하지 못했습니다.')
             return result
         if status == 'failed':
-            message = str((job.get('error') or {}).get('message') or '대본 생성 작업이 실패했습니다.')
-            if is_content_repair_failure('/api/script/generate', 400, message):
+            error = job.get('error') or {}
+            message = str(error.get('message') or '대본 생성 작업이 실패했습니다.')
+            structured = error.get('severity') is not None
+            recoverable = (error.get('code') in ('LOCATION_ACTIVITY_CONFLICT', 'LOCATION_REFERENCE_MULTIPLE')
+                           and error.get('retryable') is True and error.get('severity') == 'repairable')
+            if recoverable or (not structured and is_content_repair_failure('/api/script/generate', 400, message)):
                 raise ContentRepairExhausted(message)
             raise AdapterFailure(message)
         if status == 'cancelled':

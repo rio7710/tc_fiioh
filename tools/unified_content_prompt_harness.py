@@ -10,6 +10,9 @@ from typing import Any, Callable
 from tools.validate_unified_content import UnifiedContentError, validate_timeline
 from tools.location_activity_validation import validate_location_activity_policy, location_policy_context
 from tools.storyboard_issue import issue_details
+from tools.location_reference_validation import validate_location_references
+from tools.scene_structure_repair import structure_target, structure_prompt, apply_structure_response
+from tools.scene_activity_repair import activity_target, activity_prompt, apply_activity_response
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema_file
 from tools.scene_validation_repair import target_scene, repair_prompt, apply_patch_response
 from tools.reference_asset_index import (
@@ -830,6 +833,7 @@ def validate_transition_bridge_routes(
     canonical_assets: dict[str, dict[str, Any]] | None = None,
 ) -> None:
     """Validate explicitly used bridges; direct editorial location cuts are allowed."""
+    validate_location_references(document, canonical_assets)
     production = document.get("production") or {}
     scenes = (production.get("timeline") or {}).get("scenes") or []
     bridge_ids = transition_bridge_asset_ids(document, canonical_assets)
@@ -1113,6 +1117,7 @@ def validate_document(document: dict[str, Any], selected_keywords: list[str], st
     if actual != selected_keywords:
         raise UnifiedContentError("project.selected_keywords must exactly preserve the input order and values")
     validate_character_reference_versions(document)
+    validate_location_references(document, canonical_reference_assets)
     if strict_schema:
         validate_scene_reference_media(document)
     validate_visual_continuity(document, canonical_reference_assets)
@@ -1411,7 +1416,46 @@ def run_generation_harness(
                     validation_error=str(validation_error)[:300],
                 )
                 scene = target_scene(document, validation_error) if isinstance(document, dict) else None
-                if scene:
+                structural = structure_target(document, validation_error, canonical_reference_assets) if document else None
+                activity = activity_target(document, validation_error) if document else None
+                if activity:
+                    activity_scene, paths = activity
+                    response = generate(activity_prompt(document, activity_scene, paths, validation_error))
+                    repaired_candidate = candidate
+                    try:
+                        repaired = apply_activity_response(document, activity_scene, paths, response)
+                        validate_document(repaired, selected_keywords, strict_schema, locked_plan,
+                                          canonical_reference_assets=canonical_reference_assets)
+                        repaired_candidate = json.dumps(repaired, ensure_ascii=False)
+                        diagnose('activity_patch_accepted', repaired_candidate, validation_error,
+                                 scene_id=activity_scene['id'], before_scene=activity_scene,
+                                 after_scene=next(s for s in repaired['production']['timeline']['scenes']
+                                                  if s['id'] == activity_scene['id']))
+                    except (ValueError, TypeError, KeyError) as patch_error:
+                        diagnose('activity_patch_rejected', response, patch_error,
+                                 scene_id=activity_scene['id'], before_scene=activity_scene)
+                elif structural:
+                    structural_scene, choices = structural
+                    response = generate(structure_prompt(document, structural_scene, choices, canonical_reference_assets))
+                    repaired_candidate = candidate
+                    try:
+                        repaired = apply_structure_response(document, structural_scene, choices,
+                                                            canonical_reference_assets, response)
+                        validate_document(repaired, selected_keywords, strict_schema, locked_plan,
+                                          canonical_reference_assets=canonical_reference_assets)
+                        repaired_candidate = json.dumps(repaired, ensure_ascii=False)
+                        diagnose('structure_patch_accepted', repaired_candidate, validation_error,
+                                 scene_id=structural_scene['id'], before_scene=structural_scene,
+                                 after_scene=next(s for s in repaired['production']['timeline']['scenes']
+                                                  if s['id'] == structural_scene['id']))
+                    except (ValueError, TypeError, KeyError) as patch_error:
+                        diagnose('structure_patch_rejected', response, patch_error,
+                                 scene_id=structural_scene['id'], before_scene=structural_scene)
+                elif issue_details(validation_error).get('code') in ('LOCATION_REFERENCE_MULTIPLE', 'LOCATION_ACTIVITY_CONFLICT'):
+                    # Do not fall back to full-document rewriting when registered
+                    # candidates are missing or the choice cannot be safely gated.
+                    raise validation_error
+                elif scene:
                     report('repair_requested', percent=60 + repairs_in_generation * 5,
                            detail=f"검증·보완 중 · {repairs_in_generation + 1}/{repair_limit}회 · {scene['id']}")
                     response = generate(repair_prompt(document, scene, validation_error, asset_index))

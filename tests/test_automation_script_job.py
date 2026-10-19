@@ -53,6 +53,21 @@ class ScriptQueueAdapterTests(unittest.TestCase):
             generate_via_script_job(api, {}, sleep=lambda _: None)
         self.assertNotIsInstance(error.exception, ContentRepairExhausted)
 
+    def test_structured_location_failure_does_not_depend_on_message(self):
+        api = self.api({'job_id': 'a'}, {'status': 'failed', 'error': {
+            'code': 'LOCATION_REFERENCE_MULTIPLE', 'severity': 'repairable',
+            'retryable': True, 'message': '장소 레퍼런스 선택 오류'}})
+        with self.assertRaises(ContentRepairExhausted):
+            generate_via_script_job(api, {}, sleep=lambda _: None)
+
+    def test_structured_hard_failure_never_uses_legacy_message_match(self):
+        api = self.api({'job_id': 'a'}, {'status': 'failed', 'error': {
+            'code': 'ASSET_FILE_MISSING', 'severity': 'hard',
+            'retryable': False, 'message': 'scene-01 오류'}})
+        with self.assertRaises(AdapterFailure) as caught:
+            generate_via_script_job(api, {}, sleep=lambda _: None)
+        self.assertNotIsInstance(caught.exception, ContentRepairExhausted)
+
     def test_cancelled_job_stops_pipeline(self):
         api = self.api({'job_id': 'a'}, {'status': 'cancelled'})
         with self.assertRaises(InterruptedError):
