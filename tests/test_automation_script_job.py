@@ -68,6 +68,13 @@ class ScriptQueueAdapterTests(unittest.TestCase):
             generate_via_script_job(api, {}, sleep=lambda _: None)
         self.assertNotIsInstance(caught.exception, ContentRepairExhausted)
 
+    def test_table_conflict_is_recoverable_even_with_reference_word(self):
+        api = self.api({'job_id': 'a'}, {'status': 'failed', 'error': {
+            'code': 'TABLE_GEOMETRY_CONFLICT', 'severity': 'repairable', 'retryable': True,
+            'message': 'scene-01: 기준 장소 레퍼런스와 테이블 형태 충돌'}})
+        with self.assertRaises(ContentRepairExhausted):
+            generate_via_script_job(api, {}, sleep=lambda _: None)
+
     def test_cancelled_job_stops_pipeline(self):
         api = self.api({'job_id': 'a'}, {'status': 'cancelled'})
         with self.assertRaises(InterruptedError):

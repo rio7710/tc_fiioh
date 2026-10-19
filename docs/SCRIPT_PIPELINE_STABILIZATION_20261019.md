@@ -132,3 +132,4 @@ python3 tools/lint_project.py
 - 미완료: 장소 참조 오류 코드 분리, 제한된 구조 패치와 전체 재검증 후 채택, S5 실사용 3회. 이 항목들은 이번 장소 정책 패치와 별도로 계속 검증해야 한다.
 - 장소 정책 패치 검증: Python 393개와 전체 JS·랜덤 API/worker·lifecycle·lint 종료 코드 0. 실행 중 작업 0건 확인 후 API·worker에 배포했다. 실제 GPT 신규 제작 및 캘린더 E2E 3회는 아직 수행하지 않았다.
 - 후속 부분 보정 검증: 복도 자산 유무와 독립적으로 장소 중복 검사, LOCATION_REFERENCE_MULTIPLE 코드 분리, 코드 기반 복구 판정, 제한된 장소 선택·활동 텍스트 패치 구현. 전체 Python 401개 및 JS/API/worker/lifecycle/lint 종료 코드 0. 실제 제작 검증은 다음 단계이며 완료로 집계하지 않는다.
+- 실제 배치 결과: 1개 최종 영상·캘린더 성공, 1개 테이블 충돌 실패, 1개 미시작. 테이블 복구 패치 및 실제 GPT 부분 보정 3회 결과는 [별도 리포트](TABLE_GEOMETRY_RECOVERY_REPORT_20261019.md)에 기록했다. S5 전체 제작 3회 성공은 아직 미완료다.

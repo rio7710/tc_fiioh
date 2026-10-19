@@ -20,6 +20,7 @@ COPY tools/scene_validation_repair.py /app/tools/scene_validation_repair.py
 COPY tools/location_activity_validation.py tools/visible_activity.py tools/storyboard_issue.py /app/tools/
 COPY tools/location_reference_validation.py tools/scene_structure_repair.py /app/tools/
 COPY tools/scene_activity_repair.py /app/tools/
+COPY tools/table_geometry_repair.py /app/tools/
 COPY tools/reference_asset_index.py /app/tools/reference_asset_index.py
 COPY tools/validate_unified_content.py /app/tools/validate_unified_content.py
 COPY tools/validate_json_schema.py /app/tools/validate_json_schema.py

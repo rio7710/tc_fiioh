@@ -13,6 +13,7 @@ from tools.storyboard_issue import issue_details
 from tools.location_reference_validation import validate_location_references
 from tools.scene_structure_repair import structure_target, structure_prompt, apply_structure_response
 from tools.scene_activity_repair import activity_target, activity_prompt, apply_activity_response
+from tools.table_geometry_repair import geometry_conflict, table_target, table_prompt, apply_table_response
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema_file
 from tools.scene_validation_repair import target_scene, repair_prompt, apply_patch_response
 from tools.reference_asset_index import (
@@ -959,7 +960,7 @@ def validate_visual_continuity(
         return found
 
     continuity = production.get("continuity") or {}
-    property_texts = [_text(item) for item in continuity.get("props", []) if isinstance(item, (dict, str))]
+    property_texts = [_text(item) for item in continuity.get("props", [])]
     property_geometry = " ".join(property_texts)
     all_props_shapes = shapes_in(property_geometry)
     location_terms = ("휴게실", "가족상담실", "상담실", "식당", "로비", "옥상정원",
@@ -971,7 +972,7 @@ def validate_visual_continuity(
         for asset in assets if isinstance(asset, dict)
         and str(asset.get("kind", "")).lower() in {"location", "facility"}
     }
-    for scene in scenes:
+    for scene_index, scene in enumerate(scenes):
         prompt = _text(scene.get("image_prompt"))
         scene_location_ids = [str(item) for item in (scene.get("reference_ids") or [])
                               if str(item) in location_ids]
@@ -984,16 +985,22 @@ def validate_visual_continuity(
         scene_context = " ".join((str(scene.get("title", "")), prompt, reference_text,
                                    *(_text(sequence.get(key)) for key in ("entry_action", "exit_action", "continuity_anchor"))))
         scene_places = [term for term in location_terms if term in scene_context]
-        scene_props = [text for text in property_texts
-                       if any(term in text for term in scene_places)]
-        props_shapes = shapes_in(" ".join(scene_props)) if scene_props else all_props_shapes
+        prop_indices = [i for i, text in enumerate(property_texts)
+                        if any(term in text for term in scene_places)]
+        if not prop_indices:
+            # A ledger entry naming another room is not a global geometry rule.
+            prop_indices = [i for i, text in enumerate(property_texts)
+                            if not any(term in text for term in location_terms)]
+        scene_props = [property_texts[i] for i in prop_indices]
+        props_shapes = shapes_in(" ".join(scene_props))
         if reference_shapes and props_shapes:
             compatible_shapes = reference_shapes & props_shapes
             if not compatible_shapes:
-                raise UnifiedContentError("기준 장소 레퍼런스와 continuity.props의 테이블 형태가 서로 충돌합니다")
+                raise geometry_conflict(scene, scene_index, prop_indices, scene_location_ids,
+                                        reference_shapes, props_shapes)
         else:
             compatible_shapes = reference_shapes or props_shapes
-        table_in_scope = "테이블" in prompt or "테이블" in property_geometry or "테이블" in reference_text
+        table_in_scope = "테이블" in prompt or "테이블" in " ".join(scene_props) or "테이블" in reference_text
         prompt_lower = prompt.lower()
         reference_lock_terms = (
             "기준 레퍼런스", "레퍼런스대로", "참조 이미지", "참조 레퍼런스",
@@ -1418,7 +1425,21 @@ def run_generation_harness(
                 scene = target_scene(document, validation_error) if isinstance(document, dict) else None
                 structural = structure_target(document, validation_error, canonical_reference_assets) if document else None
                 activity = activity_target(document, validation_error) if document else None
-                if activity:
+                table_paths = table_target(document, validation_error) if document else None
+                if table_paths:
+                    response = generate(table_prompt(document, validation_error, table_paths))
+                    repaired_candidate = candidate
+                    try:
+                        repaired = apply_table_response(document, validation_error, table_paths, response)
+                        validate_document(repaired, selected_keywords, strict_schema, locked_plan,
+                                          canonical_reference_assets=canonical_reference_assets)
+                        repaired_candidate = json.dumps(repaired, ensure_ascii=False)
+                        diagnose('table_patch_accepted', repaired_candidate, validation_error,
+                                 before_document=document, after_document=repaired)
+                    except (ValueError, TypeError, KeyError) as patch_error:
+                        diagnose('table_patch_rejected', response, patch_error,
+                                 original_issue=issue_details(validation_error))
+                elif activity:
                     activity_scene, paths = activity
                     response = generate(activity_prompt(document, activity_scene, paths, validation_error))
                     repaired_candidate = candidate
@@ -1451,7 +1472,7 @@ def run_generation_harness(
                     except (ValueError, TypeError, KeyError) as patch_error:
                         diagnose('structure_patch_rejected', response, patch_error,
                                  scene_id=structural_scene['id'], before_scene=structural_scene)
-                elif issue_details(validation_error).get('code') in ('LOCATION_REFERENCE_MULTIPLE', 'LOCATION_ACTIVITY_CONFLICT'):
+                elif issue_details(validation_error).get('code') in ('LOCATION_REFERENCE_MULTIPLE', 'LOCATION_ACTIVITY_CONFLICT', 'TABLE_GEOMETRY_CONFLICT'):
                     # Do not fall back to full-document rewriting when registered
                     # candidates are missing or the choice cannot be safely gated.
                     raise validation_error

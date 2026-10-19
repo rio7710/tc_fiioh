@@ -20,6 +20,7 @@ COPY --chown=appuser:appuser tools/scene_validation_repair.py /app/tools/scene_v
 COPY --chown=appuser:appuser tools/location_activity_validation.py tools/visible_activity.py tools/storyboard_issue.py /app/tools/
 COPY --chown=appuser:appuser tools/location_reference_validation.py tools/scene_structure_repair.py /app/tools/
 COPY --chown=appuser:appuser tools/scene_activity_repair.py /app/tools/
+COPY --chown=appuser:appuser tools/table_geometry_repair.py /app/tools/
 COPY --chown=appuser:appuser tools/reference_asset_index.py /app/tools/reference_asset_index.py
 COPY --chown=appuser:appuser tools/validate_unified_content.py /app/tools/validate_unified_content.py
 COPY --chown=appuser:appuser tools/validate_json_schema.py /app/tools/validate_json_schema.py

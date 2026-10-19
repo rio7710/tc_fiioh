@@ -34,7 +34,7 @@ def generate_via_script_job(api, payload, *, sleep=time.sleep, poll_seconds=3):
             error = job.get('error') or {}
             message = str(error.get('message') or '대본 생성 작업이 실패했습니다.')
             structured = error.get('severity') is not None
-            recoverable = (error.get('code') in ('LOCATION_ACTIVITY_CONFLICT', 'LOCATION_REFERENCE_MULTIPLE')
+            recoverable = (error.get('code') in ('LOCATION_ACTIVITY_CONFLICT', 'LOCATION_REFERENCE_MULTIPLE', 'TABLE_GEOMETRY_CONFLICT')
                            and error.get('retryable') is True and error.get('severity') == 'repairable')
             if recoverable or (not structured and is_content_repair_failure('/api/script/generate', 400, message)):
                 raise ContentRepairExhausted(message)
