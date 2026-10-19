@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from tools.validate_unified_content import UnifiedContentError, validate_timeline
+from tools.location_activity_validation import validate_location_activity_policy, location_policy_context
+from tools.storyboard_issue import issue_details
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema_file
 from tools.scene_validation_repair import target_scene, repair_prompt, apply_patch_response
 from tools.reference_asset_index import (
@@ -627,130 +629,6 @@ def _all_text(value: Any) -> str:
     return str(value or "")
 
 
-def validate_location_activity_policy(
-    document: dict[str, Any],
-    canonical_assets: dict[str, dict[str, Any]] | None = None,
-) -> None:
-    """Keep therapy, dining, and event scenes in their registered spaces."""
-    policy = json.loads(LOCATION_ACTIVITY_POLICY_PATH.read_text(encoding="utf-8"))
-    classification = policy.get("classification") or {}
-    location_roles = policy.get("location_roles") or {}
-    activity_classes = policy.get("activity_classes") or {}
-    production = document.get("production") or {}
-    scenes = (production.get("timeline") or {}).get("scenes") or []
-    document_assets = {
-        str(asset.get("id")): asset
-        for asset in (production.get("reference_assets") or [])
-        if isinstance(asset, dict) and asset.get("id")
-    }
-    catalog = dict(document_assets)
-    for reference_id, asset in (canonical_assets or {}).items():
-        if isinstance(asset, dict):
-            catalog[str(reference_id)] = asset
-
-    def contains_any(text: str, terms: list[Any]) -> bool:
-        lowered = text.lower()
-        return any(str(term).strip().lower() in lowered for term in terms if str(term).strip())
-
-    def asset_role(asset: dict[str, Any]) -> str | None:
-        if str(asset.get("kind", "")).lower() not in {"location", "facility"}:
-            return None
-        if str(asset.get("usage_role", "")).lower() in {
-            str(item).lower() for item in classification.get("excluded_usage_roles") or []
-        }:
-            return None
-        if str(asset.get("assignment", "")).lower() in {
-            str(item).lower() for item in classification.get("excluded_assignments") or []
-        }:
-            return None
-        explicit_roles = {
-            str(asset.get(field) or "").strip()
-            for field in classification.get("explicit_role_fields") or []
-            if str(asset.get(field) or "").strip()
-        }
-        unknown_roles = explicit_roles - set(location_roles)
-        if unknown_roles:
-            raise UnifiedContentError(
-                f"장소 레퍼런스 {asset.get('id', 'unknown')}의 전용 용도 값이 올바르지 않습니다: "
-                f"{', '.join(sorted(unknown_roles))}"
-            )
-        if len(explicit_roles) > 1:
-            raise UnifiedContentError(
-                f"장소 레퍼런스 {asset.get('id', 'unknown')}의 전용 용도 분류가 중복됩니다: "
-                f"{', '.join(sorted(explicit_roles))}"
-            )
-        if explicit_roles:
-            return next(iter(explicit_roles))
-        exact_matches = [
-            role for role, spec in location_roles.items()
-            if str(asset.get("id") or "") in (spec.get("asset_ids") or [])
-        ]
-        if len(exact_matches) > 1:
-            raise UnifiedContentError(
-                f"장소 레퍼런스 {asset.get('id', 'unknown')}의 용도 분류가 중복됩니다: "
-                f"{', '.join(exact_matches)}"
-            )
-        if exact_matches:
-            return exact_matches[0]
-        searchable = _all_text({
-            key: asset.get(key) for key in
-            classification.get("identity_fields") or
-            ("id", "uri", "source_filename", "display_name", "aliases")
-        })
-        matches = [
-            role for role, spec in location_roles.items()
-            if contains_any(searchable, spec.get("location_terms") or [])
-        ]
-        if len(matches) > 1:
-            raise UnifiedContentError(
-                f"장소 레퍼런스 {asset.get('id', 'unknown')}의 용도 분류가 중복됩니다: {', '.join(matches)}"
-            )
-        return matches[0] if matches else None
-
-    for scene in scenes:
-        if not isinstance(scene, dict):
-            continue
-        location_role_set = {
-            role for reference_id in (scene.get("reference_ids") or [])
-            if isinstance(catalog.get(str(reference_id)), dict)
-            for role in [asset_role(catalog[str(reference_id)])]
-            if role
-        }
-        # Location policy concerns what is visibly staged in the room. Narration
-        # may legitimately mention a previous or next activity without placing it
-        # in the current space, so only visual/action planning fields are scanned.
-        scene_content = {
-            key: scene.get(key) for key in
-            ("title", "description", "visual", "image_prompt", "motion_prompt", "sequence", "camera")
-            if scene.get(key) is not None
-        }
-        scene_text = _all_text(scene_content)
-        activities = {
-            activity for activity, spec in activity_classes.items()
-            if contains_any(scene_text, spec.get("terms") or [])
-        }
-        scene_id = str(scene.get("id") or "scene")
-        for role in location_role_set:
-            required = location_roles.get(role, {}).get("required_activity")
-            if required and required not in activities:
-                label = location_roles[role].get("label", role)
-                activity_label = activity_classes.get(required, {}).get("label", required)
-                raise UnifiedContentError(
-                    f"{scene_id}: {label} 장면에는 {activity_label} 행동만 배치해야 합니다"
-                )
-            if required and any(activity != required for activity in activities):
-                label = location_roles[role].get("label", role)
-                raise UnifiedContentError(
-                    f"{scene_id}: {label} 장면에 다른 용도의 행동을 함께 배치할 수 없습니다"
-                )
-        for activity in activities:
-            required_role = activity_classes.get(activity, {}).get("required_location_role")
-            if required_role and required_role not in location_role_set:
-                activity_label = activity_classes[activity].get("label", activity)
-                location_label = location_roles.get(required_role, {}).get("label", required_role)
-                raise UnifiedContentError(
-                    f"{scene_id}: {activity_label} 장면은 {location_label} 레퍼런스를 사용해야 합니다"
-                )
 
 
 def _has_visible_axis_crossing(scene: dict[str, Any]) -> bool:
@@ -1303,7 +1181,7 @@ def build_repair_prompt(candidate: str, error: Exception,
         "테이블 형태 누락 오류라면 오류에 표시된 한국어 형태명을 해당 scene의 image_prompt.text에 직접 넣고, continuity.props 및 기준 레퍼런스와 일치시킨다.\n"
         "캐릭터 버전 오류라면 해당 character_id에 등록된 V2 reference asset 하나를 선택해 모든 씬의 reference_ids에서 동일하게 사용한다. V2가 없는 캐릭터만 V1을 유지하며, 동일 캐릭터의 의상 variant도 콘티 중간에 바꾸지 않는다.\n"
         "장소 사이 연결 복도는 소프트 연출 권고이며 필수가 아니다. 복도 없이 다음 장소 내부로 직접 편집 전환해도 유효하므로 복도 누락만으로 씬을 추가하거나 재작성하지 않는다. 복도를 사용할 때만 등록된 ready 자산을 사용하고 첫 씬·마지막 씬을 피하며 앞뒤 출발·목적지 장소를 명시한다. 문·문손잡이·문턱 통과를 생성하지 않는다.\n"
-        "장소 용도 오류라면 물리치료실에는 물리치료·재활치료 행동만, 식당·식사 공간에는 식사 행동만 남긴다. 꽃꽂이·공예·미술·음악·원예·레크리에이션·생일·기념·공연·모임 같은 기타 행사·프로그램은 로비 reference로 옮기고 image_prompt, motion_prompt, sequence의 장소와 행동을 함께 맞춘다.\n"
+        f"장소 용도 보정은 다음 공통 정책을 따른다. 휴식 장면을 강제로 치료·식사로 변경하지 않는다:\n{location_policy_context()}\n"
         "참조 자산 오류라면 제공된 레퍼런스 인덱스의 정식 character/location 자산만 사용하고 id·uri·status·버전·의상 값을 추측하거나 변형하지 않는다. style은 연출 메타데이터로 유지하되 이미지 파일 URI를 만들어 내지 않는다.\n"
         "씬 수 오류라면 확정 내레이션 문장은 바꾸지 않고 행동·리액션·손과 소품 디테일·공간 확립·연결 구도를 추가하거나 합쳐 production.timeline.scenes를 12~20개로 맞춘다. 각 씬은 최소 1.5초이며 인접 구도를 반복하지 않는다.\n"
         "자막 연결 오류라면 확정된 13자 이하 narration beat 각각이 최소 한 씬에서 새로 시작하도록 narration_cue_ids를 순서대로 배치한다. caption.text는 해당 narration.text와 동일하게 유지하고 줄바꿈이나 두 자막 합치기를 금지한다.\n"
@@ -1365,6 +1243,7 @@ def run_generation_harness(
             "event": event,
             "error_type": type(error).__name__,
             "message": str(error)[:800],
+            "issue": issue_details(error),
             "response_length": len(encoded),
             "response_sha256": hashlib.sha256(encoded).hexdigest(),
             "response_excerpt": str(response_text or "")[:4000],

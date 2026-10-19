@@ -48,6 +48,8 @@ from worker_core import JobConflict, JobNotFound, JobStore
 kling_submission_lock = threading.Lock()
 from keyword_pool import load_month_pool, normalize_keyword_label
 from tools.unified_content_prompt_harness import normalize_reference_asset_metadata, run_generation_harness, validate_document
+from tools.location_activity_validation import location_policy_context
+from tools.storyboard_issue import issue_details
 from tools.validate_json_schema import JsonSchemaError, validate_json_schema_file
 from storyboard_scene_reviewer import review_storyboard_scenes
 from script_copy_quality import (
@@ -1218,6 +1220,7 @@ def script_plan_request_contract(selected_labels, local_date=None, client_name="
 - 마지막 1~3개 beat는 앞 장면의 의미를 받아 하나의 자연스러운 마무리가 되게 한다. 마지막 beat는 조사와 서술어를 갖춘 종결 문장으로 쓴다. 추상적인 '잇습니다'로 끝내지 않는다. '편안한 일상을 / 함께 이어 나갑니다', '따뜻한 오늘을 / 함께 만들어 갑니다', '오늘도 곁에서 / 함께하겠습니다'처럼 자막을 나눌 수 있으며, 이야기 문맥에 맞춰 다양하게 쓴다. 같은 문구를 매번 복제하지 않는다.
 {client_contract.rstrip()}
 - 선택 키워드: {json.dumps(selected_labels, ensure_ascii=False)}
+- 장소 선택 공통 정책: {location_policy_context()}
 - 제작 기준일: {context['local_date']} (Asia/Seoul), 현재 계절: {context['season']}, 이번 달 참고 주제: {context['themes']}.
 - 제목·서사·내레이션·화면 소품을 현재 계절와 맞춘다. '계절'·'달력' 같은 범용 키워드를 임의의 다른 계절로 바꾸지 않는다. 현재와 다른 계절은 선택 키워드에 그 계절이 명시된 경우에만 허용한다."""
 
@@ -2965,7 +2968,7 @@ def _run_script_job(job_id: str) -> None:
         log_script_generation_failure(job["project_id"], exc, job_id=job_id)
         safe = str(exc) if isinstance(exc, (ValueError, RuntimeError)) else "대본 생성을 완료하지 못했습니다."
         queue.transition(job_id, "failed", error={
-            "code": type(exc).__name__, "message": safe[:500]
+            "code": type(exc).__name__, "message": safe[:500], **issue_details(exc)
         })
     finally:
         stop.set()

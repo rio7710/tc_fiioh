@@ -1,5 +1,6 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
+  "neutral_activity_policy": "휴식·대화·미소·잠시 앉아 있기 등 중립 행동은 모든 장소에서 허용한다. 전용 행동이 없다는 이유로 실패시키지 않는다. 식사는 식당과 로비에서 허용하며 치료실의 실제 식사만 충돌이다. 금지문·이전/다음 장면 설명·직업명·소품만으로 현재 행동을 확정하지 않는다.",
   "classification": {
     "explicit_role_fields": ["location_activity_role", "activity_role"],
     "identity_fields": ["id", "uri", "source_filename", "display_name", "aliases"],
@@ -28,10 +29,12 @@
   "activity_classes": {
     "therapy": {
       "label": "물리치료",
+      "action_terms": ["관절 운동", "보행 훈련", "균형 훈련", "운동치료를", "재활치료를", "물리치료를", "물리치료 받", "물리치료 중", "receives physical therapy", "joint exercise", "gait training"],
       "terms": ["물리치료", "재활치료", "운동치료", "보행 훈련", "관절 운동", "균형 훈련", "물리치료사", "physical therapy", "physiotherapy"]
     },
     "meal": {
       "label": "식사",
+      "action_terms": ["식사한다", "식사를", "식사 중", "식사하는", "식사하며", "식사하고", "밥을 먹", "음식을 먹", "eating", "having a meal"],
       "terms": ["식사", "식사한다", "밥을 먹", "음식을 먹", "식판", "반찬", "수저", "숟가락", "젓가락", "meal", "eating"]
     },
     "event": {

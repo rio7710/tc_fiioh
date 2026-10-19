@@ -532,8 +532,8 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         self.assertIn("한 레퍼런스 안에 서로 다른 테이블 형태가 함께 있으면", prompt)
         self.assertIn("sequence.camera_axis_transition", prompt)
         self.assertIn("LOCATION ACTIVITY POLICY", prompt)
-        self.assertIn("물리치료실 장면에는 실제 물리치료·재활치료 행동만", prompt)
-        self.assertIn("기타 행사와 프로그램은 로비에서만", prompt)
+        self.assertIn("중립 장면은 모든 장소에서 허용", prompt)
+        self.assertIn('"required_location_role":"lobby"', prompt)
         self.assertIn("소프트 연출 권고이며 필수가 아니다", prompt)
         self.assertIn("복도 누락만으로 검증 실패·재작성·씬 추가를 하지 않는다", prompt)
 
@@ -565,8 +565,7 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         location.update(kind="location", uri="시설/식당.png", usage="식사 공간")
         scene = value["production"]["timeline"]["scenes"][0]
         scene["image_prompt"]["text"] = "식당 테이블 앞에서 대화만 나눈다."
-        with self.assertRaisesRegex(UnifiedContentError, "식사 행동만"):
-            validate_location_activity_policy(value)
+        validate_location_activity_policy(value)
         scene["image_prompt"]["text"] = "식당에서 반찬과 밥을 천천히 식사한다."
         validate_location_activity_policy(value)
         location.update(uri="시설/로비.png", usage="공용 로비")
@@ -618,8 +617,7 @@ class UnifiedContentPromptHarnessTests(unittest.TestCase):
         scene = value["production"]["timeline"]["scenes"][0]
         scene["reference_ids"] = ["ref-character-elder", opaque_id]
         scene["image_prompt"]["text"] = "의자에 앉아 창밖을 바라본다."
-        with self.assertRaisesRegex(UnifiedContentError, "물리치료실 장면"):
-            validate_location_activity_policy(value)
+        validate_location_activity_policy(value)
 
     def test_prior_output_is_supplied_as_avoidance_context(self):
         prior = document(["재활", "존중"])

@@ -12,6 +12,7 @@ import json
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
+from tools.location_activity_validation import location_policy_context
 
 
 IMMUTABLE_SCENE_FIELDS = (
@@ -42,6 +43,7 @@ def build_scene_review_prompt(
     context = {
         "scene_index": index + 1,
         "scene_total": len(scenes),
+        "location_activity_policy": json.loads(location_policy_context()),
         "previous_scene": scenes[index - 1] if index else None,
         "scene": scene,
         "next_scene": scenes[index + 1] if index + 1 < len(scenes) else None,

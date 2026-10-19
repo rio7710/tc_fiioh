@@ -2,11 +2,21 @@
 import copy
 import json
 import re
+from tools.location_activity_validation import location_policy_context
+from tools.storyboard_issue import issue_details
 
 FIELDS = {'image_prompt', 'camera', 'lighting', 'motion_prompt', 'transition'}
 
 
 def target_scene(document, error):
+    issue = issue_details(error)
+    if issue:
+        if issue['code'] != 'LOCATION_ACTIVITY_CONFLICT' or not issue['field_paths']:
+            return None
+        if any(path.split('.')[0] not in FIELDS for path in issue['field_paths']):
+            return None
+        scenes = document['production']['timeline']['scenes']
+        return next((scene for scene in scenes if scene.get('id') == issue['scene_id']), None)
     text = str(error)
     # Structural/reference errors need the existing document repair path.
     if not any(term in text for term in ('image_prompt', '테이블', ' 행동만 배치해야', 'motion_prompt')):
@@ -29,7 +39,7 @@ def repair_prompt(document, scene, error, asset_index):
         '검증에 실패한 현재 씬의 해당 부분만 보완한다. 전체 콘티를 재작성하지 않는다. '
         '등록된 장소·인물·소품과 내부 계약을 유지한다. 확정 내레이션과 자막, 시간, ID, '
         'reference_ids, sequence는 변경하지 않는다. 복도 생략은 오류가 아니다. '
-        '물리치료실은 치료, 식당은 식사, 기타 행사는 로비라는 장소 용도에 맞춘다. '
+        f'장소 공통 정책: {location_policy_context()} '
         'JSON {"scene_id":"...","patch":{"image_prompt":{"text":"..."}}}만 반환한다. '
         'patch 허용 필드는 image_prompt/camera/lighting/motion_prompt/transition의 text뿐이다.\n'
         + json.dumps(context, ensure_ascii=False))
